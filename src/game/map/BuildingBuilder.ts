@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { OsmWay } from './OverpassClient';
 import type { GeoOrigin } from './geo';
+import { makeBuildingFacade } from '../visuals/Textures';
 
 const BUILDING_COLORS = [0x8a9099, 0x9aa3ad, 0x7d858f, 0xa8b0b8, 0x6e7680, 0xb0a89c];
 
@@ -65,20 +66,30 @@ function cleanFootprint(raw: Array<{ x: number; z: number }>): Array<{ x: number
 
 export class BuildingBuilder {
   private materials: THREE.MeshStandardMaterial[];
+  private facades: Array<{ map: THREE.CanvasTexture; emissiveMap: THREE.CanvasTexture }>;
 
   constructor() {
+    this.facades = BUILDING_COLORS.map((_, i) => makeBuildingFacade(i + 1));
     this.materials = BUILDING_COLORS.map(
-      (c) =>
+      (c, i) =>
         new THREE.MeshStandardMaterial({
           color: c,
-          roughness: 0.88,
-          metalness: 0.08,
-          // Slight offset vs roads/terrain to reduce sparkles at shared edges
+          map: this.facades[i].map,
+          emissive: 0xffe6a8,
+          emissiveMap: this.facades[i].emissiveMap,
+          emissiveIntensity: 0,
+          roughness: 0.82,
+          metalness: 0.1,
           polygonOffset: true,
           polygonOffsetFactor: 1,
           polygonOffsetUnits: 1,
         }),
     );
+  }
+
+  setNightGlow(night: number): void {
+    const e = Math.max(0, Math.min(1, night)) * 0.85;
+    for (const m of this.materials) m.emissiveIntensity = e;
   }
 
   build(
@@ -140,6 +151,15 @@ export class BuildingBuilder {
       // Extrude goes along +Z in shape space; rotate to Y-up
       geo.rotateX(-Math.PI / 2);
       geo.computeVertexNormals();
+      const uv = geo.getAttribute('uv');
+      if (uv) {
+        const uScale = Math.max(1.2, Math.sqrt(area) * 0.08);
+        const vScale = Math.max(1.2, height * 0.12);
+        for (let u = 0; u < uv.count; u++) {
+          uv.setXY(u, uv.getX(u) * uScale, uv.getY(u) * vScale);
+        }
+        uv.needsUpdate = true;
+      }
 
       const mat = this.materials[i % this.materials.length];
       i++;
@@ -170,5 +190,9 @@ export class BuildingBuilder {
 
   dispose(): void {
     for (const m of this.materials) m.dispose();
+    for (const f of this.facades) {
+      f.map.dispose();
+      f.emissiveMap.dispose();
+    }
   }
 }

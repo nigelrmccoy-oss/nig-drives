@@ -10,12 +10,13 @@ import {
   type SurfaceProfile,
 } from './RoadSurface';
 import type { WeatherPreset } from '../weather/Environment';
+import { makeEdgeLineTexture, makeLaneTexture, makeRoadMaps, type SurfaceMaps } from '../visuals/Textures';
 
 /** Lift asphalt slightly above DEM / terrain to avoid Z-fighting and sinking. */
-export const ROAD_Y_BIAS = 0.14;
+export const ROAD_Y_BIAS = 0.2;
 
 /** Max miter length as a multiple of half-width (clamps exploding sharp corners). */
-const MAX_MITER_FACTOR = 2.0;
+const MAX_MITER_FACTOR = 1.22;
 
 /** Skip ways with more than this many cleaned vertices (perf / freeze guard). */
 const MAX_WAY_VERTS = 400;
@@ -60,6 +61,36 @@ function roadWidth(highway: string | undefined): number {
 
 function finiteY(y: number): number {
   return Number.isFinite(y) ? y : 0;
+}
+
+/** Break long OSM/fallback segments so ribbons follow DEM instead of becoming giant sloped slabs. */
+function densifyNodes(
+  nodes: Array<{ lat: number; lon: number }>,
+  origin: GeoOrigin,
+  maxStep = 22,
+): Array<{ lat: number; lon: number }> {
+  if (nodes.length < 2) return nodes;
+  const out: Array<{ lat: number; lon: number }> = [nodes[0]];
+  for (let i = 1; i < nodes.length; i++) {
+    const a = nodes[i - 1];
+    const b = nodes[i];
+    const pa = origin.toLocal(a.lat, a.lon);
+    const pb = origin.toLocal(b.lat, b.lon);
+    const dist = Math.hypot(pb.x - pa.x, pb.z - pa.z);
+    if (!Number.isFinite(dist) || dist < 0.5) {
+      out.push(b);
+      continue;
+    }
+    // Skip pathological mega-spans (bad data / exploded coords)
+    if (dist > 1800) continue;
+    const steps = Math.min(40, Math.floor(dist / maxStep));
+    for (let s = 1; s <= steps; s++) {
+      const u = s / (steps + 1);
+      out.push({ lat: a.lat + (b.lat - a.lat) * u, lon: a.lon + (b.lon - a.lon) * u });
+    }
+    out.push(b);
+  }
+  return out;
 }
 
 function horizDir(from: THREE.Vector3, to: THREE.Vector3, fallback: THREE.Vector3): THREE.Vector3 {
@@ -129,8 +160,8 @@ function buildRibbonGeometry(
     if (miterLen < -maxLen) miterLen = -maxLen;
 
     const turnDot = THREE.MathUtils.clamp(dirIn.dot(dirOut), -1, 1);
-    if (turnDot < 0.15) {
-      const bevel = half * (turnDot < -0.5 ? 1.1 : 1.35);
+    if (turnDot < 0.35) {
+      const bevel = half * (turnDot < 0 ? 1.02 : 1.12);
       miterLen = Math.sign(miterLen || 1) * Math.min(Math.abs(miterLen), bevel);
     }
 
@@ -146,7 +177,7 @@ function buildRibbonGeometry(
   let dist = 0;
   for (let i = 0; i < points.length; i++) {
     if (i > 0) dist += points[i].distanceTo(points[i - 1]);
-    const u = dist * 0.08;
+    const u = dist * 0.12;
     positions.push(left[i].x, left[i].y, left[i].z);
     uvs.push(0, u);
     positions.push(right[i].x, right[i].y, right[i].z);
@@ -169,26 +200,7 @@ function buildRibbonGeometry(
   return geo;
 }
 
-function laneMarkTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 256;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#2a2a2e';
-  ctx.fillRect(0, 0, 64, 256);
-  ctx.fillStyle = '#d8d8d0';
-  ctx.fillRect(30, 0, 4, 40);
-  ctx.fillRect(30, 80, 4, 40);
-  ctx.fillRect(30, 160, 4, 40);
-  ctx.fillRect(30, 240, 4, 16);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.anisotropy = 4;
-  return tex;
-}
+
 
 function yieldFrame(): Promise<void> {
   return new Promise((r) => setTimeout(r, 0));
@@ -197,21 +209,44 @@ function yieldFrame(): Promise<void> {
 export class RoadBuilder {
   private matsByKind = new Map<SurfaceKind, THREE.MeshStandardMaterial>();
   private profilesByKind = new Map<SurfaceKind, SurfaceProfile>();
+  private mapsByKind = new Map<SurfaceKind, SurfaceMaps>();
   private laneMat: THREE.MeshStandardMaterial;
+  private edgeMat: THREE.MeshStandardMaterial;
+  private curbMat: THREE.MeshStandardMaterial;
   private sharedLaneTex: THREE.CanvasTexture;
+  private sharedEdgeTex: THREE.CanvasTexture;
   private weather: WeatherPreset = 'clear';
   private disposed = false;
 
   constructor() {
-    this.sharedLaneTex = laneMarkTexture();
+    this.sharedLaneTex = makeLaneTexture();
+    this.sharedEdgeTex = makeEdgeLineTexture();
     this.laneMat = new THREE.MeshStandardMaterial({
       map: this.sharedLaneTex,
-      roughness: 0.85,
-      metalness: 0.02,
+      transparent: true,
+      roughness: 0.55,
+      metalness: 0.04,
       polygonOffset: true,
-      polygonOffsetFactor: -4,
-      polygonOffsetUnits: -4,
-      depthWrite: true,
+      polygonOffsetFactor: -5,
+      polygonOffsetUnits: -5,
+      depthWrite: false,
+    });
+    this.edgeMat = new THREE.MeshStandardMaterial({
+      map: this.sharedEdgeTex,
+      color: 0xf0ece0,
+      roughness: 0.5,
+      metalness: 0.04,
+      polygonOffset: true,
+      polygonOffsetFactor: -5,
+      polygonOffsetUnits: -5,
+    });
+    this.curbMat = new THREE.MeshStandardMaterial({
+      color: 0x5a5854,
+      roughness: 0.88,
+      metalness: 0.04,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     });
     // Pre-create common materials
     for (const kind of [
@@ -239,8 +274,14 @@ export class RoadBuilder {
         ? defaultAsphaltProfile()
         : { ...profile, kind, label: profile.label };
     this.profilesByKind.set(kind, p);
+    const maps = makeRoadMaps(kind);
+    this.mapsByKind.set(kind, maps);
     mat = new THREE.MeshStandardMaterial({
       color: weatherTintColor(p.color, this.weather),
+      map: maps.map,
+      roughnessMap: maps.roughnessMap,
+      normalMap: maps.normalMap,
+      normalScale: new THREE.Vector2(0.45, 0.45),
       roughness: weatherRoughness(p.roughness, this.weather),
       metalness: this.weather === 'rain' ? Math.min(0.35, p.metalness + 0.2) : p.metalness,
       polygonOffset: true,
@@ -284,6 +325,8 @@ export class RoadBuilder {
 
     const geosByKind = new Map<SurfaceKind, THREE.BufferGeometry[]>();
     const laneGeos: THREE.BufferGeometry[] = [];
+    const edgeGeos: THREE.BufferGeometry[] = [];
+    const curbGeos: THREE.BufferGeometry[] = [];
     const centerlines: RoadCenterline[] = [];
 
     let processed = 0;
@@ -300,7 +343,7 @@ export class RoadBuilder {
       const width = roadWidth(highway);
       const pts: THREE.Vector3[] = [];
       const clPoints: RoadCenterPoint[] = [];
-      for (const n of way.geometry) {
+      for (const n of densifyNodes(way.geometry, origin)) {
         const p = origin.toLocal(n.lat, n.lon);
         let y = heightAt ? heightAt(n.lat, n.lon) : 0;
         y = finiteY(y);
@@ -314,13 +357,12 @@ export class RoadBuilder {
 
       const cleaned: THREE.Vector3[] = [];
       for (const p of pts) {
-        if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.25) {
+        if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.36) {
           cleaned.push(p);
         }
       }
       if (cleaned.length < 2) continue;
       if (cleaned.length > MAX_WAY_VERTS) {
-        // Decimate evenly to cap mesh cost
         const step = Math.ceil(cleaned.length / MAX_WAY_VERTS);
         const dec: THREE.Vector3[] = [];
         for (let i = 0; i < cleaned.length; i += step) dec.push(cleaned[i]);
@@ -329,6 +371,12 @@ export class RoadBuilder {
         }
         cleaned.length = 0;
         cleaned.push(...dec);
+      }
+
+      const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
+      if (paved && width >= 5) {
+        const curb = buildRibbonGeometry(cleaned, width + 0.55, ROAD_Y_BIAS - 0.02);
+        if (curb) curbGeos.push(curb);
       }
 
       const asphalt = buildRibbonGeometry(cleaned, width);
@@ -346,8 +394,8 @@ export class RoadBuilder {
         highway === 'trunk' ||
         highway === 'primary' ||
         highway === 'secondary';
-      if (major && width >= 8 && profile.kind === 'asphalt') {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.35, width * 0.04), ROAD_Y_BIAS + 0.03);
+      if (major && width >= 7 && paved) {
+        const lane = buildRibbonGeometry(cleaned, Math.min(0.22, width * 0.03), ROAD_Y_BIAS + 0.025);
         if (lane) laneGeos.push(lane);
       }
 
@@ -369,6 +417,17 @@ export class RoadBuilder {
       for (const g of geos) g.dispose();
     }
 
+    if (curbGeos.length) {
+      const merged = mergeGeometries(curbGeos);
+      if (merged) {
+        const mesh = new THREE.Mesh(merged, this.curbMat);
+        mesh.receiveShadow = true;
+        mesh.name = 'curbs';
+        group.add(mesh);
+      }
+      for (const g of curbGeos) g.dispose();
+    }
+
     if (laneGeos.length) {
       const merged = mergeGeometries(laneGeos);
       if (merged) {
@@ -377,6 +436,16 @@ export class RoadBuilder {
         group.add(mesh);
       }
       for (const g of laneGeos) g.dispose();
+    }
+
+    if (edgeGeos.length) {
+      const merged = mergeGeometries(edgeGeos);
+      if (merged) {
+        const mesh = new THREE.Mesh(merged, this.edgeMat);
+        mesh.name = 'edges';
+        group.add(mesh);
+      }
+      for (const g of edgeGeos) g.dispose();
     }
 
     return { group, centerlines };
@@ -393,6 +462,7 @@ export class RoadBuilder {
     group.name = 'roads';
     const geosByKind = new Map<SurfaceKind, THREE.BufferGeometry[]>();
     const laneGeos: THREE.BufferGeometry[] = [];
+    const curbGeos: THREE.BufferGeometry[] = [];
     const centerlines: RoadCenterline[] = [];
 
     for (const way of ways) {
@@ -421,7 +491,7 @@ export class RoadBuilder {
       const width = roadWidth(highway);
       const pts: THREE.Vector3[] = [];
       const clPoints: RoadCenterPoint[] = [];
-      for (const n of way.geometry) {
+      for (const n of densifyNodes(way.geometry, origin)) {
         const p = origin.toLocal(n.lat, n.lon);
         const y = finiteY(heightAt ? heightAt(n.lat, n.lon) : 0);
         if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
@@ -434,11 +504,17 @@ export class RoadBuilder {
 
       const cleaned: THREE.Vector3[] = [];
       for (const p of pts) {
-        if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.25) {
+        if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.36) {
           cleaned.push(p);
         }
       }
       if (cleaned.length < 2) continue;
+
+      const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
+      if (paved && width >= 5) {
+        const curb = buildRibbonGeometry(cleaned, width + 0.55, ROAD_Y_BIAS - 0.02);
+        if (curb) curbGeos.push(curb);
+      }
 
       const asphalt = buildRibbonGeometry(cleaned, width);
       if (asphalt) {
@@ -455,8 +531,8 @@ export class RoadBuilder {
         highway === 'trunk' ||
         highway === 'primary' ||
         highway === 'secondary';
-      if (major && width >= 8) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.35, width * 0.04), ROAD_Y_BIAS + 0.03);
+      if (major && width >= 7 && paved) {
+        const lane = buildRibbonGeometry(cleaned, Math.min(0.22, width * 0.03), ROAD_Y_BIAS + 0.025);
         if (lane) laneGeos.push(lane);
       }
     }
@@ -470,6 +546,16 @@ export class RoadBuilder {
         group.add(mesh);
       }
       for (const g of geos) g.dispose();
+    }
+    if (curbGeos.length) {
+      const merged = mergeGeometries(curbGeos);
+      if (merged) {
+        const mesh = new THREE.Mesh(merged, this.curbMat);
+        mesh.receiveShadow = true;
+        mesh.name = 'curbs';
+        group.add(mesh);
+      }
+      for (const g of curbGeos) g.dispose();
     }
     if (laneGeos.length) {
       const merged = mergeGeometries(laneGeos);
@@ -488,8 +574,17 @@ export class RoadBuilder {
     this.disposed = true;
     for (const mat of this.matsByKind.values()) mat.dispose();
     this.matsByKind.clear();
+    for (const maps of this.mapsByKind.values()) {
+      maps.map.dispose();
+      maps.roughnessMap.dispose();
+      maps.normalMap.dispose();
+    }
+    this.mapsByKind.clear();
     this.laneMat.dispose();
+    this.edgeMat.dispose();
+    this.curbMat.dispose();
     this.sharedLaneTex.dispose();
+    this.sharedEdgeTex.dispose();
   }
 }
 

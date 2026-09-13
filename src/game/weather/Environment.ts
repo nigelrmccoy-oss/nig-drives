@@ -15,6 +15,27 @@ const DAY_LENGTH_SEC = 180;
 
 const PARTICLE_COUNT = 900;
 
+const SKY_VERT = /* glsl */ `
+varying vec3 vDir;
+void main() {
+  vDir = normalize(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const SKY_FRAG = /* glsl */ `
+uniform vec3 topColor;
+uniform vec3 horizonColor;
+uniform vec3 bottomColor;
+varying vec3 vDir;
+void main() {
+  float h = vDir.y;
+  vec3 col = mix(horizonColor, topColor, smoothstep(0.02, 0.62, h));
+  col = mix(bottomColor, col, smoothstep(-0.22, 0.06, h));
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
 export class Environment {
   weather: WeatherPreset = 'clear';
   /** 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset */
@@ -25,34 +46,61 @@ export class Environment {
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
   private ambient: THREE.AmbientLight;
+  private fill: THREE.DirectionalLight;
   private rain: THREE.Points;
   private snow: THREE.Points;
   private rainVel: Float32Array;
   private snowVel: Float32Array;
   private tmpColor = new THREE.Color();
+  private sky: THREE.Mesh;
+  private skyMat: THREE.ShaderMaterial;
   private onWeatherChange?: (w: WeatherPreset) => void;
+  private _night = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    this.hemi = new THREE.HemisphereLight(0xb1d0ff, 0x3d5a3d, 0.85);
+    this.hemi = new THREE.HemisphereLight(0xb8d4ff, 0x3a4a32, 0.9);
     scene.add(this.hemi);
 
-    this.ambient = new THREE.AmbientLight(0x405060, 0.15);
+    this.ambient = new THREE.AmbientLight(0x4a5a6a, 0.18);
     scene.add(this.ambient);
 
-    this.sun = new THREE.DirectionalLight(0xfff2d6, 1.15);
+    this.sun = new THREE.DirectionalLight(0xfff3d8, 1.25);
     this.sun.position.set(60, 120, 40);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1024, 1024);
-    this.sun.shadow.camera.near = 10;
-    this.sun.shadow.camera.far = 400;
-    this.sun.shadow.camera.left = -80;
-    this.sun.shadow.camera.right = 80;
-    this.sun.shadow.camera.top = 80;
-    this.sun.shadow.camera.bottom = -80;
+    this.sun.shadow.mapSize.set(1536, 1536);
+    this.sun.shadow.camera.near = 8;
+    this.sun.shadow.camera.far = 380;
+    this.sun.shadow.camera.left = -70;
+    this.sun.shadow.camera.right = 70;
+    this.sun.shadow.camera.top = 70;
+    this.sun.shadow.camera.bottom = -70;
+    this.sun.shadow.bias = -0.00035;
+    this.sun.shadow.normalBias = 0.035;
     scene.add(this.sun);
     scene.add(this.sun.target);
+
+    this.fill = new THREE.DirectionalLight(0xa8c4e8, 0.18);
+    this.fill.position.set(-40, 30, -20);
+    scene.add(this.fill);
+
+    this.skyMat = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: new THREE.Color(0x4a90d9) },
+        horizonColor: { value: new THREE.Color(0xd4e4f2) },
+        bottomColor: { value: new THREE.Color(0x6a7a58) },
+      },
+      vertexShader: SKY_VERT,
+      fragmentShader: SKY_FRAG,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+    });
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 18), this.skyMat);
+    this.sky.name = 'sky-dome';
+    this.sky.frustumCulled = false;
+    scene.add(this.sky);
 
     const rainGeo = new THREE.BufferGeometry();
     const rainPos = new Float32Array(PARTICLE_COUNT * 3);
@@ -141,10 +189,6 @@ export class Environment {
     this.timePaused = !this.timePaused;
   }
 
-  /**
-   * Friction / drivability multipliers for the tire model.
-   * clear: high grip; rain: reduced; snow: much reduced + weaker accel/brake.
-   */
   getGripMultiplier(): number {
     switch (this.weather) {
       case 'clear':
@@ -175,13 +219,21 @@ export class Environment {
     return 'Night';
   }
 
+  /** 0 at noon, 1 at night — for headlights / bloom / window glow. */
+  getNightFactor(): number {
+    return this._night;
+  }
+
+  getEnvIntensity(): number {
+    return 0.18 + (1 - this._night) * 0.42;
+  }
+
   update(dt: number, followX: number, followZ: number, followY = 0): void {
     if (!this.timePaused) {
       this.timeOfDay = (this.timeOfDay + dt / DAY_LENGTH_SEC) % 1;
     }
     this.applyVisuals();
 
-    // Sun orbits with time; stay roughly above the player
     const angle = this.timeOfDay * Math.PI * 2 - Math.PI / 2;
     const sunHeight = Math.sin(angle);
     const sunDist = 140;
@@ -192,61 +244,75 @@ export class Environment {
     );
     this.sun.target.position.set(followX, followY, followZ);
     this.sun.target.updateMatrixWorld();
+    this.fill.position.set(followX - 50, followY + 28, followZ - 30);
+
+    this.sky.position.set(followX, followY, followZ);
 
     this.updateParticles(dt, followX, followZ, followY);
   }
 
   private applyVisuals(): void {
     const dayFactor = this.dayFactor();
-    const night = 1 - dayFactor;
+    this._night = THREE.MathUtils.clamp(1 - dayFactor * 1.2, 0, 1);
+    const night = this._night;
 
-    // Sky / fog by time + weather
-    let sky = this.tmpColor.setRGB(
-      0.15 + 0.4 * dayFactor,
-      0.18 + 0.55 * dayFactor,
-      0.28 + 0.65 * dayFactor,
+    const top = this.tmpColor.setRGB(
+      0.06 + 0.22 * dayFactor,
+      0.1 + 0.42 * dayFactor,
+      0.18 + 0.62 * dayFactor,
     );
-    if (this.weather === 'rain') {
-      sky.multiplyScalar(0.72);
-      sky.offsetHSL(0, -0.05, -0.05);
-    } else if (this.weather === 'snow') {
-      sky.offsetHSL(0, -0.15, 0.08);
-      sky.lerp(new THREE.Color(0xb8c4d4), 0.35);
+    if (this.weather === 'rain') top.multiplyScalar(0.7);
+    if (this.weather === 'snow') top.lerp(new THREE.Color(0xb8c6d6), 0.35);
+    if (night > 0.45) top.lerp(new THREE.Color(0x050814), (night - 0.45) * 1.6);
+
+    const horizon = new THREE.Color().copy(top);
+    if (dayFactor > 0.15 && dayFactor < 0.45) {
+      // dawn / dusk warmth
+      horizon.lerp(new THREE.Color(0xff8a4a), 0.35 * (1 - Math.abs(dayFactor - 0.3) * 4));
+    } else {
+      horizon.lerp(new THREE.Color(0xdce8f4), 0.45 * dayFactor);
     }
-    if (night > 0.5) {
-      sky.lerp(new THREE.Color(0x050814), (night - 0.5) * 2 * 0.85);
-    }
-    this.scene.background = sky.clone();
+    if (this.weather === 'rain') horizon.multiplyScalar(0.75);
+    if (this.weather === 'snow') horizon.lerp(new THREE.Color(0xd0dae6), 0.4);
+    if (night > 0.5) horizon.lerp(new THREE.Color(0x101828), night);
+
+    const bottom = new THREE.Color(this.weather === 'snow' ? 0xb8c4b8 : 0x4a5a3a);
+    bottom.multiplyScalar(0.35 + 0.65 * dayFactor);
+
+    (this.skyMat.uniforms.topColor.value as THREE.Color).copy(top);
+    (this.skyMat.uniforms.horizonColor.value as THREE.Color).copy(horizon);
+    (this.skyMat.uniforms.bottomColor.value as THREE.Color).copy(bottom);
+
+    this.scene.background = top.clone();
     if (!this.scene.fog) {
-      this.scene.fog = new THREE.Fog(sky.getHex(), 160, 850);
+      this.scene.fog = new THREE.Fog(horizon.getHex(), 160, 900);
     } else if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.color.copy(sky);
-      this.scene.fog.near = this.weather === 'snow' ? 90 : this.weather === 'rain' ? 120 : 160;
-      this.scene.fog.far = this.weather === 'snow' ? 520 : this.weather === 'rain' ? 650 : 900;
+      this.scene.fog.color.copy(horizon);
+      this.scene.fog.near = this.weather === 'snow' ? 80 : this.weather === 'rain' ? 110 : 180;
+      this.scene.fog.far = this.weather === 'snow' ? 500 : this.weather === 'rain' ? 620 : 980;
     }
 
-    this.hemi.intensity = 0.25 + 0.7 * dayFactor;
-    this.hemi.color.set(dayFactor > 0.3 ? 0xb1d0ff : 0x1a2040);
-    this.hemi.groundColor.set(dayFactor > 0.3 ? 0x3d5a3d : 0x0a120a);
+    this.hemi.intensity = 0.22 + 0.72 * dayFactor;
+    this.hemi.color.set(dayFactor > 0.28 ? 0xb8d4ff : 0x1a2448);
+    this.hemi.groundColor.set(dayFactor > 0.28 ? 0x3a4a32 : 0x0a100c);
 
-    this.sun.intensity = Math.max(0.05, dayFactor * (this.weather === 'clear' ? 1.2 : 0.7));
-    this.sun.color.set(dayFactor > 0.4 ? 0xfff2d6 : 0x8899cc);
-    this.ambient.intensity = 0.08 + night * 0.25 + (this.weather !== 'clear' ? 0.05 : 0);
+    this.sun.intensity = Math.max(0.04, dayFactor * (this.weather === 'clear' ? 1.35 : 0.72));
+    this.sun.color.set(dayFactor > 0.38 ? 0xfff3d8 : dayFactor > 0.18 ? 0xffb070 : 0x8899cc);
+    this.sun.castShadow = dayFactor > 0.12;
+    this.ambient.intensity = 0.08 + night * 0.22 + (this.weather !== 'clear' ? 0.04 : 0);
+    this.fill.intensity = 0.08 + 0.16 * dayFactor;
 
     this.rain.visible = this.weather === 'rain';
     this.snow.visible = this.weather === 'snow';
   }
 
-  /** 0 at night, 1 at noon-ish. */
   private dayFactor(): number {
-    // Smooth bump around midday
     const t = this.timeOfDay;
     const elev = Math.sin((t - 0.25) * Math.PI * 2);
     return THREE.MathUtils.clamp(elev * 0.5 + 0.5, 0, 1);
   }
 
   private updateParticles(dt: number, x: number, z: number, groundY: number): void {
-    // Particles live in local space with y=0 at groundY so they don't fall underground on hills
     if (this.rain.visible) {
       const pos = this.rain.geometry.getAttribute('position') as THREE.BufferAttribute;
       this.rain.position.set(x, groundY, z);
@@ -258,7 +324,6 @@ export class Environment {
           pos.setZ(i, (Math.random() - 0.5) * 60);
         }
         pos.setY(i, y);
-        // slight wind drift
         pos.setX(i, pos.getX(i) + dt * 2);
       }
       pos.needsUpdate = true;
@@ -282,9 +347,8 @@ export class Environment {
     }
   }
 
-  /** Keep particles when clearing world (lights + particles are env-owned). */
   getOwnedObjects(): THREE.Object3D[] {
-    return [this.hemi, this.sun, this.sun.target, this.ambient, this.rain, this.snow];
+    return [this.hemi, this.sun, this.sun.target, this.ambient, this.fill, this.sky, this.rain, this.snow];
   }
 
   dispose(): void {
@@ -292,5 +356,7 @@ export class Environment {
     (this.rain.material as THREE.Material).dispose();
     this.snow.geometry.dispose();
     (this.snow.material as THREE.Material).dispose();
+    this.sky.geometry.dispose();
+    this.skyMat.dispose();
   }
 }

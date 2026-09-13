@@ -33,8 +33,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.2c</span></h1>
-        <p class="tagline">Drive a Golf or New Flyer–style transit bus on real OpenStreetMap roads across North America.</p>
+        <h1>Nig Drives <span class="ver">v1.3</span></h1>
+        <p class="tagline">Forza-inspired visuals · VW Golf hatchback or New Flyer–style bus on real OSM roads.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">

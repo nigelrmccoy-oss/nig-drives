@@ -229,10 +229,56 @@ export class Vehicle {
   /** 0–1 normalized load for engine sound. */
   throttleLoad = 0;
   private _prevVz = 0;
+  private wheelPivots: THREE.Group[] = [];
+  private spinMeshes: THREE.Object3D[] = [];
+  private headlightMats: THREE.MeshStandardMaterial[] = [];
+  private headSpots: THREE.SpotLight[] = [];
+  private wheelSpin = 0;
 
   constructor(spec: VehicleSpec, mesh: THREE.Group) {
     this.spec = spec;
     this.mesh = mesh;
+    this.collectVisuals();
+  }
+
+  private collectVisuals(): void {
+    const mats = new Set<THREE.MeshStandardMaterial>();
+    this.mesh.traverse((obj) => {
+      if (obj instanceof THREE.Group && obj.userData.wheelPivot) {
+        this.wheelPivots.push(obj);
+      }
+      if (obj.userData.spinMesh) this.spinMeshes.push(obj);
+      if (obj instanceof THREE.Mesh && obj.userData.headlight) {
+        const mat = obj.material;
+        if (mat instanceof THREE.MeshStandardMaterial) mats.add(mat);
+      }
+      if (obj instanceof THREE.SpotLight && obj.userData.headSpot) {
+        this.headSpots.push(obj);
+      }
+    });
+    this.headlightMats = [...mats];
+  }
+
+  /** Night headlights + rolling wheels. Call after physics update. */
+  updateVisuals(dt: number, night: number): void {
+    const n = THREE.MathUtils.clamp(night, 0, 1);
+    const glow = 0.28 + n * 2.4;
+    for (const mat of this.headlightMats) {
+      mat.emissiveIntensity = glow;
+    }
+    const spotI = n * (this.spec.class === 'bus' ? 7.5 : 5.5);
+    for (const s of this.headSpots) {
+      s.intensity = spotI;
+    }
+
+    const r = (this.wheelPivots[0]?.userData.wheelRadius as number | undefined) ?? 0.32;
+    this.wheelSpin += (this.vz / Math.max(0.2, r)) * dt;
+    for (const m of this.spinMeshes) {
+      m.rotation.x = this.wheelSpin;
+    }
+    for (const p of this.wheelPivots) {
+      p.rotation.y = p.userData.frontSteer ? this.steerAngle : 0;
+    }
   }
 
   setPose(x: number, z: number, headingRad: number): void {

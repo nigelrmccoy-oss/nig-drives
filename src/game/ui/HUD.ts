@@ -20,15 +20,14 @@ export class HUD {
     this.root.innerHTML = `
       <div class="hud-top">
         <div class="hud-panel">
-          <div class="label">Speed</div>
-          <div class="value" id="hud-speed">0 km/h</div>
+          <div class="label">Vehicle</div>
           <div class="sub" id="hud-vehicle">—</div>
           <div class="sub" id="hud-assist"></div>
           <div class="sub" id="hud-surface">Surface: —</div>
         </div>
         <div class="hud-panel">
           <div class="label">Location</div>
-          <div class="value" id="hud-place" style="font-size:1rem">—</div>
+          <div class="value loc" id="hud-place">—</div>
           <div class="sub" id="hud-cam">Camera: chase (C)</div>
         </div>
         <div class="hud-panel hud-interactive">
@@ -37,11 +36,14 @@ export class HUD {
           <button type="button" class="hud-btn" id="hud-time">Time: Day (T)</button>
         </div>
       </div>
+      <div class="speedo">
+        <div class="speedo-value" id="hud-speed">0</div>
+        <div class="speedo-unit">km/h</div>
+      </div>
       <div class="hud-bottom">
         <div class="controls-hint">
-          <strong>Controls</strong><br/>
           W/↑ accel · S/↓ reverse · A/D steer · Space brake · C camera<br/>
-          R cycle weather (clear/rain/snow) · T time of day · P pause clock
+          R weather · T time · P pause clock
         </div>
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
@@ -86,7 +88,7 @@ export class HUD {
 
   setSpeed(kmh: number): void {
     const v = Number.isFinite(kmh) ? Math.round(kmh) : 0;
-    this.speedEl.textContent = `${v} km/h`;
+    this.speedEl.textContent = `${v}`;
   }
 
   setSurface(label: string, grip: number): void {

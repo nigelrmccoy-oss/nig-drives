@@ -12,7 +12,7 @@ body,
   overflow: hidden;
   background: #0b1220;
   color: #e8eefc;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: "Segoe UI Variable", "Segoe UI", "DIN Alternate", system-ui, sans-serif;
 }
 
 canvas.game-canvas {
@@ -28,8 +28,9 @@ canvas.game-canvas {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(ellipse at top, #1a2a4a 0%, #0b1220 55%),
-    linear-gradient(180deg, transparent, #0008);
+    radial-gradient(ellipse at 20% 0%, #2a1a10 0%, transparent 45%),
+    radial-gradient(ellipse at top, #141820 0%, #07080c 60%),
+    linear-gradient(180deg, transparent, #000a);
   z-index: 20;
 }
 
@@ -41,9 +42,10 @@ canvas.game-canvas {
   width: min(820px, 94vw);
   max-height: 92vh;
   overflow-y: auto;
-  background: #121a2ccc;
-  border: 1px solid #3a4f7a;
-  border-radius: 16px;
+  background: #0c0e12ee;
+  border: 1px solid #3a3228;
+  border-top: 2px solid #c9a36a;
+  border-radius: 6px;
   padding: 28px 28px 22px;
   box-shadow: 0 20px 60px #000a;
   backdrop-filter: blur(8px);
@@ -58,7 +60,7 @@ canvas.game-canvas {
 .menu-card h1 .ver {
   font-size: 0.55em;
   font-weight: 600;
-  color: #7eb6ff;
+  color: #c9a36a;
   vertical-align: middle;
   margin-left: 6px;
 }
@@ -151,7 +153,10 @@ canvas.game-canvas {
   font-weight: 700;
   cursor: pointer;
   color: #061018;
-  background: linear-gradient(135deg, #5ad4ff, #7cffb2);
+  background: linear-gradient(135deg, #e0b35a, #c98a2e);
+  color: #140e06;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 #start-btn:hover {
@@ -326,4 +331,86 @@ canvas.game-canvas {
   color: #ffb4a2;
   min-height: 1em;
   font-weight: 600;
+}
+
+
+.speedo {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  min-width: 160px;
+  padding: 6px 22px 10px;
+  background: linear-gradient(180deg, #12141ad9, #0a0c10e6);
+  border: 1px solid #3d3428;
+  border-bottom: 2px solid #c9a36a;
+  border-radius: 4px;
+}
+
+.speedo-value {
+  font-size: 3.1rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #f3efe6;
+  text-shadow: 0 0 18px #c9a36a44;
+}
+
+.speedo-unit {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #c9a36a;
+  margin-top: 2px;
+}
+
+.hud-panel .value.loc {
+  font-size: 1rem;
+}
+
+.hud-panel {
+  background: #0a0c10cc;
+  border: 1px solid #2e2a24;
+  border-radius: 4px;
+}
+
+.hud-panel .label {
+  color: #c9a36a;
+}
+
+.controls-hint,
+.status-toast,
+.osm-badge {
+  background: #0a0c10cc;
+  border-color: #2e2a24;
+  border-radius: 4px;
+}
+
+.hud-btn {
+  background: #161410;
+  border-color: #3d3428;
+}
+
+.hud-btn:hover {
+  border-color: #c9a36a;
+  background: #221c14;
+}
+
+.choice {
+  border-color: #3a3228;
+  background: #14161c;
+}
+
+.choice.selected {
+  border-color: #c9a36a;
+  background: #1c1812;
+  box-shadow: inset 0 0 0 1px #c9a36a88;
+}
+
+.choice:hover {
+  border-color: #c9a36a;
+  background: #1a1612;
 }

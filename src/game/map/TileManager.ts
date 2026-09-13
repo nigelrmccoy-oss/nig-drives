@@ -16,6 +16,7 @@ import {
 } from './geo';
 import type { OsmWay } from './OverpassClient';
 import type { WeatherPreset } from '../weather/Environment';
+import { makeTerrainTexture } from '../visuals/Textures';
 
 const LOAD_RADIUS = 2;
 const UNLOAD_RADIUS = 4;
@@ -23,7 +24,7 @@ const ROAD_HEIGHT_RADIUS = 14;
 const TERRAIN_SIZE = 900;
 const TERRAIN_RES = 96;
 const TERRAIN_RECENTER_M = 120;
-const TERRAIN_Y_BIAS = -0.45;
+const TERRAIN_Y_BIAS = -0.62;
 const SPAWN_DEADLINE_MS = 14_000;
 /** Cap queued + loading tiles to avoid memory / Overpass storms. */
 const MAX_PENDING_TILES = 12;
@@ -89,23 +90,27 @@ export class TileManager {
     this.scene = scene;
     this.origin = new GeoOrigin(originLat, originLon);
 
+    const terrainTex = makeTerrainTexture();
     this.groundMat = new THREE.MeshStandardMaterial({
-      color: 0x3d5a3d,
-      roughness: 1,
+      color: 0x4a6238,
+      map: terrainTex,
+      roughness: 0.95,
       metalness: 0,
     });
     this.terrainMat = new THREE.MeshStandardMaterial({
-      color: 0x3d5a3d,
-      roughness: 1,
+      color: 0x5a6e44,
+      map: terrainTex,
+      roughness: 0.95,
       metalness: 0,
+      vertexColors: true,
       polygonOffset: true,
       polygonOffsetFactor: 2,
       polygonOffsetUnits: 2,
     });
-    const groundGeo = new THREE.PlaneGeometry(20000, 20000);
+    const groundGeo = new THREE.PlaneGeometry(3600, 3600);
     this.ground = new THREE.Mesh(groundGeo, this.groundMat);
     this.ground.rotation.x = -Math.PI / 2;
-    this.ground.position.y = -2;
+    this.ground.position.y = -6;
     this.ground.receiveShadow = true;
     this.ground.name = 'ground-fallback';
     scene.add(this.ground);
@@ -476,28 +481,36 @@ export class TileManager {
   private makeGridWaysForTile(tx: number, ty: number): OsmWay[] {
     const b = tileBounds(tx, ty);
     const ways: OsmWay[] = [];
-    let id = 900000 + tx * 1000 + ty * 10;
-    const steps = 4;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const lat = b.south + (b.north - b.south) * t;
-      const lon = b.west + (b.east - b.west) * t;
-      ways.push({
-        id: id++,
-        tags: { highway: i % 2 === 0 ? 'residential' : 'tertiary', surface: 'asphalt' },
-        geometry: [
-          { lat, lon: b.west },
-          { lat, lon: b.east },
-        ],
-      });
-      ways.push({
-        id: id++,
-        tags: { highway: i % 2 === 0 ? 'secondary' : 'residential', surface: 'asphalt' },
-        geometry: [
-          { lat: b.south, lon },
-          { lat: b.north, lon },
-        ],
-      });
+    let id = 900000 + tx * 10000 + ty * 20;
+    // Short city-block segments (~80 m) — never one mega-span across the tile.
+    const blocks = 5;
+    const lats: number[] = [];
+    const lons: number[] = [];
+    for (let i = 0; i <= blocks; i++) {
+      const u = i / blocks;
+      lats.push(b.south + (b.north - b.south) * u);
+      lons.push(b.west + (b.east - b.west) * u);
+    }
+    for (let i = 0; i <= blocks; i++) {
+      const highway = i % 3 === 0 ? 'secondary' : 'residential';
+      for (let j = 0; j < blocks; j++) {
+        ways.push({
+          id: id++,
+          tags: { highway, surface: 'asphalt' },
+          geometry: [
+            { lat: lats[i], lon: lons[j] },
+            { lat: lats[i], lon: lons[j + 1] },
+          ],
+        });
+        ways.push({
+          id: id++,
+          tags: { highway: i % 2 === 0 ? 'residential' : 'tertiary', surface: 'asphalt' },
+          geometry: [
+            { lat: lats[j], lon: lons[i] },
+            { lat: lats[j + 1], lon: lons[i] },
+          ],
+        });
+      }
     }
     return ways;
   }
@@ -558,6 +571,22 @@ export class TileManager {
       }
     }
     geo.computeVertexNormals();
+    const colors = new Float32Array(pos.count * 3);
+    const col = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const lx = pos.getX(i) + centerX;
+      const lz = pos.getZ(i) + centerZ;
+      const y = pos.getY(i);
+      const n =
+        Math.sin(lx * 0.021 + lz * 0.017) * 0.5 +
+        Math.sin(lx * 0.007 - lz * 0.011) * 0.5;
+      const t = 0.45 + n * 0.22 + Math.max(-0.1, Math.min(0.2, y * 0.012));
+      col.setRGB(0.28 + t * 0.18, 0.36 + t * 0.16, 0.18 + t * 0.08);
+      colors[i * 3] = col.r;
+      colors[i * 3 + 1] = col.g;
+      colors[i * 3 + 2] = col.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     if (this.terrainMesh) {
       this.scene.remove(this.terrainMesh);
@@ -587,47 +616,6 @@ export class TileManager {
       for (let dx = -1; dx <= 1; dx++) {
         ways.push(...this.makeGridWaysForTile(tx + dx, ty + dy));
       }
-    }
-    const blocks = 8;
-    const spacing = 80;
-    const half = (blocks * spacing) / 2;
-    let id = 1;
-    for (let i = 0; i <= blocks; i++) {
-      const o = -half + i * spacing;
-      ways.push({
-        id: id++,
-        tags: {
-          highway: i % 3 === 0 ? 'primary' : 'residential',
-          surface: 'asphalt',
-        },
-        geometry: [
-          {
-            lat: this.origin.lat + -half / this.origin.mPerDegLat,
-            lon: this.origin.lon + o / this.origin.mPerDegLon,
-          },
-          {
-            lat: this.origin.lat + half / this.origin.mPerDegLat,
-            lon: this.origin.lon + o / this.origin.mPerDegLon,
-          },
-        ],
-      });
-      ways.push({
-        id: id++,
-        tags: {
-          highway: i % 3 === 0 ? 'secondary' : 'residential',
-          surface: 'asphalt',
-        },
-        geometry: [
-          {
-            lat: this.origin.lat + o / this.origin.mPerDegLat,
-            lon: this.origin.lon + -half / this.origin.mPerDegLon,
-          },
-          {
-            lat: this.origin.lat + o / this.origin.mPerDegLat,
-            lon: this.origin.lon + half / this.origin.mPerDegLon,
-          },
-        ],
-      });
     }
     const heightAt = (lat: number, lon: number) => {
       const y = this.elevation.sampleRelative(lat, lon);
@@ -665,6 +653,10 @@ export class TileManager {
       else loaded++;
     }
     this.onStatus?.({ loading, loaded, message });
+  }
+
+  setNightGlow(night: number): void {
+    this.buildings.setNightGlow(night);
   }
 
   dispose(): void {

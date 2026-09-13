@@ -9,6 +9,8 @@ import { EngineSound } from './vehicles/EngineSound';
 import type { Vehicle } from './vehicles/Vehicle';
 import type { VehicleId } from './vehicles/Vehicle';
 import { Environment, WEATHER_LABELS } from './weather/Environment';
+import { PostFX } from './visuals/PostFX';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 export interface GameStartOptions {
   vehicle: VehicleId;
@@ -32,23 +34,36 @@ export class Game {
   private cityName = '';
   private region = '';
   private raf = 0;
+  private post: PostFX;
+  private pmrem: THREE.PMREMGenerator;
 
   constructor(parent: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.classList.add('game-canvas');
     parent.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87b5e5);
-    this.scene.fog = new THREE.Fog(0x87b5e5, 180, 900);
+    this.scene.fog = new THREE.Fog(0x87b5e5, 180, 980);
 
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.35, 2500);
+    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.35, 2800);
     this.chase = new ChaseCamera(this.camera);
 
+    this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    const room = new RoomEnvironment();
+    this.scene.environment = this.pmrem.fromScene(room, 0.04).texture;
+    this.scene.environmentIntensity = 0.48;
+    room.dispose();
+
     this.env = new Environment(this.scene);
+    this.post = new PostFX(this.renderer, this.scene, this.camera);
 
     this.hud = new HUD(parent);
     this.hud.setEnvHandlers(
@@ -212,6 +227,11 @@ export class Game {
 
     this.tiles.update(this.vehicle.position.x, this.vehicle.position.z);
     this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z, h);
+    const night = this.env.getNightFactor();
+    this.vehicle.updateVisuals(dt, night);
+    this.scene.environmentIntensity = this.env.getEnvIntensity();
+    this.post.setNight(night);
+    this.tiles.setNightGlow(night);
     this.chase.update(dt, this.vehicle);
     this.engineSound.update(this.vehicle);
 
@@ -220,7 +240,7 @@ export class Game {
     this.hud.setSurface(surface.label, surface.grip);
     this.hud.setTime(this.env.getTimeLabel(), this.env.timePaused);
 
-    this.renderer.render(this.scene, this.camera);
+    this.post.render();
     this.raf = requestAnimationFrame(this.frame);
   };
 

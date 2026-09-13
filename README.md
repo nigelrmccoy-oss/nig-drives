@@ -6,6 +6,16 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.0 — Forza-inspired visuals
+
+- **Look:** ACES tone mapping, hemisphere + sun with PCF soft shadows, sky-dome gradient, matching fog, light bloom + SMAA. Night headlights glow; building windows emit after dusk.
+- **Golf:** extruded hatchback silhouette (hood, greenhouse, C-pillar/hatch, arches, rims, swept lights) — not a fridge box. Wheels spin and steer. Engines still differ in stats only.
+- **Bus:** New Flyer–style raked windshield, destination sign, beltline, window bays, dual-rear tires, HVAC / hybrid pack.
+- **Roads:** procedural asphalt/normal/roughness, dashed lanes, curb shoulders. Long OSM/fallback ways are densified so they follow DEM instead of becoming giant sloped slabs. Tighter miters at sharp junctions.
+- **World:** terrain vertex color + grass tint; smaller hidden ground plane; buildings use a window atlas.
+- **UI:** darker automotive HUD (bottom speedo) and start menu.
+- **Kept:** OSM streaming, KW + other cities, Golf engines, diesel/hybrid buses, weather, surface friction, stability guards.
+
 ### v1.2c (1.2.3) — surface-aware roads + stability hardening
 
 - **OSM surface → friction & look:** parse `surface` (asphalt, concrete, paving_stones, gravel, dirt, grass, cobblestone, compacted, …) and `highway` class; light `maxspeed` bias. Maps to material color/roughness **and** tire grip / noise. Wet/snow multiply by surface retention (ice-like on untreated dirt/grass; motorway asphalt loses less). Offline fallback roads use plausible asphalt grip.
@@ -116,6 +126,7 @@ src/game/
   weather/Environment.ts
   map/{geo,OverpassClient,ElevationSampler,RoadBuilder,RoadSurface,BuildingBuilder,TileManager}.ts
   vehicles/{Vehicle,VehicleFactory}.ts
+  visuals/{Textures,PostFX}.ts
   camera/ChaseCamera.ts
   input/Input.ts
   ui/{HUD,StartMenu}.ts
@@ -125,6 +136,7 @@ src/game/
 ## Known limitations
 
 - Arcade/sim-cade physics, not FM/GT fidelity.
+- Visuals are Forza-**inspired** (ACES, hatch silhouette, wet roads), not FM photogrammetry — no real car scans or photo terrain.
 - Building count capped per tile for performance; no full city collision.
 - Overpass public instances can be slow or rate-limit; v1.2 / v1.2c fall back to offline grids quickly so you can still drive.
 - Not all OSM ways have `surface=*`; missing tags infer asphalt (or dirt for tracks).
