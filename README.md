@@ -4,6 +4,18 @@ Playable browser 3D driving game: take a stylized **VW Golf** or **city bus** on
 
 Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API keys.
 
+## Changelog
+
+### v1.1.0 — polygon & stability
+
+- **Roads:** clamped miters at sharp OSM angles (no more exploding junctions); asphalt/lane `polygonOffset`; consistent height bias above DEM so vehicles sit on pavement
+- **Terrain:** bilinear Terrarium sampling across tile edges (fewer DEM seams/cracks); heightfield recenters with the player; terrain depth bias vs roads
+- **Buildings:** CCW winding cleanup, duplicate-vertex strip, centroid elevation, deterministic heights, polygon offset vs ground
+- **Streaming:** tile unload disposes geometries and releases way/building IDs so tiles can reload; fewer orphan meshes / leaks
+- **Driving:** surface height uses road grade only near asphalt (off-road follows DEM); spawn sits on road elevation
+- **Camera / weather:** camera stays above terrain; near plane tweak; rain/snow particles follow ground height; wet/snow road materials refresh correctly
+
+
 ## Quick start
 
 ```bash
@@ -98,7 +110,8 @@ src/game/
 - Arcade/sim-cade physics, not FM/GT fidelity.
 - Building count capped per tile for performance; no full city collision.
 - Overpass public instances can be slow or rate-limit.
-- Terrarium is bare-earth DEM — roads may sit slightly above/below true pavement.
+- Terrarium is bare-earth DEM — roads use a small height bias above it (v1.1), not surveyed pavement.
+- Single moving heightfield patch (not full streaming LOD terrain); distant hills may look flatter until recentered.
 - Local ENU projection is for regional driving, not continental precision.
 
 ## License note

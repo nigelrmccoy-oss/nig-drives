@@ -3,6 +3,8 @@
  * URL: https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png
  * Decode: (R * 256 + G + B / 256) - 32768  → meters
  * No API key. Streaming with map chunks.
+ *
+ * v1.1: bilinear sampling + cross-tile edge reads to reduce heightfield seams.
  */
 
 const TILE_URL =
@@ -16,21 +18,17 @@ interface DemTile {
   loading?: Promise<void>;
 }
 
-function lonLatToTilePixel(
+function lonLatToTileFrac(
   lon: number,
   lat: number,
   z: number,
-): { tx: number; ty: number; px: number; py: number } {
+): { x: number; y: number } {
   const n = 2 ** z;
   const latRad = (lat * Math.PI) / 180;
   const x = ((lon + 180) / 360) * n;
   const y =
     ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
-  const tx = Math.floor(x);
-  const ty = Math.floor(y);
-  const px = Math.min(SIZE - 1, Math.max(0, Math.floor((x - tx) * SIZE)));
-  const py = Math.min(SIZE - 1, Math.max(0, Math.floor((y - ty) * SIZE)));
-  return { tx, ty, px, py };
+  return { x, y };
 }
 
 function decodeTerrarium(r: number, g: number, b: number): number {
@@ -51,32 +49,90 @@ export class ElevationSampler {
     return abs - this.originElev;
   }
 
+  /**
+   * Bilinear sample in meters. Returns null if the covering tile(s) are not loaded.
+   * Reads across DEM tile boundaries so seams don't crack.
+   */
   sampleAbsolute(lat: number, lon: number): number | null {
-    const { tx, ty, px, py } = lonLatToTilePixel(lon, lat, ZOOM);
-    const key = `${ZOOM}/${tx}/${ty}`;
+    const { x, y } = lonLatToTileFrac(lon, lat, ZOOM);
+    const tx0 = Math.floor(x);
+    const ty0 = Math.floor(y);
+    const fx = (x - tx0) * SIZE;
+    const fy = (y - ty0) * SIZE;
+    const px = Math.floor(fx);
+    const py = Math.floor(fy);
+    const dx = fx - px;
+    const dy = fy - py;
+
+    const h00 = this.pixelAbsolute(tx0, ty0, px, py);
+    const h10 = this.pixelAbsolute(tx0, ty0, px + 1, py);
+    const h01 = this.pixelAbsolute(tx0, ty0, px, py + 1);
+    const h11 = this.pixelAbsolute(tx0, ty0, px + 1, py + 1);
+
+    if (h00 === null || h10 === null || h01 === null || h11 === null) {
+      // Kick loads for any missing tiles near this sample
+      void this.ensureTile(tx0, ty0);
+      if (px + 1 >= SIZE) void this.ensureTile(tx0 + 1, ty0);
+      if (py + 1 >= SIZE) void this.ensureTile(tx0, ty0 + 1);
+      if (px + 1 >= SIZE && py + 1 >= SIZE) void this.ensureTile(tx0 + 1, ty0 + 1);
+      // Fallback to nearest loaded corner if partial
+      const any = h00 ?? h10 ?? h01 ?? h11;
+      return any;
+    }
+
+    const h0 = h00 * (1 - dx) + h10 * dx;
+    const h1 = h01 * (1 - dx) + h11 * dx;
+    return h0 * (1 - dy) + h1 * dy;
+  }
+
+  /** Read one DEM pixel, wrapping into neighbor tiles when px/py leave [0, SIZE). */
+  private pixelAbsolute(tx: number, ty: number, px: number, py: number): number | null {
+    let ttx = tx;
+    let tty = ty;
+    let ppx = px;
+    let ppy = py;
+    while (ppx < 0) {
+      ppx += SIZE;
+      ttx -= 1;
+    }
+    while (ppx >= SIZE) {
+      ppx -= SIZE;
+      ttx += 1;
+    }
+    while (ppy < 0) {
+      ppy += SIZE;
+      tty -= 1;
+    }
+    while (ppy >= SIZE) {
+      ppy -= SIZE;
+      tty += 1;
+    }
+
+    const key = `${ZOOM}/${ttx}/${tty}`;
     const tile = this.tiles.get(key);
-    if (!tile?.data) {
-      void this.ensureTile(tx, ty);
+    if (!tile?.data || tile.data.length === 0) {
+      void this.ensureTile(ttx, tty);
       return null;
     }
-    const i = (py * SIZE + px) * 4;
+    const i = (ppy * SIZE + ppx) * 4;
     return decodeTerrarium(tile.data[i], tile.data[i + 1], tile.data[i + 2]);
   }
 
   async preloadArea(south: number, west: number, north: number, east: number): Promise<void> {
     const corners = [
-      lonLatToTilePixel(west, south, ZOOM),
-      lonLatToTilePixel(east, south, ZOOM),
-      lonLatToTilePixel(west, north, ZOOM),
-      lonLatToTilePixel(east, north, ZOOM),
+      lonLatToTileFrac(west, south, ZOOM),
+      lonLatToTileFrac(east, south, ZOOM),
+      lonLatToTileFrac(west, north, ZOOM),
+      lonLatToTileFrac(east, north, ZOOM),
     ];
-    const minTx = Math.min(...corners.map((c) => c.tx));
-    const maxTx = Math.max(...corners.map((c) => c.tx));
-    const minTy = Math.min(...corners.map((c) => c.ty));
-    const maxTy = Math.max(...corners.map((c) => c.ty));
+    const minTx = Math.min(...corners.map((c) => Math.floor(c.x)));
+    const maxTx = Math.max(...corners.map((c) => Math.floor(c.x)));
+    const minTy = Math.min(...corners.map((c) => Math.floor(c.y)));
+    const maxTy = Math.max(...corners.map((c) => Math.floor(c.y)));
+    // +1 border so bilinear edge samples have neighbors ready
     const jobs: Promise<void>[] = [];
-    for (let ty = minTy; ty <= maxTy; ty++) {
-      for (let tx = minTx; tx <= maxTx; tx++) {
+    for (let ty = minTy - 1; ty <= maxTy + 1; ty++) {
+      for (let tx = minTx - 1; tx <= maxTx + 1; tx++) {
         jobs.push(this.ensureTile(tx, ty));
       }
     }
@@ -84,8 +140,17 @@ export class ElevationSampler {
   }
 
   async ensureOrigin(lat: number, lon: number): Promise<number> {
-    const { tx, ty } = lonLatToTilePixel(lon, lat, ZOOM);
-    await this.ensureTile(tx, ty);
+    const { x, y } = lonLatToTileFrac(lon, lat, ZOOM);
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    await Promise.all([
+      this.ensureTile(tx, ty),
+      this.ensureTile(tx + 1, ty),
+      this.ensureTile(tx, ty + 1),
+      this.ensureTile(tx + 1, ty + 1),
+      this.ensureTile(tx - 1, ty),
+      this.ensureTile(tx, ty - 1),
+    ]);
     const abs = this.sampleAbsolute(lat, lon);
     this.originElev = abs ?? 0;
     return this.originElev;
@@ -98,7 +163,7 @@ export class ElevationSampler {
   private ensureTile(tx: number, ty: number): Promise<void> {
     const key = `${ZOOM}/${tx}/${ty}`;
     let tile = this.tiles.get(key);
-    if (tile?.data) return Promise.resolve();
+    if (tile?.data && tile.data.length > 0) return Promise.resolve();
     if (tile?.loading) return tile.loading;
 
     tile = { key, data: new Uint8ClampedArray(0) };

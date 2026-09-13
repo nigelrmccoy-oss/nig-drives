@@ -43,7 +43,8 @@ export class Game {
     this.scene.background = new THREE.Color(0x87b5e5);
     this.scene.fog = new THREE.Fog(0x87b5e5, 180, 900);
 
-    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2500);
+    // Near plane raised slightly to reduce ground clipping sparkles
+    this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.35, 2500);
     this.chase = new ChaseCamera(this.camera);
 
     this.env = new Environment(this.scene);
@@ -80,6 +81,8 @@ export class Game {
       loadingText.textContent = info.message;
       this.hud.setStatus(info.message);
     });
+    this.chase.setGroundSampler((x, z) => this.tiles!.getHeight(x, z));
+    this.chase.reset();
 
     this.vehicle = createVehicle(opts.vehicle);
     this.scene.add(this.vehicle.mesh);
@@ -95,9 +98,14 @@ export class Game {
     const heading = (city.headingDeg * Math.PI) / 180;
     if (snap) {
       this.vehicle.setPose(snap.x, snap.z, heading);
+      // snap.y already includes ROAD_Y_BIAS from centerlines
       this.vehicle.position.y = snap.y;
+      this.vehicle.mesh.position.y = snap.y;
     } else {
+      const y = this.tiles.getHeight(0, 0);
       this.vehicle.setPose(0, 0, heading);
+      this.vehicle.position.y = y;
+      this.vehicle.mesh.position.y = y;
     }
 
     this.hud.setVehicleName(this.vehicle.spec.name);
@@ -126,12 +134,16 @@ export class Game {
   }
 
   private clearWorld(): void {
+    this.chase.setGroundSampler(null);
     if (this.vehicle) {
       this.scene.remove(this.vehicle.mesh);
       this.vehicle = null;
     }
     if (this.tiles) {
       const keep = new Set<THREE.Object3D>(this.env.getOwnedObjects());
+      // Let TileManager dispose its own meshes/materials first
+      this.tiles.dispose();
+      this.tiles = null;
       for (const child of [...this.scene.children]) {
         if (!keep.has(child)) {
           this.scene.remove(child);
@@ -145,8 +157,6 @@ export class Game {
           });
         }
       }
-      this.tiles.dispose();
-      this.tiles = null;
     }
   }
 
@@ -181,7 +191,7 @@ export class Game {
     this.vehicle.mesh.position.y = surface.height;
 
     this.tiles.update(this.vehicle.position.x, this.vehicle.position.z);
-    this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z);
+    this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z, surface.height);
     this.chase.update(dt, this.vehicle);
 
     this.hud.setSpeed(this.vehicle.getSpeedKmh());

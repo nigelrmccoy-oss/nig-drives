@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OverpassClient } from './OverpassClient';
-import { RoadBuilder } from './RoadBuilder';
+import { RoadBuilder, ROAD_Y_BIAS } from './RoadBuilder';
 import { BuildingBuilder } from './BuildingBuilder';
 import { ElevationSampler } from './ElevationSampler';
 import {
@@ -13,6 +13,15 @@ import type { WeatherPreset } from '../weather/Environment';
 
 const LOAD_RADIUS = 2; // 5x5 for denser immersion
 const UNLOAD_RADIUS = 4;
+/** Use road centerline height only within this distance (m). */
+const ROAD_HEIGHT_RADIUS = 14;
+/** Terrain heightfield half-extent (m). */
+const TERRAIN_SIZE = 800;
+const TERRAIN_RES = 64;
+/** Rebuild heightfield when player drifts this far from mesh center. */
+const TERRAIN_RECENTER_M = 180;
+/** Sink terrain slightly under roads to reduce Z-fight. */
+const TERRAIN_Y_BIAS = -0.45;
 
 export type TileStatusListener = (info: {
   loading: number;
@@ -27,6 +36,8 @@ interface TileEntry {
   group: THREE.Group;
   loading: boolean;
   centerlines: Array<{ x: number; y: number; z: number }[]>;
+  wayIds: number[];
+  buildingIds: number[];
 }
 
 export class TileManager {
@@ -41,12 +52,16 @@ export class TileManager {
   private processing = false;
   private ground: THREE.Mesh;
   private groundMat: THREE.MeshStandardMaterial;
+  private terrainMat: THREE.MeshStandardMaterial;
   private onStatus?: TileStatusListener;
   private seenWayIds = new Set<number>();
   private seenBuildingIds = new Set<number>();
   private fallbackBuilt = false;
   private centerlines: Array<{ x: number; y: number; z: number }[]> = [];
   private terrainMesh: THREE.Mesh | null = null;
+  private terrainCenterX = 0;
+  private terrainCenterZ = 0;
+  private terrainRefreshQueued = false;
 
   constructor(scene: THREE.Scene, originLat: number, originLon: number) {
     this.scene = scene;
@@ -57,11 +72,21 @@ export class TileManager {
       roughness: 1,
       metalness: 0,
     });
+    this.terrainMat = new THREE.MeshStandardMaterial({
+      color: 0x3d5a3d,
+      roughness: 1,
+      metalness: 0,
+      // Push terrain slightly away in depth vs asphalt polygonOffset
+      polygonOffset: true,
+      polygonOffsetFactor: 2,
+      polygonOffsetUnits: 2,
+    });
     const groundGeo = new THREE.PlaneGeometry(20000, 20000);
     this.ground = new THREE.Mesh(groundGeo, this.groundMat);
     this.ground.rotation.x = -Math.PI / 2;
-    this.ground.position.y = -0.5;
+    this.ground.position.y = -2;
     this.ground.receiveShadow = true;
+    this.ground.name = 'ground-fallback';
     scene.add(this.ground);
   }
 
@@ -71,13 +96,10 @@ export class TileManager {
 
   setWeatherSurface(weather: WeatherPreset): void {
     this.builder.setWeatherSurface(weather);
-    if (weather === 'snow') {
-      this.groundMat.color.setHex(0xd8e0e6);
-    } else if (weather === 'rain') {
-      this.groundMat.color.setHex(0x2f4a32);
-    } else {
-      this.groundMat.color.setHex(0x3d5a3d);
-    }
+    const groundHex =
+      weather === 'snow' ? 0xd8e0e6 : weather === 'rain' ? 0x2f4a32 : 0x3d5a3d;
+    this.groundMat.color.setHex(groundHex);
+    this.terrainMat.color.setHex(groundHex);
   }
 
   async warmStart(): Promise<void> {
@@ -89,7 +111,6 @@ export class TileManager {
     for (let dy = -LOAD_RADIUS; dy <= LOAD_RADIUS; dy++) {
       for (let dx = -LOAD_RADIUS; dx <= LOAD_RADIUS; dx++) {
         if (dx === 0 && dy === 0) continue;
-        // ring priority: closer first
         order.push({ tx: tx + dx, ty: ty + dy });
       }
     }
@@ -109,7 +130,7 @@ export class TileManager {
       await new Promise((r) => setTimeout(r, 40));
     }
 
-    await this.refreshTerrainMesh();
+    await this.refreshTerrainMesh(0, 0);
 
     if (!this.hasAnyRoads()) {
       this.buildFallbackGrid();
@@ -134,18 +155,37 @@ export class TileManager {
     for (const [key, entry] of [...this.tiles.entries()]) {
       const dist = Math.max(Math.abs(entry.tx - tx), Math.abs(entry.ty - ty));
       if (dist > UNLOAD_RADIUS && !entry.loading) {
-        this.scene.remove(entry.group);
-        entry.group.traverse((obj) => {
-          if (obj instanceof THREE.Mesh) obj.geometry.dispose();
-        });
-        this.tiles.delete(key);
-        this.rebuildCenterlineIndex();
+        this.unloadTile(key, entry);
       }
     }
 
     void this.pumpQueue();
     this.ground.position.x = playerX;
     this.ground.position.z = playerZ;
+
+    const dx = playerX - this.terrainCenterX;
+    const dz = playerZ - this.terrainCenterZ;
+    if (dx * dx + dz * dz > TERRAIN_RECENTER_M * TERRAIN_RECENTER_M) {
+      this.queueTerrainRefresh(playerX, playerZ);
+    }
+  }
+
+  private unloadTile(key: string, entry: TileEntry): void {
+    this.scene.remove(entry.group);
+    entry.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose();
+        // Shared materials live on builders — do not dispose here
+      }
+    });
+    entry.group.clear();
+
+    // Allow ways/buildings to rebuild if the tile streams back in
+    for (const id of entry.wayIds) this.seenWayIds.delete(id);
+    for (const id of entry.buildingIds) this.seenBuildingIds.delete(id);
+
+    this.tiles.delete(key);
+    this.rebuildCenterlineIndex();
   }
 
   /** Height under a local XZ point (relative to spawn). */
@@ -155,12 +195,14 @@ export class TileManager {
   }
 
   /**
-   * Road factor + nearest centerline height.
-   * 1 = on asphalt, ~0.35 = grass/off-road.
+   * Road factor + surface height for the vehicle.
+   * Near asphalt: centerline height (includes ROAD_Y_BIAS).
+   * Off-road: DEM height so the car follows terrain, not a distant road grade.
    */
   sampleSurface(x: number, z: number): { roadFactor: number; height: number } {
+    const demY = this.getHeight(x, z);
     let bestD = Infinity;
-    let bestY = this.getHeight(x, z);
+    let bestY = demY;
     for (const line of this.centerlines) {
       for (let i = 0; i < line.length - 1; i++) {
         const a = line[i];
@@ -173,9 +215,23 @@ export class TileManager {
         }
       }
     }
-    const dist = Math.sqrt(bestD);
-    const roadFactor = dist < 5 ? 1 : dist < 12 ? THREE.MathUtils.clamp(1 - (dist - 5) / 7, 0.35, 1) : 0.35;
-    return { roadFactor, height: bestY };
+    const dist = Number.isFinite(bestD) ? Math.sqrt(bestD) : Infinity;
+    const roadFactor =
+      dist < 5
+        ? 1
+        : dist < 12
+          ? THREE.MathUtils.clamp(1 - (dist - 5) / 7, 0.35, 1)
+          : 0.35;
+
+    let height: number;
+    if (dist <= ROAD_HEIGHT_RADIUS) {
+      // Blend toward DEM at the edge of the road corridor
+      const w = THREE.MathUtils.clamp(1 - dist / ROAD_HEIGHT_RADIUS, 0, 1);
+      height = bestY * w + (demY + ROAD_Y_BIAS * 0.25) * (1 - w);
+    } else {
+      height = demY;
+    }
+    return { roadFactor, height };
   }
 
   findNearestRoadPoint(x: number, z: number): { x: number; z: number; y: number } | null {
@@ -220,6 +276,8 @@ export class TileManager {
       group: new THREE.Group(),
       loading: true,
       centerlines: [],
+      wayIds: [],
+      buildingIds: [],
     };
     this.tiles.set(key, entry);
     this.emitStatus(`Streaming OSM + DEM tile ${key}…`);
@@ -233,11 +291,13 @@ export class TileManager {
       const freshWays = result.ways.filter((w) => {
         if (this.seenWayIds.has(w.id)) return false;
         this.seenWayIds.add(w.id);
+        entry.wayIds.push(w.id);
         return true;
       });
       const freshBuildings = result.buildings.filter((w) => {
         if (this.seenBuildingIds.has(w.id)) return false;
         this.seenBuildingIds.add(w.id);
+        entry.buildingIds.push(w.id);
         return true;
       });
 
@@ -256,6 +316,8 @@ export class TileManager {
     } catch (err) {
       console.warn('Tile load failed', key, err);
       this.emitStatus(`Tile ${key} failed`);
+      for (const id of entry.wayIds) this.seenWayIds.delete(id);
+      for (const id of entry.buildingIds) this.seenBuildingIds.delete(id);
       this.tiles.delete(key);
     } finally {
       const current = this.tiles.get(key);
@@ -263,19 +325,38 @@ export class TileManager {
     }
   }
 
-  private async refreshTerrainMesh(): Promise<void> {
-    // Lightweight heightfield around origin for visible grades
-    const res = 48;
-    const size = 600;
+  private queueTerrainRefresh(x: number, z: number): void {
+    if (this.terrainRefreshQueued) return;
+    this.terrainRefreshQueued = true;
+    void this.refreshTerrainMesh(x, z).finally(() => {
+      this.terrainRefreshQueued = false;
+    });
+  }
+
+  private async refreshTerrainMesh(centerX: number, centerZ: number): Promise<void> {
+    const res = TERRAIN_RES;
+    const size = TERRAIN_SIZE;
     const geo = new THREE.PlaneGeometry(size, size, res, res);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+
+    // Preload DEM under the heightfield footprint
+    const half = size * 0.5;
+    const sw = this.origin.toLatLon(centerX - half, centerZ - half);
+    const ne = this.origin.toLatLon(centerX + half, centerZ + half);
+    await this.elevation.preloadArea(
+      Math.min(sw.lat, ne.lat),
+      Math.min(sw.lon, ne.lon),
+      Math.max(sw.lat, ne.lat),
+      Math.max(sw.lon, ne.lon),
+    );
+
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      const ll = this.origin.toLatLon(x, z);
+      const lx = pos.getX(i) + centerX;
+      const lz = pos.getZ(i) + centerZ;
+      const ll = this.origin.toLatLon(lx, lz);
       const y = this.elevation.sampleRelative(ll.lat, ll.lon);
-      pos.setY(i, y - 0.35);
+      pos.setY(i, y + TERRAIN_Y_BIAS);
     }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
@@ -284,10 +365,13 @@ export class TileManager {
       this.scene.remove(this.terrainMesh);
       this.terrainMesh.geometry.dispose();
     }
-    this.terrainMesh = new THREE.Mesh(geo, this.groundMat);
+    this.terrainMesh = new THREE.Mesh(geo, this.terrainMat);
+    this.terrainMesh.position.set(centerX, 0, centerZ);
     this.terrainMesh.receiveShadow = true;
     this.terrainMesh.name = 'terrain';
     this.scene.add(this.terrainMesh);
+    this.terrainCenterX = centerX;
+    this.terrainCenterZ = centerZ;
     this.ground.visible = false;
   }
 
@@ -344,10 +428,11 @@ export class TileManager {
       group,
       loading: false,
       centerlines,
+      wayIds: [],
+      buildingIds: [],
     });
     this.rebuildCenterlineIndex();
   }
-
 
   private rebuildCenterlineIndex(): void {
     this.centerlines = [];
@@ -367,8 +452,23 @@ export class TileManager {
   }
 
   dispose(): void {
+    for (const [key, entry] of [...this.tiles.entries()]) {
+      this.unloadTile(key, entry);
+    }
+    if (this.terrainMesh) {
+      this.scene.remove(this.terrainMesh);
+      this.terrainMesh.geometry.dispose();
+      this.terrainMesh = null;
+    }
+    this.scene.remove(this.ground);
+    this.ground.geometry.dispose();
+    this.groundMat.dispose();
+    this.terrainMat.dispose();
     this.builder.dispose();
     this.buildings.dispose();
+    this.seenWayIds.clear();
+    this.seenBuildingIds.clear();
+    this.centerlines = [];
   }
 }
 

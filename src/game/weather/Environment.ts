@@ -175,7 +175,7 @@ export class Environment {
     return 'Night';
   }
 
-  update(dt: number, followX: number, followZ: number): void {
+  update(dt: number, followX: number, followZ: number, followY = 0): void {
     if (!this.timePaused) {
       this.timeOfDay = (this.timeOfDay + dt / DAY_LENGTH_SEC) % 1;
     }
@@ -187,13 +187,13 @@ export class Environment {
     const sunDist = 140;
     this.sun.position.set(
       followX + Math.cos(angle) * sunDist,
-      Math.max(8, sunHeight * 120 + 20),
+      Math.max(followY + 8, sunHeight * 120 + 20),
       followZ + Math.sin(angle) * 40,
     );
-    this.sun.target.position.set(followX, 0, followZ);
+    this.sun.target.position.set(followX, followY, followZ);
     this.sun.target.updateMatrixWorld();
 
-    this.updateParticles(dt, followX, followZ);
+    this.updateParticles(dt, followX, followZ, followY);
   }
 
   private applyVisuals(): void {
@@ -245,10 +245,11 @@ export class Environment {
     return THREE.MathUtils.clamp(elev * 0.5 + 0.5, 0, 1);
   }
 
-  private updateParticles(dt: number, x: number, z: number): void {
+  private updateParticles(dt: number, x: number, z: number, groundY: number): void {
+    // Particles live in local space with y=0 at groundY so they don't fall underground on hills
     if (this.rain.visible) {
       const pos = this.rain.geometry.getAttribute('position') as THREE.BufferAttribute;
-      this.rain.position.set(x, 0, z);
+      this.rain.position.set(x, groundY, z);
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         let y = pos.getY(i) - this.rainVel[i] * dt;
         if (y < 0) {
@@ -265,7 +266,7 @@ export class Environment {
 
     if (this.snow.visible) {
       const pos = this.snow.geometry.getAttribute('position') as THREE.BufferAttribute;
-      this.snow.position.set(x, 0, z);
+      this.snow.position.set(x, groundY, z);
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         let y = pos.getY(i) - this.snowVel[i] * dt;
         const wobble = Math.sin(y * 0.4 + i) * 3 * dt;

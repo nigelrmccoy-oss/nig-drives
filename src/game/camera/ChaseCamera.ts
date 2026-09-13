@@ -9,9 +9,15 @@ export class ChaseCamera {
   private currentPos = new THREE.Vector3();
   private currentLook = new THREE.Vector3();
   private initialized = false;
+  /** Optional ground height sampler to keep the lens above terrain. */
+  private groundAt: ((x: number, z: number) => number) | null = null;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
+  }
+
+  setGroundSampler(fn: ((x: number, z: number) => number) | null): void {
+    this.groundAt = fn;
   }
 
   toggle(): void {
@@ -38,7 +44,16 @@ export class ChaseCamera {
         .clone()
         .addScaledVector(forward, eyeForward)
         .add(new THREE.Vector3(0, eyeHeight, 0));
-      desiredLook = desiredPos.clone().addScaledVector(forward, 20).add(new THREE.Vector3(0, 0, 0));
+      desiredLook = desiredPos.clone().addScaledVector(forward, 20);
+    }
+
+    // Keep camera from clipping into hills / ground
+    if (this.groundAt) {
+      const minY = this.groundAt(desiredPos.x, desiredPos.z) + (this.mode === 'chase' ? 1.8 : 1.0);
+      if (desiredPos.y < minY) desiredPos.y = minY;
+    } else {
+      const minY = vehicle.position.y + (this.mode === 'chase' ? 1.5 : 0.8);
+      if (desiredPos.y < minY) desiredPos.y = minY;
     }
 
     if (!this.initialized) {
@@ -51,7 +66,17 @@ export class ChaseCamera {
       this.currentLook.lerp(desiredLook, lerp);
     }
 
+    // Soft clamp smoothed position too (after hills)
+    if (this.groundAt) {
+      const minY = this.groundAt(this.currentPos.x, this.currentPos.z) + 1.2;
+      if (this.currentPos.y < minY) this.currentPos.y = minY;
+    }
+
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentLook);
+  }
+
+  reset(): void {
+    this.initialized = false;
   }
 }
