@@ -3,8 +3,12 @@ import { defineConfig } from 'vite';
 /**
  * Dev proxy for Overpass when a public instance blocks browser CORS.
  * Client tries direct Overpass first; falls back to /api/overpass in dev.
+ *
+ * base: './' so Electron loadFile() resolves assets under dist/ (file://).
+ * Also works for static hosting and `npm run preview`.
  */
 export default defineConfig({
+  base: './',
   server: {
     proxy: {
       '/api/overpass': {

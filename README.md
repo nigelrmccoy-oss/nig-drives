@@ -6,6 +6,12 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.1 — Windows desktop (Electron)
+
+- **Windows portable `.exe`** via Electron + electron-builder (loads the Vite `dist/` build locally — not a remote URL).
+- Scripts: `electron:dev`, `electron:build` / `dist:win`. Browser `npm run build` / `npm run dev` unchanged.
+- Vite `base: './'` so assets resolve under `file://` in Electron and still work for static hosting.
+
 ### v1.3.0 — Forza-inspired visuals
 
 - **Look:** ACES tone mapping, hemisphere + sun with PCF soft shadows, sky-dome gradient, matching fog, light bloom + SMAA. Night headlights glow; building windows emit after dusk.
@@ -57,6 +63,37 @@ Open the URL Vite prints (usually `http://localhost:5173`).
 npm run build
 npm run preview
 ```
+
+## Windows desktop build
+
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-1.3.1-portable.exe`).
+
+**Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
+
+### Rebuild the Windows `.exe`
+
+```bash
+npm install
+npm run dist:win
+# or: npm run electron:build
+```
+
+Artifact lands in `release/NigDrives-<version>-portable.exe`.
+
+**From Linux** (this CI/box): wine is used by electron-builder for the win target:
+
+```bash
+# wine / wine64 should be on PATH
+npm run dist:win
+```
+
+**Dev (Electron + Vite):** start Vite in one terminal (`npm run dev`), then:
+
+```bash
+npm run electron:dev
+```
+
+That loads `http://localhost:5173`. Production Electron always loads packaged `dist/index.html`.
 
 ## Controls
 
