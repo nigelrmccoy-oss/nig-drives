@@ -6,6 +6,13 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.2c (1.2.3) — surface-aware roads + stability hardening
+
+- **OSM surface → friction & look:** parse `surface` (asphalt, concrete, paving_stones, gravel, dirt, grass, cobblestone, compacted, …) and `highway` class; light `maxspeed` bias. Maps to material color/roughness **and** tire grip / noise. Wet/snow multiply by surface retention (ice-like on untreated dirt/grass; motorway asphalt loses less). Offline fallback roads use plausible asphalt grip.
+- **HUD:** small surface / grip hint under assists.
+- **Stability:** Overpass concurrency cap + cancel on dispose; max pending tiles; NaN height/camera/vehicle guards; clamped miters & merge vert caps; DEM tile cache LRU; terrain rebuild chunked (yields); road mesh build yields every N ways; speed/yaw clamps; EngineSound only after Start gesture with safe resume.
+- **Tracks:** `highway=track` included in Overpass filter (dirt default when untagged).
+
 ### v1.2.0 — spawn reliability, KW, engines & transit buses
 
 - **Overpass hang fix:** 10s per-attempt timeouts, parallel endpoint race, limited retries; **per-tile offline road-grid fallback** kicks in immediately on fail/timeout so spawn is playable within ~15s even when Overpass is down
@@ -76,7 +83,7 @@ HUD buttons also switch weather and time of day.
 
 - **Presets (not live weather APIs):** clear/dry, rain, snow.
 - Visuals: sky/fog/lights, rain or snow particles, wet/snowy road & ground tint.
-- **Grip:** clear ≈ full mu; rain reduced; snow much reduced (plus weaker accel/brake). Off-asphalt also lowers grip.
+- **Grip:** clear ≈ full mu; rain/snow reduce by **surface retention** (asphalt motorway holds better than dirt/grass). Off-asphalt also lowers grip. HUD shows surface + grip %.
 - Day/night cycle (~3 min) with darker night lighting; T jumps phases, P pauses.
 
 ## Driving feel (sim-cade)
@@ -107,7 +114,7 @@ San Francisco · Chicago · New York City · Toronto · **Kitchener–Waterloo**
 src/game/
   Game.ts
   weather/Environment.ts
-  map/{geo,OverpassClient,ElevationSampler,RoadBuilder,BuildingBuilder,TileManager}.ts
+  map/{geo,OverpassClient,ElevationSampler,RoadBuilder,RoadSurface,BuildingBuilder,TileManager}.ts
   vehicles/{Vehicle,VehicleFactory}.ts
   camera/ChaseCamera.ts
   input/Input.ts
@@ -119,7 +126,8 @@ src/game/
 
 - Arcade/sim-cade physics, not FM/GT fidelity.
 - Building count capped per tile for performance; no full city collision.
-- Overpass public instances can be slow or rate-limit; v1.2 falls back to offline grids quickly so you can still drive.
+- Overpass public instances can be slow or rate-limit; v1.2 / v1.2c fall back to offline grids quickly so you can still drive.
+- Not all OSM ways have `surface=*`; missing tags infer asphalt (or dirt for tracks).
 - Terrarium is bare-earth DEM — roads use a small height bias above it (v1.1), not surveyed pavement.
 - Single moving heightfield patch (not full streaming LOD terrain); distant hills may look flatter until recentered.
 - Local ENU projection is for regional driving, not continental precision.

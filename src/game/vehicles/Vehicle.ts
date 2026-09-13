@@ -196,6 +196,10 @@ export const BUS_VARIANT_IDS: VehicleId[] = ['bus_diesel', 'bus_hybrid'];
 
 export interface SurfaceInfo {
   roadFactor: number;
+  /** Absolute grip mul from OSM surface × weather retain (already includes roadFactor). */
+  grip?: number;
+  /** Surface bumpiness 0–1. */
+  noise?: number;
 }
 
 export interface WeatherDriveInfo {
@@ -246,8 +250,13 @@ export class Vehicle {
   update(dt: number, input: Input, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
     const s = this.spec;
     const g = 9.81;
-    const mu =
-      s.gripMu * weather.gripMul * THREE.MathUtils.clamp(surface.roadFactor, 0.25, 1.0);
+    // Prefer surface-aware grip (OSM surface × weather); fall back to roadFactor × weather.
+    const surfaceGrip =
+      surface.grip !== undefined && Number.isFinite(surface.grip)
+        ? THREE.MathUtils.clamp(surface.grip, 0.1, 1.2)
+        : weather.gripMul * THREE.MathUtils.clamp(surface.roadFactor, 0.25, 1.0);
+    const mu = s.gripMu * surfaceGrip;
+    const noise = THREE.MathUtils.clamp(surface.noise ?? 0, 0, 1);
 
     const steerTarget =
       ((input.left ? 1 : 0) + (input.right ? -1 : 0)) * s.steerLock;
@@ -382,10 +391,33 @@ export class Vehicle {
     this.position.z += wz * dt;
     this.heading += this.yawRate * dt;
 
+    // Surface noise: small lateral jitter on rough surfaces (gravel/dirt/cobble)
+    if (noise > 0.1 && Math.abs(this.vz) > 2) {
+      this.vx += (Math.random() - 0.5) * noise * 0.35 * dt * Math.min(Math.abs(this.vz), 20);
+    }
+
     this.speed = Math.hypot(this.vx, this.vz);
 
+    // Hard clamps — prevent runaway / NaN cascade
     if (this.vz < -s.maxSpeed * 0.28) this.vz = -s.maxSpeed * 0.28;
     if (this.vz > s.maxSpeed * 1.05) this.vz = s.maxSpeed * 1.05;
+    const maxLat = s.maxSpeed * 0.55;
+    if (this.vx > maxLat) this.vx = maxLat;
+    if (this.vx < -maxLat) this.vx = -maxLat;
+    if (this.yawRate > 3.5) this.yawRate = 3.5;
+    if (this.yawRate < -3.5) this.yawRate = -3.5;
+
+    if (!Number.isFinite(this.vx)) this.vx = 0;
+    if (!Number.isFinite(this.vz)) this.vz = 0;
+    if (!Number.isFinite(this.yawRate)) this.yawRate = 0;
+    if (!Number.isFinite(this.heading)) this.heading = 0;
+    if (!Number.isFinite(this.position.x) || !Number.isFinite(this.position.z)) {
+      this.position.x = 0;
+      this.position.z = 0;
+      this.vx = 0;
+      this.vz = 0;
+    }
+    this.speed = Math.hypot(this.vx, this.vz);
 
     this.syncMesh();
   }

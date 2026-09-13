@@ -16,21 +16,23 @@ export interface OverpassResult {
 }
 
 const HIGHWAY_FILTER =
-  'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link';
+  'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link';
 
 /** Per-attempt fetch timeout (ms). Keep short so offline fallback can kick in. */
 export const OVERPASS_ATTEMPT_MS = 10_000;
 /** Max endpoint attempts per tile (sequential after a short parallel race). */
 const MAX_ATTEMPTS = 2;
+/** Cap in-flight Overpass tile fetches across the client. */
+const MAX_CONCURRENT = 3;
+/** Soft cap on memory cache entries. */
+const MAX_CACHE = 48;
 
 function buildQuery(south: number, west: number, north: number, east: number): string {
-  // Pad bbox slightly so roads on tile edges are not clipped (helps dense grids).
   const pad = 0.0004;
   const s = south - pad;
   const w = west - pad;
   const n = north + pad;
   const e = east + pad;
-  // Server-side timeout must be <= client abort or we wait forever on a hung socket.
   return `
 [out:json][timeout:9];
 (
@@ -66,6 +68,27 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 export class OverpassClient {
   private memoryCache = new Map<string, { ways: OsmWay[]; buildings: OsmWay[] }>();
+  private generation = 0;
+  private inFlight = 0;
+  private waiters: Array<() => void> = [];
+  private activeAborts = new Set<AbortController>();
+
+  /** Bump generation + abort in-flight fetches (e.g. on TileManager.dispose). */
+  cancelAll(): void {
+    this.generation++;
+    for (const ctrl of this.activeAborts) {
+      try {
+        ctrl.abort();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.activeAborts.clear();
+  }
+
+  getGeneration(): number {
+    return this.generation;
+  }
 
   getCached(key: string): { ways: OsmWay[]; buildings: OsmWay[] } | undefined {
     return this.memoryCache.get(key);
@@ -73,11 +96,40 @@ export class OverpassClient {
 
   setCached(key: string, data: { ways: OsmWay[]; buildings: OsmWay[] }): void {
     this.memoryCache.set(key, data);
+    this.trimCache();
+  }
+
+  private trimCache(): void {
+    while (this.memoryCache.size > MAX_CACHE) {
+      const first = this.memoryCache.keys().next().value;
+      if (first === undefined) break;
+      this.memoryCache.delete(first);
+    }
+  }
+
+  private async acquireSlot(): Promise<void> {
+    if (this.inFlight < MAX_CONCURRENT) {
+      this.inFlight++;
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      this.waiters.push(() => {
+        this.inFlight++;
+        resolve();
+      });
+    });
+  }
+
+  private releaseSlot(): void {
+    this.inFlight = Math.max(0, this.inFlight - 1);
+    const next = this.waiters.shift();
+    if (next) next();
   }
 
   /**
    * Fetch highways + buildings for a tile bbox.
    * Short timeouts + limited retries so callers can fall back offline quickly.
+   * Pass expectGen to ignore results after cancelAll / dispose.
    */
   async fetchTile(
     key: string,
@@ -85,46 +137,66 @@ export class OverpassClient {
     west: number,
     north: number,
     east: number,
+    expectGen?: number,
   ): Promise<OverpassResult> {
     const cached = this.memoryCache.get(key);
     if (cached) return { ...cached, source: 'memory' };
 
-    const query = buildQuery(south, west, north, east);
-    let lastError: unknown;
-
-    // Race the two public endpoints first (whichever answers wins).
-    try {
-      const raced = await withTimeout(
-        Promise.any(
-          ENDPOINTS.slice(0, 2).map((ep) =>
-            this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
-          ),
-        ),
-        OVERPASS_ATTEMPT_MS,
-        'Overpass race',
-      );
-      this.memoryCache.set(key, raced.parsed);
-      return { ...raced.parsed, source: raced.source };
-    } catch (err) {
-      lastError = err;
+    if (expectGen !== undefined && expectGen !== this.generation) {
+      throw new Error('Overpass request cancelled (stale generation)');
     }
 
-    // One more sequential try via Vite proxy endpoints (CORS fallback in dev).
-    for (const endpoint of ENDPOINTS.slice(2, 2 + MAX_ATTEMPTS)) {
+    await this.acquireSlot();
+    try {
+      if (expectGen !== undefined && expectGen !== this.generation) {
+        throw new Error('Overpass request cancelled (stale generation)');
+      }
+
+      const query = buildQuery(south, west, north, east);
+      let lastError: unknown;
+
       try {
-        const parsed = await withTimeout(
-          this.postQuery(endpoint, query),
+        const raced = await withTimeout(
+          Promise.any(
+            ENDPOINTS.slice(0, 2).map((ep) =>
+              this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
+            ),
+          ),
           OVERPASS_ATTEMPT_MS,
-          `Overpass ${endpoint}`,
+          'Overpass race',
         );
-        this.memoryCache.set(key, parsed);
-        return { ...parsed, source: endpoint };
+        if (expectGen !== undefined && expectGen !== this.generation) {
+          throw new Error('Overpass request cancelled (stale generation)');
+        }
+        this.memoryCache.set(key, raced.parsed);
+        this.trimCache();
+        return { ...raced.parsed, source: raced.source };
       } catch (err) {
         lastError = err;
       }
-    }
 
-    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+      for (const endpoint of ENDPOINTS.slice(2, 2 + MAX_ATTEMPTS)) {
+        if (expectGen !== undefined && expectGen !== this.generation) {
+          throw new Error('Overpass request cancelled (stale generation)');
+        }
+        try {
+          const parsed = await withTimeout(
+            this.postQuery(endpoint, query),
+            OVERPASS_ATTEMPT_MS,
+            `Overpass ${endpoint}`,
+          );
+          this.memoryCache.set(key, parsed);
+          this.trimCache();
+          return { ...parsed, source: endpoint };
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    } finally {
+      this.releaseSlot();
+    }
   }
 
   private async postQuery(
@@ -132,6 +204,7 @@ export class OverpassClient {
     query: string,
   ): Promise<{ ways: OsmWay[]; buildings: OsmWay[] }> {
     const ctrl = new AbortController();
+    this.activeAborts.add(ctrl);
     const abortTimer = setTimeout(() => ctrl.abort(), OVERPASS_ATTEMPT_MS);
     try {
       const res = await fetch(endpoint, {
@@ -166,13 +239,13 @@ export class OverpassClient {
         if (tags.highway) ways.push(item);
         else if (tags.building) buildings.push(item);
       }
-      // Cap buildings per tile for mid-laptop perf (dense Canadian downtowns).
       if (buildings.length > 180) {
         buildings.length = 180;
       }
       return { ways, buildings };
     } finally {
       clearTimeout(abortTimer);
+      this.activeAborts.delete(ctrl);
     }
   }
 }

@@ -14,6 +14,7 @@ export class EngineSound {
 
   start(): void {
     if (this.started || !this.enabled) return;
+    // Must be called from a user-gesture stack (Start menu click).
     try {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new Ctx();
@@ -37,7 +38,9 @@ export class EngineSound {
       this.osc.start();
       this.osc2.start();
       this.started = true;
-      void this.ctx.resume();
+      void this.ctx.resume().catch(() => {
+        /* autoplay policy — stay silent until next resume */
+      });
     } catch {
       this.enabled = false;
     }
@@ -50,7 +53,9 @@ export class EngineSound {
     const rpm = vehicle.getEngineRpmNorm();
     const pitch = vehicle.spec.soundPitch;
     const base = vehicle.spec.class === 'bus' ? 48 : 70;
-    const freq = (base + rpm * 180) * pitch;
+    let freq = (base + rpm * 180) * pitch;
+    if (!Number.isFinite(freq) || freq < 20) freq = 60;
+    if (freq > 1200) freq = 1200;
     const now = this.ctx.currentTime;
     this.osc.frequency.setTargetAtTime(freq, now, 0.05);
     this.osc2.frequency.setTargetAtTime(freq * 1.5, now, 0.05);

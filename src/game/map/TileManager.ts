@@ -1,8 +1,13 @@
 import * as THREE from 'three';
 import { OverpassClient } from './OverpassClient';
-import { RoadBuilder, ROAD_Y_BIAS } from './RoadBuilder';
+import { RoadBuilder, ROAD_Y_BIAS, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder } from './BuildingBuilder';
 import { ElevationSampler } from './ElevationSampler';
+import {
+  defaultAsphaltProfile,
+  effectiveGrip,
+  type SurfaceProfile,
+} from './RoadSurface';
 import {
   GeoOrigin,
   latLonToTile,
@@ -12,20 +17,18 @@ import {
 import type { OsmWay } from './OverpassClient';
 import type { WeatherPreset } from '../weather/Environment';
 
-const LOAD_RADIUS = 2; // 5x5 for denser immersion
+const LOAD_RADIUS = 2;
 const UNLOAD_RADIUS = 4;
-/** Use road centerline height only within this distance (m). */
 const ROAD_HEIGHT_RADIUS = 14;
-/** Terrain heightfield half-extent (m). */
 const TERRAIN_SIZE = 900;
-/** Higher res = solid grades as player moves (v1.2 rebuild). */
 const TERRAIN_RES = 96;
-/** Rebuild heightfield when player drifts this far from mesh center. */
 const TERRAIN_RECENTER_M = 120;
-/** Sink terrain slightly under roads to reduce Z-fight. */
 const TERRAIN_Y_BIAS = -0.45;
-/** Hard cap for spawn readiness (ms) — then show world with whatever we have. */
 const SPAWN_DEADLINE_MS = 14_000;
+/** Cap queued + loading tiles to avoid memory / Overpass storms. */
+const MAX_PENDING_TILES = 12;
+/** Max tiles kept loaded (Chebyshev neighborhood soft cap). */
+const MAX_LOADED_TILES = 36;
 
 export type TileStatusListener = (info: {
   loading: number;
@@ -33,16 +36,26 @@ export type TileStatusListener = (info: {
   message: string;
 }) => void;
 
+export interface SurfaceSample {
+  roadFactor: number;
+  height: number;
+  grip: number;
+  noise: number;
+  label: string;
+  kind: string;
+}
+
 interface TileEntry {
   key: string;
   tx: number;
   ty: number;
   group: THREE.Group;
   loading: boolean;
-  centerlines: Array<{ x: number; y: number; z: number }[]>;
+  centerlines: RoadCenterline[];
   wayIds: number[];
   buildingIds: number[];
   usedFallback: boolean;
+  cancelled: boolean;
 }
 
 export class TileManager {
@@ -62,12 +75,15 @@ export class TileManager {
   private seenWayIds = new Set<number>();
   private seenBuildingIds = new Set<number>();
   private fallbackBuilt = false;
-  private centerlines: Array<{ x: number; y: number; z: number }[]> = [];
+  private centerlines: RoadCenterline[] = [];
   private terrainMesh: THREE.Mesh | null = null;
   private terrainCenterX = 0;
   private terrainCenterZ = 0;
   private terrainRefreshQueued = false;
   private usedOfflineFallback = false;
+  private weather: WeatherPreset = 'clear';
+  private disposed = false;
+  private fetchGen = 0;
 
   constructor(scene: THREE.Scene, originLat: number, originLon: number) {
     this.scene = scene;
@@ -100,6 +116,7 @@ export class TileManager {
   }
 
   setWeatherSurface(weather: WeatherPreset): void {
+    this.weather = weather;
     this.builder.setWeatherSurface(weather);
     const groundHex =
       weather === 'snow' ? 0xd8e0e6 : weather === 'rain' ? 0x2f4a32 : 0x3d5a3d;
@@ -115,10 +132,12 @@ export class TileManager {
     const t0 = Date.now();
     this.emitStatus('Loading Terrarium elevation…');
     await this.elevation.ensureOrigin(this.origin.lat, this.origin.lon);
+    if (this.disposed) return;
 
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
     this.emitStatus(`Loading spawn tile ${tileKey(tx, ty)}…`);
     await this.loadTile(tx, ty);
+    if (this.disposed) return;
 
     if (!this.hasAnyRoads()) {
       this.buildFallbackGrid();
@@ -128,15 +147,14 @@ export class TileManager {
       this.emitStatus('Using offline roads (Overpass slow)');
     }
 
-    // Terrain rebuild — capped so DEM can't block spawn
     await Promise.race([
       this.refreshTerrainMesh(0, 0),
       new Promise<void>((r) => setTimeout(r, 4_000)),
     ]);
+    if (this.disposed) return;
 
     const remaining = Math.max(0, SPAWN_DEADLINE_MS - (Date.now() - t0));
     if (remaining > 0 && !this.hasAnyRoads()) {
-      // Brief grace if somehow still empty
       await new Promise((r) => setTimeout(r, Math.min(500, remaining)));
     }
 
@@ -148,7 +166,6 @@ export class TileManager {
       );
     }
 
-    // Background: rest of 5×5 ring (do not await)
     for (let dy = -LOAD_RADIUS; dy <= LOAD_RADIUS; dy++) {
       for (let dx = -LOAD_RADIUS; dx <= LOAD_RADIUS; dx++) {
         if (dx === 0 && dy === 0) continue;
@@ -159,6 +176,9 @@ export class TileManager {
   }
 
   update(playerX: number, playerZ: number): void {
+    if (this.disposed) return;
+    if (!Number.isFinite(playerX) || !Number.isFinite(playerZ)) return;
+
     const ll = this.origin.toLatLon(playerX, playerZ);
     const { tx, ty } = latLonToTile(ll.lat, ll.lon);
 
@@ -175,6 +195,21 @@ export class TileManager {
       }
     }
 
+    // Soft cap: unload farthest non-loading tiles if over budget
+    if (this.tiles.size > MAX_LOADED_TILES) {
+      const ranked = [...this.tiles.values()]
+        .filter((e) => !e.loading && e.key !== 'fallback')
+        .map((e) => ({
+          e,
+          dist: Math.max(Math.abs(e.tx - tx), Math.abs(e.ty - ty)),
+        }))
+        .sort((a, b) => b.dist - a.dist);
+      while (this.tiles.size > MAX_LOADED_TILES && ranked.length) {
+        const far = ranked.shift()!;
+        this.unloadTile(far.e.key, far.e);
+      }
+    }
+
     void this.pumpQueue();
     this.ground.position.x = playerX;
     this.ground.position.z = playerZ;
@@ -187,10 +222,12 @@ export class TileManager {
   }
 
   private unloadTile(key: string, entry: TileEntry): void {
+    entry.cancelled = true;
     this.scene.remove(entry.group);
     entry.group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose();
+        // Shared materials owned by RoadBuilder / BuildingBuilder — do not dispose here
       }
     });
     entry.group.clear();
@@ -203,26 +240,45 @@ export class TileManager {
   }
 
   getHeight(x: number, z: number): number {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
     const ll = this.origin.toLatLon(x, z);
-    return this.elevation.sampleRelative(ll.lat, ll.lon);
+    const y = this.elevation.sampleRelative(ll.lat, ll.lon);
+    return Number.isFinite(y) ? y : 0;
   }
 
-  sampleSurface(x: number, z: number): { roadFactor: number; height: number } {
+  sampleSurface(x: number, z: number): SurfaceSample {
     const demY = this.getHeight(x, z);
+    const offRoad: SurfaceSample = {
+      roadFactor: 0.35,
+      height: demY,
+      grip: effectiveGrip(defaultAsphaltProfile(), 0.35, this.weather) * 0.85,
+      noise: 0.2,
+      label: 'Off-road',
+      kind: 'dirt',
+    };
+
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return offRoad;
+
     let bestD = Infinity;
     let bestY = demY;
+    let bestProfile: SurfaceProfile = defaultAsphaltProfile();
+
     for (const line of this.centerlines) {
-      for (let i = 0; i < line.length - 1; i++) {
-        const a = line[i];
-        const b = line[i + 1];
+      const pts = line.points;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i];
+        const b = pts[i + 1];
         const d = distPointSegSq(x, z, a.x, a.z, b.x, b.z);
         if (d < bestD) {
           bestD = d;
           const t = projectT(x, z, a.x, a.z, b.x, b.z);
-          bestY = a.y + (b.y - a.y) * t;
+          const y = a.y + (b.y - a.y) * t;
+          bestY = Number.isFinite(y) ? y : demY;
+          bestProfile = line.surface;
         }
       }
     }
+
     const dist = Number.isFinite(bestD) ? Math.sqrt(bestD) : Infinity;
     const roadFactor =
       dist < 5
@@ -238,13 +294,24 @@ export class TileManager {
     } else {
       height = demY;
     }
-    return { roadFactor, height };
+    if (!Number.isFinite(height)) height = 0;
+
+    const grip = effectiveGrip(bestProfile, roadFactor, this.weather);
+    return {
+      roadFactor,
+      height,
+      grip,
+      noise: bestProfile.noise * (roadFactor > 0.5 ? 1 : 1.4),
+      label: roadFactor > 0.5 ? bestProfile.label : 'Off-road',
+      kind: roadFactor > 0.5 ? bestProfile.kind : 'dirt',
+    };
   }
 
   findNearestRoadPoint(x: number, z: number): { x: number; z: number; y: number } | null {
     let best: { x: number; z: number; y: number; d: number } | null = null;
     for (const line of this.centerlines) {
-      for (const p of line) {
+      for (const p of line.points) {
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.z) || !Number.isFinite(p.y)) continue;
         const d = (p.x - x) ** 2 + (p.z - z) ** 2;
         if (!best || d < best.d) best = { x: p.x, z: p.z, y: p.y, d };
       }
@@ -256,15 +323,20 @@ export class TileManager {
     const key = tileKey(tx, ty);
     if (this.tiles.has(key)) return;
     if (this.queue.some((q) => q.tx === tx && q.ty === ty)) return;
+    const pending = this.queue.length + [...this.tiles.values()].filter((t) => t.loading).length;
+    if (pending >= MAX_PENDING_TILES) {
+      // Drop farthest queued (keep nearer to end of queue which are more recent)
+      if (this.queue.length > 0) this.queue.shift();
+      else return;
+    }
     this.queue.push({ tx, ty });
   }
 
   private async pumpQueue(): Promise<void> {
-    if (this.processing) return;
+    if (this.processing || this.disposed) return;
     this.processing = true;
     try {
-      // Parallelism of 2 background tiles (each has its own Overpass timeout)
-      while (this.queue.length > 0) {
+      while (this.queue.length > 0 && !this.disposed) {
         const batch: Array<{ tx: number; ty: number }> = [];
         while (batch.length < 2 && this.queue.length > 0) {
           batch.push(this.queue.shift()!);
@@ -277,6 +349,7 @@ export class TileManager {
   }
 
   private async loadTile(tx: number, ty: number): Promise<void> {
+    if (this.disposed) return;
     const key = tileKey(tx, ty);
     if (this.tiles.has(key)) return;
 
@@ -290,21 +363,42 @@ export class TileManager {
       wayIds: [],
       buildingIds: [],
       usedFallback: false,
+      cancelled: false,
     };
     this.tiles.set(key, entry);
     this.emitStatus(`Streaming OSM + DEM tile ${key}…`);
 
     const b = tileBounds(tx, ty);
-    const heightAt = (lat: number, lon: number) => this.elevation.sampleRelative(lat, lon);
+    const heightAt = (lat: number, lon: number) => {
+      const y = this.elevation.sampleRelative(lat, lon);
+      return Number.isFinite(y) ? y : 0;
+    };
 
-    // DEM preload — never block forever
+    const gen = this.fetchGen;
+
     await Promise.race([
       this.elevation.preloadArea(b.south, b.west, b.north, b.east),
       new Promise<void>((r) => setTimeout(r, 8_500)),
     ]);
+    if (this.disposed || entry.cancelled || gen !== this.fetchGen) {
+      this.finishLoading(key);
+      return;
+    }
 
     try {
-      const result = await this.client.fetchTile(key, b.south, b.west, b.north, b.east);
+      const result = await this.client.fetchTile(
+        key,
+        b.south,
+        b.west,
+        b.north,
+        b.east,
+        gen,
+      );
+      if (this.disposed || entry.cancelled || gen !== this.fetchGen) {
+        this.finishLoading(key);
+        return;
+      }
+
       const freshWays = result.ways.filter((w) => {
         if (this.seenWayIds.has(w.id)) return false;
         this.seenWayIds.add(w.id);
@@ -319,15 +413,21 @@ export class TileManager {
       });
 
       if (freshWays.length === 0) {
-        // Empty OSM response → offline grid for this tile immediately
         this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
       } else {
-        const { group: roads, centerlines } = this.builder.buildWays(
+        const { group: roads, centerlines } = await this.builder.buildWaysAsync(
           freshWays,
           this.origin,
           heightAt,
         );
+        if (this.disposed || entry.cancelled) {
+          roads.traverse((obj) => {
+            if (obj instanceof THREE.Mesh) obj.geometry.dispose();
+          });
+          this.finishLoading(key);
+          return;
+        }
         entry.centerlines = centerlines;
         this.rebuildCenterlineIndex();
         entry.group.add(roads);
@@ -341,20 +441,28 @@ export class TileManager {
         );
       }
     } catch (err) {
+      if (this.disposed || entry.cancelled) {
+        this.finishLoading(key);
+        return;
+      }
       console.warn('Tile load failed — offline fallback', key, err);
       this.applyTileFallback(entry, heightAt);
       this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
     } finally {
-      const current = this.tiles.get(key);
-      if (current) current.loading = false;
+      this.finishLoading(key);
     }
   }
 
-  /** Immediate per-tile road grid so gameplay is never stuck waiting on Overpass. */
+  private finishLoading(key: string): void {
+    const current = this.tiles.get(key);
+    if (current) current.loading = false;
+  }
+
   private applyTileFallback(
     entry: TileEntry,
     heightAt: (lat: number, lon: number) => number,
   ): void {
+    if (entry.cancelled || this.disposed) return;
     this.usedOfflineFallback = true;
     entry.usedFallback = true;
     const ways = this.makeGridWaysForTile(entry.tx, entry.ty);
@@ -376,7 +484,7 @@ export class TileManager {
       const lon = b.west + (b.east - b.west) * t;
       ways.push({
         id: id++,
-        tags: { highway: i % 2 === 0 ? 'residential' : 'tertiary' },
+        tags: { highway: i % 2 === 0 ? 'residential' : 'tertiary', surface: 'asphalt' },
         geometry: [
           { lat, lon: b.west },
           { lat, lon: b.east },
@@ -384,7 +492,7 @@ export class TileManager {
       });
       ways.push({
         id: id++,
-        tags: { highway: i % 2 === 0 ? 'secondary' : 'residential' },
+        tags: { highway: i % 2 === 0 ? 'secondary' : 'residential', surface: 'asphalt' },
         geometry: [
           { lat: b.south, lon },
           { lat: b.north, lon },
@@ -395,18 +503,15 @@ export class TileManager {
   }
 
   private queueTerrainRefresh(x: number, z: number): void {
-    if (this.terrainRefreshQueued) return;
+    if (this.terrainRefreshQueued || this.disposed) return;
     this.terrainRefreshQueued = true;
     void this.refreshTerrainMesh(x, z).finally(() => {
       this.terrainRefreshQueued = false;
     });
   }
 
-  /**
-   * Rebuild a denser heightfield centered on the player so grades feel solid
-   * as DEM tiles stream in and the vehicle moves.
-   */
   private async refreshTerrainMesh(centerX: number, centerZ: number): Promise<void> {
+    if (this.disposed) return;
     const res = TERRAIN_RES;
     const size = TERRAIN_SIZE;
     const geo = new THREE.PlaneGeometry(size, size, res, res);
@@ -425,15 +530,33 @@ export class TileManager {
       ),
       new Promise<void>((r) => setTimeout(r, 8_500)),
     ]);
-
-    for (let i = 0; i < pos.count; i++) {
-      const lx = pos.getX(i) + centerX;
-      const lz = pos.getZ(i) + centerZ;
-      const ll = this.origin.toLatLon(lx, lz);
-      const y = this.elevation.sampleRelative(ll.lat, ll.lon);
-      pos.setY(i, y + TERRAIN_Y_BIAS);
+    if (this.disposed) {
+      geo.dispose();
+      return;
     }
-    pos.needsUpdate = true;
+
+    // Chunk vertex updates to reduce main-thread stalls
+    const count = pos.count;
+    const CHUNK = 1024;
+    for (let start = 0; start < count; start += CHUNK) {
+      const end = Math.min(count, start + CHUNK);
+      for (let i = start; i < end; i++) {
+        const lx = pos.getX(i) + centerX;
+        const lz = pos.getZ(i) + centerZ;
+        const ll = this.origin.toLatLon(lx, lz);
+        let y = this.elevation.sampleRelative(ll.lat, ll.lon);
+        if (!Number.isFinite(y)) y = 0;
+        pos.setY(i, y + TERRAIN_Y_BIAS);
+      }
+      pos.needsUpdate = true;
+      if (end < count) {
+        await new Promise<void>((r) => setTimeout(r, 0));
+        if (this.disposed) {
+          geo.dispose();
+          return;
+        }
+      }
+    }
     geo.computeVertexNormals();
 
     if (this.terrainMesh) {
@@ -455,18 +578,16 @@ export class TileManager {
   }
 
   private buildFallbackGrid(): void {
-    if (this.fallbackBuilt) return;
+    if (this.fallbackBuilt || this.disposed) return;
     this.fallbackBuilt = true;
     this.usedOfflineFallback = true;
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
-    // Cover spawn tile ±1 with grid
     const ways: OsmWay[] = [];
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         ways.push(...this.makeGridWaysForTile(tx + dx, ty + dy));
       }
     }
-    // Also a wider classic grid around origin for open driving
     const blocks = 8;
     const spacing = 80;
     const half = (blocks * spacing) / 2;
@@ -475,7 +596,10 @@ export class TileManager {
       const o = -half + i * spacing;
       ways.push({
         id: id++,
-        tags: { highway: i % 3 === 0 ? 'primary' : 'residential' },
+        tags: {
+          highway: i % 3 === 0 ? 'primary' : 'residential',
+          surface: 'asphalt',
+        },
         geometry: [
           {
             lat: this.origin.lat + -half / this.origin.mPerDegLat,
@@ -489,7 +613,10 @@ export class TileManager {
       });
       ways.push({
         id: id++,
-        tags: { highway: i % 3 === 0 ? 'secondary' : 'residential' },
+        tags: {
+          highway: i % 3 === 0 ? 'secondary' : 'residential',
+          surface: 'asphalt',
+        },
         geometry: [
           {
             lat: this.origin.lat + o / this.origin.mPerDegLat,
@@ -502,7 +629,10 @@ export class TileManager {
         ],
       });
     }
-    const heightAt = (lat: number, lon: number) => this.elevation.sampleRelative(lat, lon);
+    const heightAt = (lat: number, lon: number) => {
+      const y = this.elevation.sampleRelative(lat, lon);
+      return Number.isFinite(y) ? y : 0;
+    };
     const { group, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
     this.scene.add(group);
     this.tiles.set('fallback', {
@@ -515,6 +645,7 @@ export class TileManager {
       wayIds: [],
       buildingIds: [],
       usedFallback: true,
+      cancelled: false,
     });
     this.rebuildCenterlineIndex();
   }
@@ -537,7 +668,12 @@ export class TileManager {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.fetchGen++;
+    this.client.cancelAll();
+    this.queue.length = 0;
     for (const [key, entry] of [...this.tiles.entries()]) {
+      entry.cancelled = true;
       this.unloadTile(key, entry);
     }
     if (this.terrainMesh) {
@@ -551,6 +687,7 @@ export class TileManager {
     this.terrainMat.dispose();
     this.builder.dispose();
     this.buildings.dispose();
+    this.elevation.dispose();
     this.seenWayIds.clear();
     this.seenBuildingIds.clear();
     this.centerlines = [];

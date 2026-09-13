@@ -4,7 +4,7 @@
  * Decode: (R * 256 + G + B / 256) - 32768  → meters
  * No API key. Streaming with map chunks.
  *
- * v1.2: fetch timeouts + last-known / flat fallback so DEM never hangs gameplay.
+ * v1.2c: fetch timeouts, NaN guards, tile cache cap, dispose.
  */
 
 const TILE_URL =
@@ -13,11 +13,14 @@ const ZOOM = 12;
 const SIZE = 256;
 /** Abort a single Terrarium PNG fetch after this many ms. */
 const DEM_FETCH_MS = 8_000;
+/** Soft cap on cached DEM tiles to limit memory. */
+const MAX_DEM_TILES = 64;
 
 interface DemTile {
   key: string;
   data: Uint8ClampedArray;
   loading?: Promise<void>;
+  lastAccess: number;
 }
 
 function lonLatToTileFrac(
@@ -34,7 +37,8 @@ function lonLatToTileFrac(
 }
 
 function decodeTerrarium(r: number, g: number, b: number): number {
-  return r * 256 + g + b / 256 - 32768;
+  const h = r * 256 + g + b / 256 - 32768;
+  return Number.isFinite(h) ? h : 0;
 }
 
 export class ElevationSampler {
@@ -47,15 +51,18 @@ export class ElevationSampler {
 
   /** Relative height (meters) above spawn elevation. Never blocks; flat/last-known on miss. */
   sampleRelative(lat: number, lon: number): number {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return 0;
     const abs = this.sampleAbsolute(lat, lon);
     if (abs === null) {
       const fallback = this.lastKnownAbs ?? this.originElev ?? 0;
       if (this.originElev === null) this.originElev = fallback;
-      return fallback - this.originElev;
+      const rel = fallback - this.originElev;
+      return Number.isFinite(rel) ? rel : 0;
     }
     this.lastKnownAbs = abs;
     if (this.originElev === null) this.originElev = abs;
-    return abs - this.originElev;
+    const rel = abs - this.originElev;
+    return Number.isFinite(rel) ? rel : 0;
   }
 
   /**
@@ -63,7 +70,9 @@ export class ElevationSampler {
    * Reads across DEM tile boundaries so seams don't crack.
    */
   sampleAbsolute(lat: number, lon: number): number | null {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     const { x, y } = lonLatToTileFrac(lon, lat, ZOOM);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     const tx0 = Math.floor(x);
     const ty0 = Math.floor(y);
     const fx = (x - tx0) * SIZE;
@@ -89,7 +98,8 @@ export class ElevationSampler {
 
     const h0 = h00 * (1 - dx) + h10 * dx;
     const h1 = h01 * (1 - dx) + h11 * dx;
-    return h0 * (1 - dy) + h1 * dy;
+    const h = h0 * (1 - dy) + h1 * dy;
+    return Number.isFinite(h) ? h : null;
   }
 
   /** Read one DEM pixel, wrapping into neighbor tiles when px/py leave [0, SIZE). */
@@ -121,6 +131,7 @@ export class ElevationSampler {
       void this.ensureTile(ttx, tty);
       return null;
     }
+    tile.lastAccess = performance.now();
     const i = (ppy * SIZE + ppx) * 4;
     return decodeTerrarium(tile.data[i], tile.data[i + 1], tile.data[i + 2]);
   }
@@ -142,7 +153,6 @@ export class ElevationSampler {
         jobs.push(this.ensureTile(tx, ty));
       }
     }
-    // Don't hang forever if AWS is slow — proceed with whatever arrived.
     await Promise.race([
       Promise.all(jobs),
       new Promise<void>((r) => setTimeout(r, DEM_FETCH_MS + 500)),
@@ -174,13 +184,27 @@ export class ElevationSampler {
     return this.originElev ?? 0;
   }
 
+  private trimCache(): void {
+    if (this.tiles.size <= MAX_DEM_TILES) return;
+    const ranked = [...this.tiles.values()]
+      .filter((t) => t.data.length > 0 && !t.loading)
+      .sort((a, b) => a.lastAccess - b.lastAccess);
+    while (this.tiles.size > MAX_DEM_TILES && ranked.length) {
+      const old = ranked.shift()!;
+      this.tiles.delete(old.key);
+    }
+  }
+
   private ensureTile(tx: number, ty: number): Promise<void> {
     const key = `${ZOOM}/${tx}/${ty}`;
     let tile = this.tiles.get(key);
-    if (tile?.data && tile.data.length > 0) return Promise.resolve();
+    if (tile?.data && tile.data.length > 0) {
+      tile.lastAccess = performance.now();
+      return Promise.resolve();
+    }
     if (tile?.loading) return tile.loading;
 
-    tile = { key, data: new Uint8ClampedArray(0) };
+    tile = { key, data: new Uint8ClampedArray(0), lastAccess: performance.now() };
     this.tiles.set(key, tile);
 
     const url = TILE_URL.replace('{z}', String(ZOOM))
@@ -206,7 +230,9 @@ export class ElevationSampler {
         ctx.drawImage(bitmap, 0, 0);
         const img = ctx.getImageData(0, 0, SIZE, SIZE);
         tile!.data = img.data;
+        tile!.lastAccess = performance.now();
         bitmap.close();
+        this.trimCache();
       } catch (err) {
         console.warn('Terrarium tile failed/timeout', key, err);
         this.tiles.delete(key);
@@ -217,5 +243,14 @@ export class ElevationSampler {
     })();
 
     return tile.loading;
+  }
+
+  /** Drop cached DEM tiles (call on TileManager dispose). */
+  dispose(): void {
+    this.tiles.clear();
+    this.originElev = null;
+    this.lastKnownAbs = null;
+    this.canvas = null;
+    this.ctx = null;
   }
 }

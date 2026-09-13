@@ -49,7 +49,9 @@ export class ChaseCamera {
 
     // Keep camera from clipping into hills / ground
     if (this.groundAt) {
-      const minY = this.groundAt(desiredPos.x, desiredPos.z) + (this.mode === 'chase' ? 1.8 : 1.0);
+      let gy = this.groundAt(desiredPos.x, desiredPos.z);
+      if (!Number.isFinite(gy)) gy = vehicle.position.y;
+      const minY = gy + (this.mode === 'chase' ? 1.8 : 1.0);
       if (desiredPos.y < minY) desiredPos.y = minY;
     } else {
       const minY = vehicle.position.y + (this.mode === 'chase' ? 1.5 : 0.8);
@@ -68,8 +70,31 @@ export class ChaseCamera {
 
     // Soft clamp smoothed position too (after hills)
     if (this.groundAt) {
-      const minY = this.groundAt(this.currentPos.x, this.currentPos.z) + 1.2;
+      let gy = this.groundAt(this.currentPos.x, this.currentPos.z);
+      if (!Number.isFinite(gy)) gy = vehicle.position.y;
+      const minY = gy + 1.2;
       if (this.currentPos.y < minY) this.currentPos.y = minY;
+    }
+
+    // Reject NaN camera poses (DEM / vehicle glitches)
+    if (
+      !Number.isFinite(this.currentPos.x) ||
+      !Number.isFinite(this.currentPos.y) ||
+      !Number.isFinite(this.currentPos.z)
+    ) {
+      this.currentPos.set(
+        vehicle.position.x,
+        vehicle.position.y + spec.cameraHeight,
+        vehicle.position.z - spec.cameraDistance,
+      );
+      this.currentLook.copy(vehicle.position);
+    }
+    if (
+      !Number.isFinite(this.currentLook.x) ||
+      !Number.isFinite(this.currentLook.y) ||
+      !Number.isFinite(this.currentLook.z)
+    ) {
+      this.currentLook.copy(vehicle.position).add(new THREE.Vector3(0, 1, 0));
     }
 
     this.camera.position.copy(this.currentPos);

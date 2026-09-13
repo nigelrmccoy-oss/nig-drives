@@ -67,6 +67,7 @@ export class Game {
   async start(opts: GameStartOptions): Promise<void> {
     this.stopLoop();
     this.clearWorld();
+    // AudioContext only after user gesture (Start button) — resume if suspended
     this.engineSound.start();
 
     const city = getCityById(opts.cityId);
@@ -96,14 +97,16 @@ export class Game {
       this.hud.setStatus('Map load issue — offline / partial tiles');
     }
 
+    // Spawn race guard: prefer nearest road; fall back to origin DEM; reject NaN
     const snap = this.tiles.findNearestRoadPoint(0, 0);
     const heading = (city.headingDeg * Math.PI) / 180;
-    if (snap) {
+    if (snap && Number.isFinite(snap.x) && Number.isFinite(snap.z) && Number.isFinite(snap.y)) {
       this.vehicle.setPose(snap.x, snap.z, heading);
       this.vehicle.position.y = snap.y;
       this.vehicle.mesh.position.y = snap.y;
     } else {
-      const y = this.tiles.getHeight(0, 0);
+      let y = this.tiles.getHeight(0, 0);
+      if (!Number.isFinite(y)) y = 0;
       this.vehicle.setPose(0, 0, heading);
       this.vehicle.position.y = y;
       this.vehicle.mesh.position.y = y;
@@ -126,7 +129,7 @@ export class Game {
     const w = this.env.cycleWeather();
     this.tiles?.setWeatherSurface(w);
     this.hud.setWeather(w);
-    this.hud.setStatus(`Weather: ${WEATHER_LABELS[w]} — grip ${Math.round(this.env.getGripMultiplier() * 100)}%`);
+    this.hud.setStatus(`Weather: ${WEATHER_LABELS[w]} — base grip ${Math.round(this.env.getGripMultiplier() * 100)}% (surface modulates)`);
   }
 
   private cycleTime(): void {
@@ -177,6 +180,8 @@ export class Game {
     }
 
     const surface = this.tiles.sampleSurface(this.vehicle.position.x, this.vehicle.position.z);
+    let h = surface.height;
+    if (!Number.isFinite(h)) h = 0;
     this.vehicle.update(
       dt,
       this.input,
@@ -185,18 +190,34 @@ export class Game {
         gripMul: this.env.getGripMultiplier(),
         accelBrakeMul: this.env.getAccelBrakeMultiplier(),
       },
-      { roadFactor: surface.roadFactor },
+      {
+        roadFactor: surface.roadFactor,
+        grip: surface.grip,
+        noise: surface.noise,
+      },
     );
-    this.vehicle.position.y = surface.height;
-    this.vehicle.mesh.position.y = surface.height;
+    this.vehicle.position.y = h;
+    this.vehicle.mesh.position.y = h;
+
+    // Bail if vehicle state went non-finite (camera NaN cascade)
+    if (
+      !Number.isFinite(this.vehicle.position.x) ||
+      !Number.isFinite(this.vehicle.position.z) ||
+      !Number.isFinite(this.vehicle.heading)
+    ) {
+      this.vehicle.setPose(0, 0, 0);
+      this.vehicle.position.y = this.tiles.getHeight(0, 0) || 0;
+      this.hud.setStatus('Recovered from invalid vehicle state');
+    }
 
     this.tiles.update(this.vehicle.position.x, this.vehicle.position.z);
-    this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z, surface.height);
+    this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z, h);
     this.chase.update(dt, this.vehicle);
     this.engineSound.update(this.vehicle);
 
     this.hud.setSpeed(this.vehicle.getSpeedKmh());
     this.hud.setAssists(this.vehicle.getAssistFlags());
+    this.hud.setSurface(surface.label, surface.grip);
     this.hud.setTime(this.env.getTimeLabel(), this.env.timePaused);
 
     this.renderer.render(this.scene, this.camera);

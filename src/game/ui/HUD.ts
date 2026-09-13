@@ -10,6 +10,7 @@ export class HUD {
   private weatherEl: HTMLElement;
   private timeEl: HTMLElement;
   private assistEl: HTMLElement;
+  private surfaceEl: HTMLElement;
   private onWeatherClick?: () => void;
   private onTimeClick?: () => void;
 
@@ -23,6 +24,7 @@ export class HUD {
           <div class="value" id="hud-speed">0 km/h</div>
           <div class="sub" id="hud-vehicle">—</div>
           <div class="sub" id="hud-assist"></div>
+          <div class="sub" id="hud-surface">Surface: —</div>
         </div>
         <div class="hud-panel">
           <div class="label">Location</div>
@@ -54,6 +56,7 @@ export class HUD {
     this.weatherEl = this.root.querySelector('#hud-weather')!;
     this.timeEl = this.root.querySelector('#hud-time')!;
     this.assistEl = this.root.querySelector('#hud-assist')!;
+    this.surfaceEl = this.root.querySelector('#hud-surface')!;
 
     this.weatherEl.addEventListener('click', () => this.onWeatherClick?.());
     this.timeEl.addEventListener('click', () => this.onTimeClick?.());
@@ -82,7 +85,13 @@ export class HUD {
   }
 
   setSpeed(kmh: number): void {
-    this.speedEl.textContent = `${Math.round(kmh)} km/h`;
+    const v = Number.isFinite(kmh) ? Math.round(kmh) : 0;
+    this.speedEl.textContent = `${v} km/h`;
+  }
+
+  setSurface(label: string, grip: number): void {
+    const g = Number.isFinite(grip) ? Math.round(grip * 100) : 0;
+    this.surfaceEl.textContent = `Surface: ${label} · grip ${g}%`;
   }
 
   setStatus(msg: string): void {

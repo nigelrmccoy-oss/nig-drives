@@ -55,6 +55,14 @@ canvas.game-canvas {
   margin-bottom: 4px;
 }
 
+.menu-card h1 .ver {
+  font-size: 0.55em;
+  font-weight: 600;
+  color: #7eb6ff;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
 .menu-card .tagline {
   color: #9bb0d4;
   margin-bottom: 20px;

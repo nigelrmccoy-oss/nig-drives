@@ -33,7 +33,7 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives</h1>
+        <h1>Nig Drives <span class="ver">v1.2c</span></h1>
         <p class="tagline">Drive a Golf or New Flyer–style transit bus on real OpenStreetMap roads across North America.</p>
 
         <div class="section-label">Vehicle</div>
