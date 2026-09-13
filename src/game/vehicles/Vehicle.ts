@@ -2,82 +2,199 @@ import * as THREE from 'three';
 import type { Input } from '../input/Input';
 import type { WeatherPreset } from '../weather/Environment';
 
-export type VehicleId = 'golf' | 'bus';
+/** Selectable drivetrains / transit variants (v1.2). */
+export type VehicleId =
+  | 'golf_18carb'
+  | 'golf_20aba'
+  | 'golf_19tdi'
+  | 'golf_28vr6'
+  | 'bus_diesel'
+  | 'bus_hybrid';
+
+export type VehicleClass = 'golf' | 'bus';
+
+export function vehicleClassOf(id: VehicleId): VehicleClass {
+  return id.startsWith('bus') ? 'bus' : 'golf';
+}
 
 export interface VehicleSpec {
   id: VehicleId;
   name: string;
+  class: VehicleClass;
+  /** Short label for menus (engine / powertrain). */
+  variantLabel: string;
   mass: number;
   /** Peak engine accel force / mass (m/s²) at full throttle on dry. */
   accel: number;
   maxSpeed: number;
   brakeForce: number;
-  /** Wheelbase meters — longer = slower yaw response. */
   wheelbase: number;
-  /** Track width meters. */
   track: number;
-  /** Base tire peak mu on dry asphalt. */
   gripMu: number;
-  /** Steering lock (radians). */
   steerLock: number;
-  /** How quickly steer angle approaches input. */
   steerSpeed: number;
-  /** CG height for weight transfer (m). */
   cgHeight: number;
-  /** Front weight bias 0–1. */
   frontBias: number;
   cameraHeight: number;
   cameraDistance: number;
   length: number;
   width: number;
   height: number;
+  /**
+   * Speed fraction (0–1 of maxSpeed) where torque peaks.
+   * Lower = stronger low-end (TDI); higher = top-end (VR6).
+   */
+  torquePeak: number;
+  /** Extra force multiplier near torque peak / low-end band. */
+  lowEndMul: number;
+  /** Exponent for power fade toward redline (higher = falls off sooner). */
+  powerFadeExp: number;
+  /** Engine note base pitch (1 = ABA reference). */
+  soundPitch: number;
+  /** Hybrid regen: extra brake force multiplier when braking / lifting. */
+  regenBrakeMul: number;
+  /** Soft regen when coasting off-throttle (hybrid). */
+  coastRegen: number;
 }
 
+const GOLF_BASE = {
+  class: 'golf' as const,
+  wheelbase: 2.62,
+  track: 1.54,
+  gripMu: 1.15,
+  steerLock: 0.55,
+  steerSpeed: 3.2,
+  cgHeight: 0.52,
+  frontBias: 0.58,
+  cameraHeight: 3.2,
+  cameraDistance: 8.5,
+  length: 4.3,
+  width: 1.8,
+  height: 1.45,
+  regenBrakeMul: 1,
+  coastRegen: 0,
+};
+
+const BUS_BASE = {
+  class: 'bus' as const,
+  wheelbase: 6.1,
+  track: 2.1,
+  gripMu: 0.85,
+  steerLock: 0.42,
+  steerSpeed: 1.6,
+  cgHeight: 1.15,
+  frontBias: 0.48,
+  cameraHeight: 6.5,
+  cameraDistance: 16,
+  length: 12.2,
+  width: 2.55,
+  height: 3.2,
+};
+
 export const VEHICLE_SPECS: Record<VehicleId, VehicleSpec> = {
-  golf: {
-    id: 'golf',
-    name: 'VW Golf',
-    mass: 1320,
-    accel: 9.5,
+  golf_18carb: {
+    ...GOLF_BASE,
+    id: 'golf_18carb',
+    name: 'VW Golf 1.8 carb',
+    variantLabel: '1.8 carb',
+    mass: 1160,
+    accel: 6.2,
+    maxSpeed: 41,
+    brakeForce: 16,
+    torquePeak: 0.35,
+    lowEndMul: 1.05,
+    powerFadeExp: 1.6,
+    soundPitch: 0.88,
+  },
+  golf_20aba: {
+    ...GOLF_BASE,
+    id: 'golf_20aba',
+    name: 'VW Golf 2.0 ABA',
+    variantLabel: '2.0 ABA',
+    mass: 1280,
+    accel: 9.2,
     maxSpeed: 48,
     brakeForce: 18,
-    wheelbase: 2.62,
-    track: 1.54,
-    gripMu: 1.15,
-    steerLock: 0.55,
-    steerSpeed: 3.2,
-    cgHeight: 0.52,
-    frontBias: 0.58,
-    cameraHeight: 3.2,
-    cameraDistance: 8.5,
-    length: 4.3,
-    width: 1.8,
-    height: 1.45,
+    torquePeak: 0.42,
+    lowEndMul: 1.12,
+    powerFadeExp: 1.4,
+    soundPitch: 1.0,
   },
-  bus: {
-    id: 'bus',
-    name: 'City Bus',
-    mass: 12500,
-    accel: 2.8,
+  golf_19tdi: {
+    ...GOLF_BASE,
+    id: 'golf_19tdi',
+    name: 'VW Golf 1.9 TDI',
+    variantLabel: '1.9 TDI',
+    mass: 1340,
+    accel: 7.8,
+    maxSpeed: 44,
+    brakeForce: 17.5,
+    // Diesel: fat low/mid torque, soft top end
+    torquePeak: 0.28,
+    lowEndMul: 1.45,
+    powerFadeExp: 2.1,
+    soundPitch: 0.72,
+  },
+  golf_28vr6: {
+    ...GOLF_BASE,
+    id: 'golf_28vr6',
+    name: 'VW Golf 2.8 VR6',
+    variantLabel: '2.8 VR6',
+    mass: 1420,
+    accel: 12.2,
+    maxSpeed: 56,
+    brakeForce: 19,
+    frontBias: 0.6,
+    // Peakier top-end howl
+    torquePeak: 0.55,
+    lowEndMul: 1.08,
+    powerFadeExp: 1.15,
+    soundPitch: 1.18,
+  },
+  bus_diesel: {
+    ...BUS_BASE,
+    id: 'bus_diesel',
+    name: 'Transit Bus · Diesel',
+    variantLabel: 'Diesel',
+    mass: 14500,
+    accel: 2.55,
+    maxSpeed: 22,
+    brakeForce: 9.2,
+    torquePeak: 0.3,
+    lowEndMul: 1.35,
+    powerFadeExp: 1.8,
+    soundPitch: 0.55,
+    regenBrakeMul: 1,
+    coastRegen: 0,
+  },
+  bus_hybrid: {
+    ...BUS_BASE,
+    id: 'bus_hybrid',
+    name: 'Transit Bus · Hybrid',
+    variantLabel: 'Hybrid',
+    mass: 13800,
+    accel: 3.35,
     maxSpeed: 24,
-    brakeForce: 9.5,
-    wheelbase: 6.1,
-    track: 2.1,
-    gripMu: 0.85,
-    steerLock: 0.42,
-    steerSpeed: 1.6,
-    cgHeight: 1.15,
-    frontBias: 0.48,
-    cameraHeight: 6.5,
-    cameraDistance: 16,
-    length: 12,
-    width: 2.55,
-    height: 3.2,
+    brakeForce: 11.5,
+    torquePeak: 0.25,
+    lowEndMul: 1.5,
+    powerFadeExp: 1.5,
+    soundPitch: 0.95,
+    regenBrakeMul: 1.35,
+    coastRegen: 1.8,
   },
 };
 
+export const GOLF_ENGINE_IDS: VehicleId[] = [
+  'golf_18carb',
+  'golf_20aba',
+  'golf_19tdi',
+  'golf_28vr6',
+];
+
+export const BUS_VARIANT_IDS: VehicleId[] = ['bus_diesel', 'bus_hybrid'];
+
 export interface SurfaceInfo {
-  /** 1 = on asphalt road, <1 off-road / grass. */
   roadFactor: number;
 }
 
@@ -88,28 +205,26 @@ export interface WeatherDriveInfo {
 }
 
 /**
- * Sim-cade tire model (FM4 / GT5 inspired, not a full sim):
- * - Longitudinal accel/brake with weight transfer
- * - Lateral grip from slip angle; combined grip circle tradeoff
- * - Progressive under/oversteer; subtle ABS/TCS
- * - Weather & surface multipliers
+ * Sim-cade tire model (FM4 / GT5 inspired):
+ * weight transfer, grip circle, ABS/TCS, weather & surface.
+ * v1.2: engine torque curves + hybrid regen.
  */
 export class Vehicle {
   readonly spec: VehicleSpec;
   readonly mesh: THREE.Group;
   position = new THREE.Vector3();
-  /** Radians, 0 = +Z (north). */
   heading = 0;
-  /** Body-frame velocity: x = lateral (right+), z = longitudinal (forward+). */
   private vx = 0;
   private vz = 0;
   private yawRate = 0;
   private steerAngle = 0;
-  /** World speed magnitude for HUD. */
   speed = 0;
   sliding = false;
   private absActive = false;
   private tcsActive = false;
+  /** 0–1 normalized load for engine sound. */
+  throttleLoad = 0;
+  private _prevVz = 0;
 
   constructor(spec: VehicleSpec, mesh: THREE.Group) {
     this.spec = spec;
@@ -124,6 +239,7 @@ export class Vehicle {
     this.yawRate = 0;
     this.steerAngle = 0;
     this.speed = 0;
+    this.throttleLoad = 0;
     this.syncMesh();
   }
 
@@ -133,14 +249,14 @@ export class Vehicle {
     const mu =
       s.gripMu * weather.gripMul * THREE.MathUtils.clamp(surface.roadFactor, 0.25, 1.0);
 
-    // --- Steering ---
     const steerTarget =
       ((input.left ? 1 : 0) + (input.right ? -1 : 0)) * s.steerLock;
-    const steerRate = s.steerSpeed * (0.55 + 0.45 * (1 - THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1)));
+    const steerRate =
+      s.steerSpeed *
+      (0.55 + 0.45 * (1 - THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1)));
     this.steerAngle = approach(this.steerAngle, steerTarget, steerRate * s.steerLock * dt);
 
-    // --- Weight transfer (longitudinal) ---
-    const axApprox = (this.vz - (this._prevVz ?? this.vz)) / Math.max(dt, 1e-4);
+    const axApprox = (this.vz - this._prevVz) / Math.max(dt, 1e-4);
     this._prevVz = this.vz;
     const transfer = THREE.MathUtils.clamp(
       (s.mass * axApprox * s.cgHeight) / (s.wheelbase * s.mass * g),
@@ -149,8 +265,7 @@ export class Vehicle {
     );
     let wFront = THREE.MathUtils.clamp(s.frontBias - transfer, 0.28, 0.78);
     let wRear = 1 - wFront;
-    // Speed-based aero-ish slight rear stability for bus
-    if (s.id === 'bus') {
+    if (s.class === 'bus') {
       wRear = Math.min(0.62, wRear + 0.02);
       wFront = 1 - wRear;
     }
@@ -162,30 +277,33 @@ export class Vehicle {
     const maxFyFront = mu * FzFront * 1.05;
     const maxFyRear = mu * FzRear * 1.05;
 
-    // --- Longitudinal demand ---
     let throttle = input.forward ? 1 : 0;
     let brake = input.back || input.brake ? (input.brake ? 1 : 0.55) : 0;
     if (input.back && this.vz < 0.8) {
-      // reverse when nearly stopped
       throttle = 0;
     }
+    this.throttleLoad = throttle;
 
-    let engAx = throttle * s.accel * weather.accelBrakeMul;
-    // Engine force fades near top speed
-    engAx *= 1 - THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1) ** 1.4;
+    const spdFrac = THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1);
+    // Torque band around torquePeak
+    const bandDist = Math.abs(spdFrac - s.torquePeak);
+    const band = 1 + (s.lowEndMul - 1) * Math.max(0, 1 - bandDist / 0.45);
+    let engAx = throttle * s.accel * weather.accelBrakeMul * band;
+    engAx *= 1 - spdFrac ** s.powerFadeExp;
 
     let brakeAx = 0;
     if (brake > 0 && this.vz > 0.15) {
-      brakeAx = -brake * s.brakeForce * weather.accelBrakeMul;
+      brakeAx = -brake * s.brakeForce * s.regenBrakeMul * weather.accelBrakeMul;
     } else if (input.back && this.vz <= 0.15) {
       engAx = -s.accel * 0.35 * weather.accelBrakeMul;
+    } else if (throttle === 0 && brake === 0 && this.vz > 0.5 && s.coastRegen > 0) {
+      // Hybrid lift-off regen
+      brakeAx = -s.coastRegen * weather.accelBrakeMul;
     }
 
-    // Rolling resistance + drag
     const drag = 0.012 * g * Math.sign(this.vz) + 0.00045 * this.vz * Math.abs(this.vz);
     let longDemand = engAx - drag + brakeAx;
 
-    // TCS: limit drive force if rear would exceed grip
     this.tcsActive = false;
     if (longDemand > 0) {
       const driveCap = (maxFxRear * 0.92) / s.mass;
@@ -195,7 +313,6 @@ export class Vehicle {
       }
     }
 
-    // ABS: limit brake so fronts don't lock entirely
     this.absActive = false;
     if (longDemand < 0) {
       const brakeCap = -((maxFxFront + maxFxRear) * 0.9) / s.mass;
@@ -205,21 +322,17 @@ export class Vehicle {
       }
     }
 
-    // --- Slip angles (bicycle model) ---
     const vSafe = Math.max(Math.abs(this.vz), 1.2);
     const yaw = this.yawRate;
     const aFront = Math.atan2(this.vx + yaw * (s.wheelbase * wRear), vSafe) - this.steerAngle;
     const aRear = Math.atan2(this.vx - yaw * (s.wheelbase * wFront), vSafe);
 
-    // Pacejka-ish cornering stiffness scaled by load & mu
     const Cf = (FzFront / (s.mass * g)) * 9.5 * mu * s.mass * g;
     const Cr = (FzRear / (s.mass * g)) * 10.5 * mu * s.mass * g;
 
     let FyFront = -Cf * Math.tan(THREE.MathUtils.clamp(aFront, -0.6, 0.6));
     let FyRear = -Cr * Math.tan(THREE.MathUtils.clamp(aRear, -0.6, 0.6));
 
-    // --- Combined grip circle (front / rear) ---
-    // Allocate longitudinal: drive on rear, brake split by bias
     let FxFront = 0;
     let FxRear = 0;
     const Flong = longDemand * s.mass;
@@ -239,38 +352,30 @@ export class Vehicle {
 
     this.sliding = frontCombo.sliding || rearCombo.sliding;
 
-    // Resolve body accel from tire forces (steer rotates front force into body frame)
     const cos = Math.cos(this.steerAngle);
     const sin = Math.sin(this.steerAngle);
-    const Fx =
-      FxRear + FxFront * cos - FyFront * sin;
-    const Fy =
-      FyRear + FyFront * cos + FxFront * sin;
+    const Fx = FxRear + FxFront * cos - FyFront * sin;
+    const Fy = FyRear + FyFront * cos + FxFront * sin;
 
-    const ax = Fy / s.mass + this.vz * yaw; // coriolis in body frame
+    const ax = Fy / s.mass + this.vz * yaw;
     const az = Fx / s.mass - this.vx * yaw;
 
     this.vx += ax * dt;
     this.vz += az * dt;
 
-    // Yaw moment from tire lateral (+ front longitudinal with lever if steered — simplified)
     const yawMoment =
       FyFront * cos * (s.wheelbase * wRear) -
       FyRear * (s.wheelbase * wFront) +
       FxFront * sin * (s.wheelbase * wRear) * 0.35;
-    // Inertia scales with mass * wheelbase²
-    const Iz = s.mass * (s.wheelbase * 0.5) ** 2 * (s.id === 'bus' ? 1.35 : 0.95);
+    const Iz = s.mass * (s.wheelbase * 0.5) ** 2 * (s.class === 'bus' ? 1.35 : 0.95);
     this.yawRate += (yawMoment / Iz) * dt;
 
-    // Damper yaw when grip is high / low speed for stability
     const yawDamp = 1.8 + mu * 1.2;
     this.yawRate *= Math.exp(-yawDamp * dt * (0.4 + 0.6 * Math.min(1, vSafe / 12)));
 
-    // Integrate pose
     const worldYaw = this.heading;
     const c = Math.cos(worldYaw);
     const sn = Math.sin(worldYaw);
-    // body z forward, x right → world
     const wx = sn * this.vz + c * this.vx;
     const wz = c * this.vz - sn * this.vx;
     this.position.x += wx * dt;
@@ -279,14 +384,11 @@ export class Vehicle {
 
     this.speed = Math.hypot(this.vx, this.vz);
 
-    // Soft clamp reverse speed
     if (this.vz < -s.maxSpeed * 0.28) this.vz = -s.maxSpeed * 0.28;
     if (this.vz > s.maxSpeed * 1.05) this.vz = s.maxSpeed * 1.05;
 
     this.syncMesh();
   }
-
-  private _prevVz = 0;
 
   getSpeedKmh(): number {
     return this.speed * 3.6;
@@ -300,13 +402,23 @@ export class Vehicle {
     return { abs: this.absActive, tcs: this.tcsActive, slide: this.sliding };
   }
 
+  /** RPM-ish 0–1 for audio. */
+  getEngineRpmNorm(): number {
+    const s = this.spec;
+    const spd = THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1);
+    return THREE.MathUtils.clamp(0.15 + spd * 0.75 + this.throttleLoad * 0.2, 0, 1);
+  }
+
   private syncMesh(): void {
     this.mesh.position.copy(this.position);
     this.mesh.rotation.order = 'YXZ';
     this.mesh.rotation.y = this.heading;
-    // Subtle body roll / pitch for weight transfer feel
     const roll = THREE.MathUtils.clamp(-this.vx * 0.015, -0.08, 0.08);
-    const pitch = THREE.MathUtils.clamp(-this.vz * 0.002 + (this._prevVz - this.vz) * 0.01, -0.06, 0.06);
+    const pitch = THREE.MathUtils.clamp(
+      -this.vz * 0.002 + (this._prevVz - this.vz) * 0.01,
+      -0.06,
+      0.06,
+    );
     this.mesh.rotation.z = roll;
     this.mesh.rotation.x = pitch;
   }
@@ -317,7 +429,6 @@ function approach(current: number, target: number, maxDelta: number): number {
   return Math.max(current - maxDelta, target);
 }
 
-/** Elliptical grip circle: scale Fx/Fy if outside friction ellipse. */
 function combineGrip(
   fx: number,
   fy: number,
@@ -328,7 +439,6 @@ function combineGrip(
   const ny = maxFy > 1e-3 ? fy / maxFy : 0;
   const mag = Math.hypot(nx, ny);
   if (mag <= 1) return { fx, fy, sliding: mag > 0.92 };
-  // Progressive slide: soften beyond limit instead of hard clamp only
   const scale = (1 / mag) * (0.92 + 0.08 / mag);
   return { fx: fx * scale, fy: fy * scale, sliding: true };
 }

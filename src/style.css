@@ -38,7 +38,9 @@ canvas.game-canvas {
 }
 
 .menu-card {
-  width: min(720px, 94vw);
+  width: min(820px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
   background: #121a2ccc;
   border: 1px solid #3a4f7a;
   border-radius: 16px;
@@ -77,9 +79,22 @@ canvas.game-canvas {
   grid-template-columns: 1fr 1fr;
 }
 
-@media (min-width: 640px) {
-  .choice-row.cities {
+.choice-row.variants {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (min-width: 720px) {
+  .choice-row.variants {
     grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+  .choice-row.cities {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (min-width: 640px) and (max-width: 719px) {
+  .choice-row.cities {
+    grid-template-columns: 1fr 1fr 1fr;
   }
 }
 

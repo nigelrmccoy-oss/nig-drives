@@ -38,8 +38,8 @@ export class ChaseCamera {
         .add(new THREE.Vector3(0, spec.cameraHeight, 0));
       desiredLook = vehicle.position.clone().add(new THREE.Vector3(0, spec.height * 0.55, 0));
     } else {
-      const eyeHeight = spec.id === 'bus' ? 2.4 : 1.25;
-      const eyeForward = spec.id === 'bus' ? 5.2 : 0.9;
+      const eyeHeight = spec.class === 'bus' ? 2.4 : 1.25;
+      const eyeForward = spec.class === 'bus' ? 5.2 : 0.9;
       desiredPos = vehicle.position
         .clone()
         .addScaledVector(forward, eyeForward)

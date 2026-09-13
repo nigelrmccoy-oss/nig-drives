@@ -5,6 +5,7 @@ import { Input } from './input/Input';
 import { TileManager } from './map/TileManager';
 import { HUD } from './ui/HUD';
 import { createVehicle } from './vehicles/VehicleFactory';
+import { EngineSound } from './vehicles/EngineSound';
 import type { Vehicle } from './vehicles/Vehicle';
 import type { VehicleId } from './vehicles/Vehicle';
 import { Environment, WEATHER_LABELS } from './weather/Environment';
@@ -25,6 +26,7 @@ export class Game {
   private loadingEl: HTMLElement;
   private vehicle: Vehicle | null = null;
   private tiles: TileManager | null = null;
+  private engineSound = new EngineSound();
   private running = false;
   private lastT = 0;
   private cityName = '';
@@ -43,7 +45,6 @@ export class Game {
     this.scene.background = new THREE.Color(0x87b5e5);
     this.scene.fog = new THREE.Fog(0x87b5e5, 180, 900);
 
-    // Near plane raised slightly to reduce ground clipping sparkles
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.35, 2500);
     this.chase = new ChaseCamera(this.camera);
 
@@ -66,6 +67,7 @@ export class Game {
   async start(opts: GameStartOptions): Promise<void> {
     this.stopLoop();
     this.clearWorld();
+    this.engineSound.start();
 
     const city = getCityById(opts.cityId);
     this.cityName = city.name;
@@ -91,14 +93,13 @@ export class Game {
       await this.tiles.warmStart();
     } catch (err) {
       console.error(err);
-      this.hud.setStatus('Map load issue — fallback / partial tiles');
+      this.hud.setStatus('Map load issue — offline / partial tiles');
     }
 
     const snap = this.tiles.findNearestRoadPoint(0, 0);
     const heading = (city.headingDeg * Math.PI) / 180;
     if (snap) {
       this.vehicle.setPose(snap.x, snap.z, heading);
-      // snap.y already includes ROAD_Y_BIAS from centerlines
       this.vehicle.position.y = snap.y;
       this.vehicle.mesh.position.y = snap.y;
     } else {
@@ -141,7 +142,6 @@ export class Game {
     }
     if (this.tiles) {
       const keep = new Set<THREE.Object3D>(this.env.getOwnedObjects());
-      // Let TileManager dispose its own meshes/materials first
       this.tiles.dispose();
       this.tiles = null;
       for (const child of [...this.scene.children]) {
@@ -193,6 +193,7 @@ export class Game {
     this.tiles.update(this.vehicle.position.x, this.vehicle.position.z);
     this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z, surface.height);
     this.chase.update(dt, this.vehicle);
+    this.engineSound.update(this.vehicle);
 
     this.hud.setSpeed(this.vehicle.getSpeedKmh());
     this.hud.setAssists(this.vehicle.getAssistFlags());
@@ -215,6 +216,7 @@ export class Game {
 
   dispose(): void {
     this.stopLoop();
+    this.engineSound.dispose();
     this.input.dispose();
     this.env.dispose();
     window.removeEventListener('resize', this.onResize);

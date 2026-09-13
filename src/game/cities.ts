@@ -30,7 +30,7 @@ export const CITIES: CitySpawn[] = [
     id: 'nyc',
     name: 'New York City',
     region: 'New York, USA',
-    lat: 40.7580,
+    lat: 40.758,
     lon: -73.9855,
     headingDeg: 180,
   },
@@ -40,6 +40,15 @@ export const CITIES: CitySpawn[] = [
     region: 'Ontario, Canada',
     lat: 43.6532,
     lon: -79.3832,
+    headingDeg: 90,
+  },
+  {
+    // King St W @ University Ave, Waterloo — dense grid near UW / uptown
+    id: 'kw',
+    name: 'Kitchener–Waterloo',
+    region: 'Ontario, Canada',
+    lat: 43.4728,
+    lon: -80.5235,
     headingDeg: 90,
   },
 ];

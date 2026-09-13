@@ -1,5 +1,11 @@
 import { CITIES } from '../cities';
-import type { VehicleId } from '../vehicles/Vehicle';
+import {
+  BUS_VARIANT_IDS,
+  GOLF_ENGINE_IDS,
+  VEHICLE_SPECS,
+  type VehicleId,
+  type VehicleClass,
+} from '../vehicles/Vehicle';
 
 export interface StartSelection {
   vehicle: VehicleId;
@@ -8,7 +14,8 @@ export interface StartSelection {
 
 export class StartMenu {
   private root: HTMLElement;
-  private vehicle: VehicleId = 'golf';
+  private vehicleClass: VehicleClass = 'golf';
+  private vehicle: VehicleId = 'golf_20aba';
   private cityId = CITIES[0].id;
   private onStart: (sel: StartSelection) => void;
 
@@ -21,28 +28,46 @@ export class StartMenu {
   }
 
   private render(): void {
+    const variantIds = this.vehicleClass === 'golf' ? GOLF_ENGINE_IDS : BUS_VARIANT_IDS;
+    const variantLabel = this.vehicleClass === 'golf' ? 'Engine' : 'Powertrain';
+
     this.root.innerHTML = `
       <div class="menu-card">
         <h1>Nig Drives</h1>
-        <p class="tagline">Drive a Golf or city bus on real OpenStreetMap roads across North America.</p>
+        <p class="tagline">Drive a Golf or New Flyer–style transit bus on real OpenStreetMap roads across North America.</p>
 
         <div class="section-label">Vehicle</div>
-        <div class="choice-row" id="vehicle-choices">
-          <button type="button" class="choice selected" data-vehicle="golf">
+        <div class="choice-row" id="class-choices">
+          <button type="button" class="choice ${this.vehicleClass === 'golf' ? 'selected' : ''}" data-class="golf">
             <strong>VW Golf</strong>
-            <span>Agile hatchback · tighter turn · lower cam</span>
+            <span>Hatchback · pick an engine below</span>
           </button>
-          <button type="button" class="choice" data-vehicle="bus">
+          <button type="button" class="choice ${this.vehicleClass === 'bus' ? 'selected' : ''}" data-class="bus">
             <strong>City Bus</strong>
-            <span>Heavy · slow accel · wide turn · high cam</span>
+            <span>New Flyer style · diesel or hybrid</span>
           </button>
+        </div>
+
+        <div class="section-label">${variantLabel}</div>
+        <div class="choice-row variants" id="variant-choices">
+          ${variantIds
+            .map((id) => {
+              const s = VEHICLE_SPECS[id];
+              const selected = id === this.vehicle ? 'selected' : '';
+              return `
+            <button type="button" class="choice ${selected}" data-vehicle="${id}">
+              <strong>${s.variantLabel}</strong>
+              <span>${variantHint(id)}</span>
+            </button>`;
+            })
+            .join('')}
         </div>
 
         <div class="section-label">Start city</div>
         <div class="choice-row cities" id="city-choices">
           ${CITIES.map(
-            (c, i) => `
-            <button type="button" class="choice ${i === 0 ? 'selected' : ''}" data-city="${c.id}">
+            (c) => `
+            <button type="button" class="choice ${c.id === this.cityId ? 'selected' : ''}" data-city="${c.id}">
               <strong>${c.name}</strong>
               <span>${c.region}</span>
             </button>`,
@@ -54,9 +79,19 @@ export class StartMenu {
         <p class="attribution">
           Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (Overpass).
           Elevation: AWS Open Data Terrarium DEM. Not affiliated with Google — no Google Maps/Earth road data.
+          Vehicles are stylized; not affiliated with Volkswagen, New Flyer, or Grand River Transit.
         </p>
       </div>
     `;
+
+    this.root.querySelectorAll('[data-class]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.vehicleClass = (btn as HTMLElement).dataset.class as VehicleClass;
+        this.vehicle =
+          this.vehicleClass === 'golf' ? 'golf_20aba' : 'bus_diesel';
+        this.render();
+      });
+    });
 
     this.root.querySelectorAll('[data-vehicle]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -85,5 +120,24 @@ export class StartMenu {
 
   show(): void {
     this.root.classList.remove('hidden');
+  }
+}
+
+function variantHint(id: VehicleId): string {
+  switch (id) {
+    case 'golf_18carb':
+      return 'Light · mild · soft top end';
+    case 'golf_20aba':
+      return 'Balanced classic 8V feel';
+    case 'golf_19tdi':
+      return 'Low-end torque · diesel note';
+    case 'golf_28vr6':
+      return 'Strong · heavier · higher pitch';
+    case 'bus_diesel':
+      return 'Heavy · low growl · stack';
+    case 'bus_hybrid':
+      return 'Lighter · regen brake · roof pack';
+    default:
+      return '';
   }
 }

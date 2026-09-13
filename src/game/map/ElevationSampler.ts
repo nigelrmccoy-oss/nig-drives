@@ -4,13 +4,15 @@
  * Decode: (R * 256 + G + B / 256) - 32768  → meters
  * No API key. Streaming with map chunks.
  *
- * v1.1: bilinear sampling + cross-tile edge reads to reduce heightfield seams.
+ * v1.2: fetch timeouts + last-known / flat fallback so DEM never hangs gameplay.
  */
 
 const TILE_URL =
   'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 const ZOOM = 12;
 const SIZE = 256;
+/** Abort a single Terrarium PNG fetch after this many ms. */
+const DEM_FETCH_MS = 8_000;
 
 interface DemTile {
   key: string;
@@ -38,13 +40,20 @@ function decodeTerrarium(r: number, g: number, b: number): number {
 export class ElevationSampler {
   private tiles = new Map<string, DemTile>();
   private originElev: number | null = null;
+  /** Last successfully sampled absolute elevation (m). Used when tiles time out. */
+  private lastKnownAbs: number | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
 
-  /** Relative height (meters) above spawn elevation. */
+  /** Relative height (meters) above spawn elevation. Never blocks; flat/last-known on miss. */
   sampleRelative(lat: number, lon: number): number {
     const abs = this.sampleAbsolute(lat, lon);
-    if (abs === null) return 0;
+    if (abs === null) {
+      const fallback = this.lastKnownAbs ?? this.originElev ?? 0;
+      if (this.originElev === null) this.originElev = fallback;
+      return fallback - this.originElev;
+    }
+    this.lastKnownAbs = abs;
     if (this.originElev === null) this.originElev = abs;
     return abs - this.originElev;
   }
@@ -70,12 +79,10 @@ export class ElevationSampler {
     const h11 = this.pixelAbsolute(tx0, ty0, px + 1, py + 1);
 
     if (h00 === null || h10 === null || h01 === null || h11 === null) {
-      // Kick loads for any missing tiles near this sample
       void this.ensureTile(tx0, ty0);
       if (px + 1 >= SIZE) void this.ensureTile(tx0 + 1, ty0);
       if (py + 1 >= SIZE) void this.ensureTile(tx0, ty0 + 1);
       if (px + 1 >= SIZE && py + 1 >= SIZE) void this.ensureTile(tx0 + 1, ty0 + 1);
-      // Fallback to nearest loaded corner if partial
       const any = h00 ?? h10 ?? h01 ?? h11;
       return any;
     }
@@ -129,30 +136,37 @@ export class ElevationSampler {
     const maxTx = Math.max(...corners.map((c) => Math.floor(c.x)));
     const minTy = Math.min(...corners.map((c) => Math.floor(c.y)));
     const maxTy = Math.max(...corners.map((c) => Math.floor(c.y)));
-    // +1 border so bilinear edge samples have neighbors ready
     const jobs: Promise<void>[] = [];
     for (let ty = minTy - 1; ty <= maxTy + 1; ty++) {
       for (let tx = minTx - 1; tx <= maxTx + 1; tx++) {
         jobs.push(this.ensureTile(tx, ty));
       }
     }
-    await Promise.all(jobs);
+    // Don't hang forever if AWS is slow — proceed with whatever arrived.
+    await Promise.race([
+      Promise.all(jobs),
+      new Promise<void>((r) => setTimeout(r, DEM_FETCH_MS + 500)),
+    ]);
   }
 
   async ensureOrigin(lat: number, lon: number): Promise<number> {
     const { x, y } = lonLatToTileFrac(lon, lat, ZOOM);
     const tx = Math.floor(x);
     const ty = Math.floor(y);
-    await Promise.all([
-      this.ensureTile(tx, ty),
-      this.ensureTile(tx + 1, ty),
-      this.ensureTile(tx, ty + 1),
-      this.ensureTile(tx + 1, ty + 1),
-      this.ensureTile(tx - 1, ty),
-      this.ensureTile(tx, ty - 1),
+    await Promise.race([
+      Promise.all([
+        this.ensureTile(tx, ty),
+        this.ensureTile(tx + 1, ty),
+        this.ensureTile(tx, ty + 1),
+        this.ensureTile(tx + 1, ty + 1),
+        this.ensureTile(tx - 1, ty),
+        this.ensureTile(tx, ty - 1),
+      ]),
+      new Promise<void>((r) => setTimeout(r, DEM_FETCH_MS + 500)),
     ]);
     const abs = this.sampleAbsolute(lat, lon);
-    this.originElev = abs ?? 0;
+    this.originElev = abs ?? this.lastKnownAbs ?? 0;
+    if (abs !== null) this.lastKnownAbs = abs;
     return this.originElev;
   }
 
@@ -174,8 +188,10 @@ export class ElevationSampler {
       .replace('{y}', String(ty));
 
     tile.loading = (async () => {
+      const ctrl = new AbortController();
+      const abortTimer = setTimeout(() => ctrl.abort(), DEM_FETCH_MS);
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: ctrl.signal });
         if (!res.ok) throw new Error(`DEM ${res.status}`);
         const blob = await res.blob();
         const bitmap = await createImageBitmap(blob);
@@ -192,9 +208,10 @@ export class ElevationSampler {
         tile!.data = img.data;
         bitmap.close();
       } catch (err) {
-        console.warn('Terrarium tile failed', key, err);
+        console.warn('Terrarium tile failed/timeout', key, err);
         this.tiles.delete(key);
       } finally {
+        clearTimeout(abortTimer);
         if (tile) tile.loading = undefined;
       }
     })();

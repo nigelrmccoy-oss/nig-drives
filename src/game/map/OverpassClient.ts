@@ -18,13 +18,24 @@ export interface OverpassResult {
 const HIGHWAY_FILTER =
   'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link';
 
+/** Per-attempt fetch timeout (ms). Keep short so offline fallback can kick in. */
+export const OVERPASS_ATTEMPT_MS = 10_000;
+/** Max endpoint attempts per tile (sequential after a short parallel race). */
+const MAX_ATTEMPTS = 2;
+
 function buildQuery(south: number, west: number, north: number, east: number): string {
-  // Highways + building footprints for immersion (capped by tile size).
+  // Pad bbox slightly so roads on tile edges are not clipped (helps dense grids).
+  const pad = 0.0004;
+  const s = south - pad;
+  const w = west - pad;
+  const n = north + pad;
+  const e = east + pad;
+  // Server-side timeout must be <= client abort or we wait forever on a hung socket.
   return `
-[out:json][timeout:28];
+[out:json][timeout:9];
 (
-  way["highway"~"^(${HIGHWAY_FILTER})$"](${south},${west},${north},${east});
-  way["building"](${south},${west},${north},${east});
+  way["highway"~"^(${HIGHWAY_FILTER})$"](${s},${w},${n},${e});
+  way["building"](${s},${w},${n},${e});
 );
 out geom;
 `.trim();
@@ -37,14 +48,20 @@ const ENDPOINTS = [
   '/api/overpass-kumi',
 ];
 
-let lastRequestAt = 0;
-const MIN_GAP_MS = 900;
-
-async function waitForSlot(): Promise<void> {
-  const now = Date.now();
-  const wait = Math.max(0, MIN_GAP_MS - (now - lastRequestAt));
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastRequestAt = Date.now();
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (err) => {
+        clearTimeout(t);
+        reject(err);
+      },
+    );
+  });
 }
 
 export class OverpassClient {
@@ -58,6 +75,10 @@ export class OverpassClient {
     this.memoryCache.set(key, data);
   }
 
+  /**
+   * Fetch highways + buildings for a tile bbox.
+   * Short timeouts + limited retries so callers can fall back offline quickly.
+   */
   async fetchTile(
     key: string,
     south: number,
@@ -71,10 +92,31 @@ export class OverpassClient {
     const query = buildQuery(south, west, north, east);
     let lastError: unknown;
 
-    for (const endpoint of ENDPOINTS) {
+    // Race the two public endpoints first (whichever answers wins).
+    try {
+      const raced = await withTimeout(
+        Promise.any(
+          ENDPOINTS.slice(0, 2).map((ep) =>
+            this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
+          ),
+        ),
+        OVERPASS_ATTEMPT_MS,
+        'Overpass race',
+      );
+      this.memoryCache.set(key, raced.parsed);
+      return { ...raced.parsed, source: raced.source };
+    } catch (err) {
+      lastError = err;
+    }
+
+    // One more sequential try via Vite proxy endpoints (CORS fallback in dev).
+    for (const endpoint of ENDPOINTS.slice(2, 2 + MAX_ATTEMPTS)) {
       try {
-        await waitForSlot();
-        const parsed = await this.postQuery(endpoint, query);
+        const parsed = await withTimeout(
+          this.postQuery(endpoint, query),
+          OVERPASS_ATTEMPT_MS,
+          `Overpass ${endpoint}`,
+        );
         this.memoryCache.set(key, parsed);
         return { ...parsed, source: endpoint };
       } catch (err) {
@@ -89,41 +131,48 @@ export class OverpassClient {
     endpoint: string,
     query: string,
   ): Promise<{ ways: OsmWay[]; buildings: OsmWay[] }> {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        Accept: 'application/json',
-      },
-      body: `data=${encodeURIComponent(query)}`,
-    });
+    const ctrl = new AbortController();
+    const abortTimer = setTimeout(() => ctrl.abort(), OVERPASS_ATTEMPT_MS);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          Accept: 'application/json',
+        },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: ctrl.signal,
+      });
 
-    if (!res.ok) {
-      throw new Error(`Overpass ${res.status} from ${endpoint}`);
-    }
+      if (!res.ok) {
+        throw new Error(`Overpass ${res.status} from ${endpoint}`);
+      }
 
-    const data = (await res.json()) as {
-      elements?: Array<{
-        type: string;
-        id: number;
-        tags?: Record<string, string>;
-        geometry?: OsmNode[];
-      }>;
-    };
+      const data = (await res.json()) as {
+        elements?: Array<{
+          type: string;
+          id: number;
+          tags?: Record<string, string>;
+          geometry?: OsmNode[];
+        }>;
+      };
 
-    const ways: OsmWay[] = [];
-    const buildings: OsmWay[] = [];
-    for (const el of data.elements ?? []) {
-      if (el.type !== 'way' || !el.geometry || el.geometry.length < 2) continue;
-      const tags = el.tags ?? {};
-      const item: OsmWay = { id: el.id, tags, geometry: el.geometry };
-      if (tags.highway) ways.push(item);
-      else if (tags.building) buildings.push(item);
+      const ways: OsmWay[] = [];
+      const buildings: OsmWay[] = [];
+      for (const el of data.elements ?? []) {
+        if (el.type !== 'way' || !el.geometry || el.geometry.length < 2) continue;
+        const tags = el.tags ?? {};
+        const item: OsmWay = { id: el.id, tags, geometry: el.geometry };
+        if (tags.highway) ways.push(item);
+        else if (tags.building) buildings.push(item);
+      }
+      // Cap buildings per tile for mid-laptop perf (dense Canadian downtowns).
+      if (buildings.length > 180) {
+        buildings.length = 180;
+      }
+      return { ways, buildings };
+    } finally {
+      clearTimeout(abortTimer);
     }
-    // Cap buildings per tile for mid-laptop perf
-    if (buildings.length > 220) {
-      buildings.length = 220;
-    }
-    return { ways, buildings };
   }
 }
