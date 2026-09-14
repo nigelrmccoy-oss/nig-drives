@@ -364,10 +364,11 @@ export class Vehicle {
 
     let throttle = input.forward ? 1 : 0;
     let brake = input.brake ? 1 : 0;
-    // S: brake when moving forward; request reverse intent when slow / in R
+    // S: brake when moving forward; only drive when already in reverse gear/selector
     if (input.back) {
-      if (this.vz > 0.6) brake = Math.max(brake, 0.7);
-      else if (drive.reverse || this.transmission.mode === 'auto') throttle = Math.max(throttle, 0.85);
+      if (this.vz > 0.6 && !drive.reverse) brake = Math.max(brake, 0.7);
+      else if (drive.reverse) throttle = Math.max(throttle, 0.85);
+      else if (Math.abs(this.vz) <= 0.6) brake = Math.max(brake, 0.55);
     }
 
     // Auto reverse via selector; stick reverse via gear
