@@ -6,10 +6,12 @@ import {
   type VehicleId,
   type VehicleClass,
 } from '../vehicles/Vehicle';
+import type { TransmissionMode } from '../vehicles/Transmission';
 
 export interface StartSelection {
   vehicle: VehicleId;
   cityId: string;
+  transmission: TransmissionMode;
 }
 
 export class StartMenu {
@@ -17,6 +19,7 @@ export class StartMenu {
   private vehicleClass: VehicleClass = 'golf';
   private vehicle: VehicleId = 'golf_20aba';
   private cityId = CITIES[0].id;
+  private transmission: TransmissionMode = 'auto';
   private onStart: (sel: StartSelection) => void;
 
   constructor(parent: HTMLElement, onStart: (sel: StartSelection) => void) {
@@ -33,8 +36,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3</span></h1>
-        <p class="tagline">Forza-inspired visuals · VW Golf hatchback or New Flyer–style bus on real OSM roads.</p>
+        <h1>Nig Drives <span class="ver">v1.3.1a</span></h1>
+        <p class="tagline">Gears · telemetry · minimap · street signs · slower day cycle · OSM roads.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">
@@ -61,6 +64,22 @@ export class StartMenu {
             </button>`;
             })
             .join('')}
+        </div>
+
+        <div class="section-label">Transmission</div>
+        <div class="choice-row" id="trans-choices">
+          <button type="button" class="choice ${this.transmission === 'auto' ? 'selected' : ''}" data-trans="auto">
+            <strong>Auto</strong>
+            <span>P/R/N/D · G cycles · shift points</span>
+          </button>
+          <button type="button" class="choice ${this.transmission === 'stick_seq' ? 'selected' : ''}" data-trans="stick_seq">
+            <strong>Stick · Sequential</strong>
+            <span>Q/E · 1–5/6 + R · clutch optional</span>
+          </button>
+          <button type="button" class="choice ${this.transmission === 'stick_h' ? 'selected' : ''}" data-trans="stick_h">
+            <strong>Stick · H-pattern</strong>
+            <span>1–6 / N / B=R · Q/E also</span>
+          </button>
         </div>
 
         <div class="section-label">Start city</div>
@@ -101,6 +120,14 @@ export class StartMenu {
       });
     });
 
+    this.root.querySelectorAll('[data-trans]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.transmission = (btn as HTMLElement).dataset.trans as TransmissionMode;
+        this.root.querySelectorAll('[data-trans]').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
     this.root.querySelectorAll('[data-city]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.cityId = (btn as HTMLElement).dataset.city!;
@@ -110,7 +137,11 @@ export class StartMenu {
     });
 
     this.root.querySelector('#start-btn')!.addEventListener('click', () => {
-      this.onStart({ vehicle: this.vehicle, cityId: this.cityId });
+      this.onStart({
+        vehicle: this.vehicle,
+        cityId: this.cityId,
+        transmission: this.transmission,
+      });
     });
   }
 

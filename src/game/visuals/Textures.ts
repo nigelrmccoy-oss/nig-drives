@@ -196,21 +196,35 @@ export function makeBuildingFacade(seed: number): { map: THREE.CanvasTexture; em
   ctx.fillRect(0, 0, size, size);
   e.fillStyle = '#000';
   e.fillRect(0, 0, size, size);
-  const cols = 6;
-  const rows = 8;
-  const gapX = 8;
-  const gapY = 10;
+  // Subtle facade grain
+  for (let y = 0; y < size; y += 2) {
+    for (let x = 0; x < size; x += 2) {
+      const n = hash(seed + x, y) * 12 - 6;
+      ctx.fillStyle = `rgba(0,0,0,${0.03 + hash(x, y + seed) * 0.04})`;
+      if (n > 2) ctx.fillRect(x, y, 2, 2);
+    }
+  }
+  const cols = 5;
+  const rows = 7;
+  const gapX = 10;
+  const gapY = 12;
   const cellW = (size - gapX * (cols + 1)) / cols;
   const cellH = (size - gapY * (rows + 1)) / rows;
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const lit = hash(seed * 13 + row * 17 + col, 9) > 0.68;
+      const lit = hash(seed * 13 + row * 17 + col, 9) > 0.62;
       const x = gapX + col * (cellW + gapX);
       const y = gapY + row * (cellH + gapY);
-      ctx.fillStyle = lit ? '#d8c48a' : '#1c2433';
+      // Window frame
+      ctx.fillStyle = '#2a3038';
+      ctx.fillRect(x - 1, y - 1, cellW + 2, cellH * 0.78);
+      ctx.fillStyle = lit ? '#e0c988' : '#151c28';
       ctx.fillRect(x, y, cellW, cellH * 0.72);
+      // Mullion
+      ctx.fillStyle = 'rgba(40,45,55,0.55)';
+      ctx.fillRect(x + cellW * 0.48, y, 2, cellH * 0.72);
       if (lit) {
-        e.fillStyle = '#e8d6a0';
+        e.fillStyle = '#f0d9a0';
         e.fillRect(x, y, cellW, cellH * 0.72);
       }
     }

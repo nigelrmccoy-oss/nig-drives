@@ -414,3 +414,132 @@ canvas.game-canvas {
   border-color: #c9a36a;
   background: #1a1612;
 }
+
+
+/* --- v1.3.1a: telemetry, minimap, transmission UI --- */
+
+.choice-row#trans-choices,
+#trans-choices {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  #trans-choices {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.speedo-cluster {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.speedo {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+}
+
+.speedo-gear {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #5ad4ff;
+  letter-spacing: 0.06em;
+}
+
+.telemetry {
+  min-width: 168px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #12141ad9, #0a0c10e6);
+  border: 1px solid #3d3428;
+  border-bottom: 2px solid #c9a36a;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: #e8eef0;
+}
+
+.telem-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0;
+}
+
+.telem-k {
+  color: #c9a36a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.68rem;
+}
+
+.rpm-bar {
+  height: 5px;
+  background: #1a1e28;
+  border-radius: 2px;
+  margin: 4px 0 6px;
+  overflow: hidden;
+}
+
+.rpm-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #3d8f5a, #c9a36a);
+  transition: width 0.08s linear;
+}
+
+.rpm-fill.hot {
+  background: linear-gradient(90deg, #c9a36a, #e85d4c);
+}
+
+#minimap {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 12;
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px #0008;
+}
+
+#minimap.expanded {
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
+}
+
+#minimap canvas {
+  display: block;
+}
+
+.minimap-hint {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: #c9a36a;
+  pointer-events: none;
+}
+
+.osm-badge {
+  right: auto;
+  left: 14px;
+  bottom: 4px;
+  opacity: 0.85;
+}
+
+.hud-bottom {
+  bottom: 8px;
+}

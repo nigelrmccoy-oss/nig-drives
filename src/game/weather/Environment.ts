@@ -10,8 +10,12 @@ export const WEATHER_LABELS: Record<WeatherPreset, string> = {
 
 const WEATHER_ORDER: WeatherPreset[] = ['clear', 'rain', 'snow'];
 
-/** Full day cycle length in real seconds. */
-const DAY_LENGTH_SEC = 180;
+/**
+ * Full day cycle length in real seconds.
+ * Default ~30 min (was 3 min — too fast). Configurable via Environment.dayLengthSec.
+ */
+export const DEFAULT_DAY_LENGTH_SEC = 30 * 60; // 30 minutes
+export const DAY_LENGTH_OPTIONS_SEC = [20 * 60, 30 * 60, 40 * 60, 60 * 60] as const;
 
 const PARTICLE_COUNT = 900;
 
@@ -41,6 +45,8 @@ export class Environment {
   /** 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset */
   timeOfDay = 0.35;
   timePaused = false;
+  /** Real seconds for a full day/night cycle (default 30 min). */
+  dayLengthSec = DEFAULT_DAY_LENGTH_SEC;
 
   private scene: THREE.Scene;
   private hemi: THREE.HemisphereLight;
@@ -189,6 +195,29 @@ export class Environment {
     this.timePaused = !this.timePaused;
   }
 
+  setDayLengthSec(sec: number): void {
+    this.dayLengthSec = Math.max(60, sec);
+  }
+
+  cycleDayLength(): number {
+    const opts = DAY_LENGTH_OPTIONS_SEC;
+    let best = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < opts.length; i++) {
+      const d = Math.abs(this.dayLengthSec - opts[i]);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    this.dayLengthSec = opts[(best + 1) % opts.length];
+    return this.dayLengthSec;
+  }
+
+  getDayLengthMinutes(): number {
+    return Math.round(this.dayLengthSec / 60);
+  }
+
   getGripMultiplier(): number {
     switch (this.weather) {
       case 'clear':
@@ -230,7 +259,8 @@ export class Environment {
 
   update(dt: number, followX: number, followZ: number, followY = 0): void {
     if (!this.timePaused) {
-      this.timeOfDay = (this.timeOfDay + dt / DAY_LENGTH_SEC) % 1;
+      const len = Math.max(60, this.dayLengthSec);
+      this.timeOfDay = (this.timeOfDay + dt / len) % 1;
     }
     this.applyVisuals();
 

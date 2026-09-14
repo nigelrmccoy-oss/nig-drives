@@ -6,6 +6,19 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.1a (package 1.3.2) — Gears, telemetry, map UX
+
+- **Gears:** Auto (P/R/N/D with shift points, **G** cycles selector) or stick — sequential (**Q/E**) or H-pattern (**1–6**, **N**, **B**=reverse). Optional-lite clutch (**Shift**). Gear shown on HUD + speedo; RPM linked to gear × speed.
+- **Audio:** Richer procedural Web Audio (RPM harmonics, load, per-engine / bus diesel·hybrid character). Optional sample layout documented under `public/audio-samples/` (not required).
+- **Minimap:** Corner map; click to expand/collapse. Player + nearby roads.
+- **Street signs:** OSM `name`/`ref` as floating world labels on major ways (capped, distance-faded).
+- **Buildings:** Prefer `height` / `building:levels`; clearer window facades; enabled by default.
+- **Day length:** ~**30 min** full cycle by default (was ~3 min); still pausable with **P**.
+- **Telemetry:** Panel by speedometer — RPM, gear, engine, throttle/brake, fake boost (TDI/VR6), coolant.
+- **Curbs:** Raised edge curb strips along paved roads (more visible).
+- **Scale:** Lane/carriageway widths recalibrated (~3–3.5 m lanes) so the ~1.8 m Golf sits naturally.
+- Web build only this release (Electron files kept; no Windows rebuild).
+
 ### v1.3.1 — Windows desktop (Electron)
 
 - **Windows portable `.exe`** via Electron + electron-builder (loads the Vite `dist/` build locally — not a remote URL).
@@ -66,7 +79,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-1.3.1-portable.exe`).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1a**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 
@@ -107,8 +120,14 @@ That loads `http://localhost:5173`. Production Electron always loads packaged `d
 | R | Cycle weather: clear / rain / snow |
 | T | Jump time of day: dawn → day → dusk → night |
 | P | Pause / resume day-night clock |
+| G | Cycle auto selector P→R→N→D |
+| Q / E | Downshift / upshift (stick) |
+| 1–6 | H-pattern gears |
+| N | Neutral (stick) |
+| B | Reverse gear (stick; R is weather) |
+| Shift | Clutch (optional-lite) |
 
-HUD buttons also switch weather and time of day.
+HUD buttons also switch weather and time of day. Click the **minimap** to expand/collapse.
 
 ## OSM vs Google
 
@@ -131,7 +150,7 @@ HUD buttons also switch weather and time of day.
 - **Presets (not live weather APIs):** clear/dry, rain, snow.
 - Visuals: sky/fog/lights, rain or snow particles, wet/snowy road & ground tint.
 - **Grip:** clear ≈ full mu; rain/snow reduce by **surface retention** (asphalt motorway holds better than dirt/grass). Off-asphalt also lowers grip. HUD shows surface + grip %.
-- Day/night cycle (~3 min) with darker night lighting; T jumps phases, P pauses.
+- Day/night cycle (~**30 min** real time by default, configurable in code) with darker night lighting; T jumps phases, P pauses.
 
 ## Driving feel (sim-cade)
 
@@ -162,11 +181,12 @@ src/game/
   Game.ts
   weather/Environment.ts
   map/{geo,OverpassClient,ElevationSampler,RoadBuilder,RoadSurface,BuildingBuilder,TileManager}.ts
-  vehicles/{Vehicle,VehicleFactory}.ts
+  vehicles/{Vehicle,VehicleFactory,Transmission,EngineSound}.ts
   visuals/{Textures,PostFX}.ts
   camera/ChaseCamera.ts
   input/Input.ts
-  ui/{HUD,StartMenu}.ts
+  ui/{HUD,StartMenu,Minimap}.ts
+  map/StreetLabels.ts
   cities.ts
 ```
 

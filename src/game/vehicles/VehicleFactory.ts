@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Vehicle, VEHICLE_SPECS, vehicleClassOf, type VehicleId } from './Vehicle';
+import type { TransmissionMode } from './Transmission';
 
 const PAINT = 0xb71c1c;
 const PAINT_DARK = 0x7f1212;
@@ -535,10 +536,10 @@ function buildNewFlyerBus(hybrid: boolean): THREE.Group {
   return g;
 }
 
-export function createVehicle(id: VehicleId): Vehicle {
+export function createVehicle(id: VehicleId, transmission: TransmissionMode = 'auto'): Vehicle {
   const spec = VEHICLE_SPECS[id];
   const cls = vehicleClassOf(id);
   const mesh = cls === 'golf' ? buildGolf() : buildNewFlyerBus(id === 'bus_hybrid');
   mesh.name = spec.name;
-  return new Vehicle(spec, mesh);
+  return new Vehicle(spec, mesh, transmission);
 }

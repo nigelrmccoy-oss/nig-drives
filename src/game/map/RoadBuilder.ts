@@ -34,24 +34,33 @@ export interface RoadCenterline {
   points: RoadCenterPoint[];
   surface: SurfaceProfile;
   highway: string;
+  /** OSM name / ref for signs & minimap. */
+  name?: string;
+  ref?: string;
+  /** Total paved width (m) used for scale-aware sampling. */
+  width: number;
 }
 
+/**
+ * Total carriageway widths (meters). Aimed at ~3.0–3.5 m lanes so a ~1.8 m Golf
+ * sits naturally (was visually oversized vs the hatch).
+ */
 const WIDTH_BY_HIGHWAY: Record<string, number> = {
-  motorway: 14,
-  trunk: 12,
-  primary: 10,
-  secondary: 9,
-  tertiary: 8,
-  unclassified: 7,
-  residential: 6.5,
-  living_street: 5.5,
-  service: 4.5,
-  track: 3.5,
-  motorway_link: 7,
-  trunk_link: 6.5,
-  primary_link: 6,
-  secondary_link: 5.5,
-  tertiary_link: 5,
+  motorway: 13.5, // ~4 × 3.4 m
+  trunk: 10.5, // ~3 × 3.5 m
+  primary: 7.2, // 2 × 3.5 m + margin
+  secondary: 7.0,
+  tertiary: 6.6,
+  unclassified: 6.2,
+  residential: 6.4, // 2 × ~3.2 m
+  living_street: 5.4,
+  service: 3.8,
+  track: 3.2,
+  motorway_link: 5.5,
+  trunk_link: 5.2,
+  primary_link: 5.0,
+  secondary_link: 4.8,
+  tertiary_link: 4.6,
 };
 
 function roadWidth(highway: string | undefined): number {
@@ -202,6 +211,38 @@ function buildRibbonGeometry(
 
 
 
+
+/** Thin ribbon offset left (−) / right (+) of centerline for curbs / edge paint. */
+function buildOffsetRibbonGeometry(
+  points: THREE.Vector3[],
+  offset: number,
+  width: number,
+  yBias: number = ROAD_Y_BIAS,
+  yRaise = 0,
+): THREE.BufferGeometry | null {
+  if (points.length < 2 || !Number.isFinite(width) || width < 0.08) return null;
+  const shifted: THREE.Vector3[] = [];
+  const defaultDir = new THREE.Vector3(1, 0, 0);
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    let dir: THREE.Vector3;
+    if (i === 0) dir = horizDir(points[0], points[1], defaultDir);
+    else if (i === points.length - 1) dir = horizDir(points[i - 1], points[i], defaultDir);
+    else {
+      const a = horizDir(points[i - 1], points[i], defaultDir);
+      const b = horizDir(points[i], points[i + 1], a);
+      dir = new THREE.Vector3().addVectors(a, b);
+      if (dir.lengthSq() < 1e-8) dir.copy(a);
+      else dir.normalize();
+    }
+    const n = new THREE.Vector3(-dir.z, 0, dir.x);
+    shifted.push(
+      new THREE.Vector3(p.x + n.x * offset, finiteY(p.y) + yRaise, p.z + n.z * offset),
+    );
+  }
+  return buildRibbonGeometry(shifted, width, yBias);
+}
+
 function yieldFrame(): Promise<void> {
   return new Promise((r) => setTimeout(r, 0));
 }
@@ -241,12 +282,12 @@ export class RoadBuilder {
       polygonOffsetUnits: -5,
     });
     this.curbMat = new THREE.MeshStandardMaterial({
-      color: 0x5a5854,
-      roughness: 0.88,
-      metalness: 0.04,
+      color: 0x9a9690,
+      roughness: 0.78,
+      metalness: 0.06,
       polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
     });
     // Pre-create common materials
     for (const kind of [
@@ -352,7 +393,14 @@ export class RoadBuilder {
         clPoints.push({ x: p.x, y: y + ROAD_Y_BIAS, z: p.z });
       }
       if (clPoints.length >= 2) {
-        centerlines.push({ points: clPoints, surface: profile, highway });
+        centerlines.push({
+          points: clPoints,
+          surface: profile,
+          highway,
+          name: way.tags.name,
+          ref: way.tags.ref,
+          width,
+        });
       }
 
       const cleaned: THREE.Vector3[] = [];
@@ -374,9 +422,14 @@ export class RoadBuilder {
       }
 
       const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
-      if (paved && width >= 5) {
-        const curb = buildRibbonGeometry(cleaned, width + 0.55, ROAD_Y_BIAS - 0.02);
-        if (curb) curbGeos.push(curb);
+      // Visible curbs along paved road edges (raised edge strips)
+      if (paved && width >= 4.2) {
+        const half = width / 2;
+        const curbW = 0.28;
+        const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06);
+        const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06);
+        if (left) curbGeos.push(left);
+        if (right) curbGeos.push(right);
       }
 
       const asphalt = buildRibbonGeometry(cleaned, width);
@@ -394,8 +447,8 @@ export class RoadBuilder {
         highway === 'trunk' ||
         highway === 'primary' ||
         highway === 'secondary';
-      if (major && width >= 7 && paved) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.22, width * 0.03), ROAD_Y_BIAS + 0.025);
+      if (major && width >= 6.5 && paved) {
+        const lane = buildRibbonGeometry(cleaned, Math.min(0.18, width * 0.028), ROAD_Y_BIAS + 0.025);
         if (lane) laneGeos.push(lane);
       }
 
@@ -499,7 +552,14 @@ export class RoadBuilder {
         clPoints.push({ x: p.x, y: y + ROAD_Y_BIAS, z: p.z });
       }
       if (clPoints.length >= 2) {
-        centerlines.push({ points: clPoints, surface: profile, highway });
+        centerlines.push({
+          points: clPoints,
+          surface: profile,
+          highway,
+          name: way.tags.name,
+          ref: way.tags.ref,
+          width,
+        });
       }
 
       const cleaned: THREE.Vector3[] = [];
@@ -511,9 +571,13 @@ export class RoadBuilder {
       if (cleaned.length < 2) continue;
 
       const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
-      if (paved && width >= 5) {
-        const curb = buildRibbonGeometry(cleaned, width + 0.55, ROAD_Y_BIAS - 0.02);
-        if (curb) curbGeos.push(curb);
+      if (paved && width >= 4.2) {
+        const half = width / 2;
+        const curbW = 0.28;
+        const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06);
+        const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06);
+        if (left) curbGeos.push(left);
+        if (right) curbGeos.push(right);
       }
 
       const asphalt = buildRibbonGeometry(cleaned, width);
@@ -531,8 +595,8 @@ export class RoadBuilder {
         highway === 'trunk' ||
         highway === 'primary' ||
         highway === 'secondary';
-      if (major && width >= 7 && paved) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.22, width * 0.03), ROAD_Y_BIAS + 0.025);
+      if (major && width >= 6.5 && paved) {
+        const lane = buildRibbonGeometry(cleaned, Math.min(0.18, width * 0.028), ROAD_Y_BIAS + 0.025);
         if (lane) laneGeos.push(lane);
       }
     }

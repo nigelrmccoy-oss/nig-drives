@@ -12,10 +12,15 @@ function hash01(id: number): number {
 }
 
 function buildingHeight(tags: Record<string, string>, id: number): number {
-  const h = tags.height ? parseFloat(tags.height) : NaN;
-  if (!Number.isNaN(h) && h > 2 && h < 200) return h;
+  // Prefer explicit OSM height / levels when present
+  const h = tags.height ? parseFloat(tags.height.replace(/m$/i, '').trim()) : NaN;
+  if (!Number.isNaN(h) && h > 2 && h < 250) return h;
   const levels = tags['building:levels'] ? parseFloat(tags['building:levels']) : NaN;
-  if (!Number.isNaN(levels) && levels > 0) return Math.min(levels * 3.2, 120);
+  if (!Number.isNaN(levels) && levels > 0) {
+    const levelH = tags['building:level_height'] ? parseFloat(tags['building:level_height']) : 3.15;
+    const lh = Number.isFinite(levelH) && levelH > 2 && levelH < 6 ? levelH : 3.15;
+    return Math.min(levels * lh, 180);
+  }
   const r = hash01(id);
   const t = tags.building;
   if (t === 'house' || t === 'detached' || t === 'semidetached_house') return 6 + r * 4;
@@ -78,8 +83,9 @@ export class BuildingBuilder {
           emissive: 0xffe6a8,
           emissiveMap: this.facades[i].emissiveMap,
           emissiveIntensity: 0,
-          roughness: 0.82,
-          metalness: 0.1,
+          roughness: 0.78 + (i % 3) * 0.04,
+          metalness: 0.08 + (i % 2) * 0.04,
+          envMapIntensity: 0.55,
           polygonOffset: true,
           polygonOffsetFactor: 1,
           polygonOffsetUnits: 1,
@@ -123,7 +129,7 @@ export class BuildingBuilder {
       cz /= local.length;
 
       let area = Math.abs(signedAreaXZ(local));
-      if (area < 25 || area > 25000) continue;
+      if (area < 18 || area > 40000) continue;
 
       // Ensure CCW in shape space (x, z) so extrusion faces wind correctly after rotateX
       const ring = signedAreaXZ(local) < 0 ? local.slice().reverse() : local.slice();
@@ -153,8 +159,10 @@ export class BuildingBuilder {
       geo.computeVertexNormals();
       const uv = geo.getAttribute('uv');
       if (uv) {
-        const uScale = Math.max(1.2, Math.sqrt(area) * 0.08);
-        const vScale = Math.max(1.2, height * 0.12);
+        // ~one facade tile per ~6 m horizontally; ~one floor (~3.1 m) vertically
+        const uScale = Math.max(1.4, Math.sqrt(area) * 0.1);
+        const floors = Math.max(1, height / 3.15);
+        const vScale = Math.max(1.5, floors * 0.95);
         for (let u = 0; u < uv.count; u++) {
           uv.setXY(u, uv.getX(u) * uScale, uv.getY(u) * vScale);
         }

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import type { Input } from '../input/Input';
 import type { WeatherPreset } from '../weather/Environment';
+import {
+  Transmission,
+  defaultForwardGears,
+  type TransmissionMode,
+} from './Transmission';
 
 /** Selectable drivetrains / transit variants (v1.2). */
 export type VehicleId =
@@ -228,6 +233,16 @@ export class Vehicle {
   private tcsActive = false;
   /** 0–1 normalized load for engine sound. */
   throttleLoad = 0;
+  /** Raw throttle / brake for telemetry (0–1). */
+  throttleInput = 0;
+  brakeInput = 0;
+  /** Engine RPM normalized 0–1 (gear-aware). */
+  engineRpm = 0.15;
+  /** Fake turbo/boost 0–1 for TDI / VR6. */
+  boost = 0;
+  /** Simple coolant 0–1 (warms with load). */
+  coolant = 0.35;
+  transmission: Transmission;
   private _prevVz = 0;
   private wheelPivots: THREE.Group[] = [];
   private spinMeshes: THREE.Object3D[] = [];
@@ -235,9 +250,13 @@ export class Vehicle {
   private headSpots: THREE.SpotLight[] = [];
   private wheelSpin = 0;
 
-  constructor(spec: VehicleSpec, mesh: THREE.Group) {
+  constructor(spec: VehicleSpec, mesh: THREE.Group, transmissionMode: TransmissionMode = 'auto') {
     this.spec = spec;
     this.mesh = mesh;
+    this.transmission = new Transmission({
+      mode: transmissionMode,
+      forwardGears: defaultForwardGears(spec.id),
+    });
     this.collectVisuals();
   }
 
@@ -332,28 +351,91 @@ export class Vehicle {
     const maxFyFront = mu * FzFront * 1.05;
     const maxFyRear = mu * FzRear * 1.05;
 
+    // --- Transmission ---
+    const hGear = input.consumeHGear();
+    this.transmission.update(dt, this.vz, input.forward ? 1 : 0, {
+      upshift: input.consumeGearUp(),
+      downshift: input.consumeGearDown(),
+      setGear: hGear,
+      clutch: input.clutch,
+      autoCycle: input.consumeAutoSelector(),
+    });
+    const drive = this.transmission.getDriveRatio();
+
     let throttle = input.forward ? 1 : 0;
-    let brake = input.back || input.brake ? (input.brake ? 1 : 0.55) : 0;
-    if (input.back && this.vz < 0.8) {
-      throttle = 0;
+    let brake = input.brake ? 1 : 0;
+    // S: brake when moving forward; request reverse intent when slow / in R
+    if (input.back) {
+      if (this.vz > 0.6) brake = Math.max(brake, 0.7);
+      else if (drive.reverse || this.transmission.mode === 'auto') throttle = Math.max(throttle, 0.85);
     }
+
+    // Auto reverse via selector; stick reverse via gear
+    const wantReverse = drive.reverse;
+    if (this.transmission.mode === 'auto' && this.transmission.autoSelector === 0) {
+      // In R: W goes reverse, S brakes
+      if (input.forward) throttle = 1;
+      if (input.back) {
+        throttle = 0;
+        brake = Math.max(brake, 0.7);
+      }
+    }
+
+    // Park: lock
+    if (this.transmission.mode === 'auto' && this.transmission.autoSelector === -1) {
+      throttle = 0;
+      this.vz *= Math.exp(-8 * dt);
+      this.vx *= Math.exp(-8 * dt);
+    }
+
+    this.throttleInput = throttle;
+    this.brakeInput = brake;
     this.throttleLoad = throttle;
 
+    // RPM from gear × speed; freer when clutch or N
+    let rpm = this.transmission.rpmFromSpeed(this.vz);
+    if (!drive.engaged || this.transmission.clutchIn) {
+      rpm = THREE.MathUtils.clamp(0.12 + throttle * 0.75, 0.12, 1);
+    } else if (throttle > 0.1) {
+      rpm = THREE.MathUtils.clamp(rpm + throttle * 0.08, 0.12, 1);
+    }
+    this.engineRpm = rpm;
+
+    // Fake boost (TDI / VR6)
+    const wantsBoost = s.id.includes('tdi') || s.id.includes('vr6');
+    const boostTarget = wantsBoost ? throttle * THREE.MathUtils.smoothstep(rpm, 0.25, 0.75) : 0;
+    this.boost = approach(this.boost, boostTarget, dt * 1.8);
+    this.coolant = approach(
+      this.coolant,
+      THREE.MathUtils.clamp(0.3 + rpm * 0.35 + throttle * 0.2, 0.3, 0.95),
+      dt * 0.05,
+    );
+
     const spdFrac = THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1);
-    // Torque band around torquePeak
     const bandDist = Math.abs(spdFrac - s.torquePeak);
     const band = 1 + (s.lowEndMul - 1) * Math.max(0, 1 - bandDist / 0.45);
-    let engAx = throttle * s.accel * weather.accelBrakeMul * band;
+    const gearTorque = drive.engaged && !this.transmission.clutchIn ? this.transmission.torqueMul() : 0;
+    let engAx = throttle * s.accel * weather.accelBrakeMul * band * gearTorque;
     engAx *= 1 - spdFrac ** s.powerFadeExp;
+    if (wantsBoost) engAx *= 1 + this.boost * 0.18;
+
+    // Direction: reverse gears apply negative long force when throttling
+    if (wantReverse && throttle > 0) {
+      engAx = -Math.abs(engAx);
+    } else if (!wantReverse && throttle > 0) {
+      engAx = Math.abs(engAx);
+    }
 
     let brakeAx = 0;
-    if (brake > 0 && this.vz > 0.15) {
-      brakeAx = -brake * s.brakeForce * s.regenBrakeMul * weather.accelBrakeMul;
-    } else if (input.back && this.vz <= 0.15) {
-      engAx = -s.accel * 0.35 * weather.accelBrakeMul;
-    } else if (throttle === 0 && brake === 0 && this.vz > 0.5 && s.coastRegen > 0) {
-      // Hybrid lift-off regen
-      brakeAx = -s.coastRegen * weather.accelBrakeMul;
+    if (brake > 0 && Math.abs(this.vz) > 0.15) {
+      brakeAx = -Math.sign(this.vz || 1) * brake * s.brakeForce * s.regenBrakeMul * weather.accelBrakeMul;
+    } else if (throttle === 0 && brake === 0 && Math.abs(this.vz) > 0.5 && s.coastRegen > 0) {
+      brakeAx = -Math.sign(this.vz) * s.coastRegen * weather.accelBrakeMul;
+    }
+
+    // Neutral / clutch: no engine force
+    if (!drive.engaged || this.transmission.clutchIn) {
+      engAx = 0;
     }
 
     const drag = 0.012 * g * Math.sign(this.vz) + 0.00045 * this.vz * Math.abs(this.vz);
@@ -480,11 +562,23 @@ export class Vehicle {
     return { abs: this.absActive, tcs: this.tcsActive, slide: this.sliding };
   }
 
-  /** RPM-ish 0–1 for audio. */
+  /** RPM-ish 0–1 for audio / HUD. */
   getEngineRpmNorm(): number {
-    const s = this.spec;
-    const spd = THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1);
-    return THREE.MathUtils.clamp(0.15 + spd * 0.75 + this.throttleLoad * 0.2, 0, 1);
+    return THREE.MathUtils.clamp(this.engineRpm, 0, 1);
+  }
+
+  getGearLabel(): string {
+    return this.transmission.mode === 'auto'
+      ? this.transmission.getAutoSelectorLabel()
+      : this.transmission.getLabel();
+  }
+
+  getEngineRpmDisplay(): number {
+    // Map 0–1 → ~800–6500 rpm (diesel lower redline)
+    const diesel = this.spec.id.includes('tdi') || this.spec.id.includes('bus_diesel');
+    const min = diesel ? 750 : 850;
+    const max = diesel ? 4500 : this.spec.id.includes('vr6') ? 6800 : 6200;
+    return Math.round(min + this.getEngineRpmNorm() * (max - min));
   }
 
   private syncMesh(): void {

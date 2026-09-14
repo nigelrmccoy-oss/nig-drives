@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OverpassClient } from './OverpassClient';
 import { RoadBuilder, ROAD_Y_BIAS, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder } from './BuildingBuilder';
+import { StreetLabels } from './StreetLabels';
 import { ElevationSampler } from './ElevationSampler';
 import {
   defaultAsphaltProfile,
@@ -85,6 +86,7 @@ export class TileManager {
   private weather: WeatherPreset = 'clear';
   private disposed = false;
   private fetchGen = 0;
+  readonly streetLabels = new StreetLabels();
 
   constructor(scene: THREE.Scene, originLat: number, originLon: number) {
     this.scene = scene;
@@ -114,6 +116,11 @@ export class TileManager {
     this.ground.receiveShadow = true;
     this.ground.name = 'ground-fallback';
     scene.add(this.ground);
+    scene.add(this.streetLabels.group);
+  }
+
+  getCenterlines(): RoadCenterline[] {
+    return this.centerlines;
   }
 
   setStatusListener(listener: TileStatusListener): void {
@@ -267,9 +274,11 @@ export class TileManager {
     let bestD = Infinity;
     let bestY = demY;
     let bestProfile: SurfaceProfile = defaultAsphaltProfile();
+    let bestHalf = 3.2;
 
     for (const line of this.centerlines) {
       const pts = line.points;
+      const half = Math.max(1.5, (line.width ?? 6.4) * 0.5);
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i];
         const b = pts[i + 1];
@@ -280,16 +289,19 @@ export class TileManager {
           const y = a.y + (b.y - a.y) * t;
           bestY = Number.isFinite(y) ? y : demY;
           bestProfile = line.surface;
+          bestHalf = half;
         }
       }
     }
 
     const dist = Number.isFinite(bestD) ? Math.sqrt(bestD) : Infinity;
+    const onRoad = bestHalf + 0.4;
+    const soft = bestHalf + 3.5;
     const roadFactor =
-      dist < 5
+      dist < onRoad
         ? 1
-        : dist < 12
-          ? THREE.MathUtils.clamp(1 - (dist - 5) / 7, 0.35, 1)
+        : dist < soft
+          ? THREE.MathUtils.clamp(1 - (dist - onRoad) / (soft - onRoad), 0.35, 1)
           : 0.35;
 
     let height: number;
@@ -679,6 +691,7 @@ export class TileManager {
     this.terrainMat.dispose();
     this.builder.dispose();
     this.buildings.dispose();
+    this.streetLabels.dispose();
     this.elevation.dispose();
     this.seenWayIds.clear();
     this.seenBuildingIds.clear();
