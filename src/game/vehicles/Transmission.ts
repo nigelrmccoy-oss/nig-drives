@@ -39,8 +39,9 @@ export class Transmission {
       this.autoSelector = 2;
       this.currentGear = 1;
     } else {
-      this.gearIndex = 0; // N
-      this.currentGear = 0;
+      // Start in 1st so manual is immediately driveable (N still available via N / downshift).
+      this.gearIndex = 1;
+      this.currentGear = 1;
     }
   }
 
@@ -103,8 +104,8 @@ export class Transmission {
   torqueMul(): number {
     const { ratio, engaged } = this.getDriveRatio();
     if (!engaged) return 0;
-    // Normalize vs ~4th gear (ratio ~3.5)
-    return Math.min(2.4, Math.max(0.45, (ratio / 3.5) * 0.95));
+    // Normalize vs ~4th gear (ratio ~3.5). Floor keeps top gears able to pull to highway speeds.
+    return Math.min(2.5, Math.max(0.62, (ratio / 3.5) * 0.95));
   }
 
   update(
@@ -192,8 +193,11 @@ export class Transmission {
       this.autoHold = 0.35;
       return;
     }
-    // Downshift
-    if (rpm < (throttle > 0.7 ? 0.28 : 0.38) && this.currentGear > 1 && speedMs > 1.5) {
+    // Downshift — include crawl speeds so D never sits in a tall gear at ~0–2 km/h
+    if (
+      this.currentGear > 1 &&
+      (rpm < (throttle > 0.7 ? 0.28 : 0.38) || (speedMs < 4 && throttle > 0.35 && this.currentGear > 2))
+    ) {
       this.currentGear--;
       this.autoHold = 0.28;
     }

@@ -416,7 +416,7 @@ canvas.game-canvas {
 }
 
 
-/* --- v1.3.1a: telemetry, minimap, transmission UI --- */
+/* --- v1.3.1a/b: telemetry, minimap, transmission UI --- */
 
 .choice-row#trans-choices,
 #trans-choices {
@@ -511,16 +511,21 @@ canvas.game-canvas {
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 4px 18px #0008;
+  /* Stay in the corner even when expanded — leave most of the driving view clear */
+  transform: none;
 }
 
 #minimap.expanded {
-  top: 50%;
-  right: 50%;
-  transform: translate(50%, -50%);
+  top: 14px;
+  right: 14px;
+  transform: none;
+  opacity: 0.92;
+  box-shadow: 0 6px 28px #000a;
 }
 
 #minimap canvas {
   display: block;
+  background: transparent;
 }
 
 .minimap-hint {
@@ -531,6 +536,53 @@ canvas.game-canvas {
   letter-spacing: 0.12em;
   color: #c9a36a;
   pointer-events: none;
+}
+
+.minimap-dismiss {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(201, 163, 106, 0.55);
+  border-radius: 3px;
+  background: rgba(12, 14, 18, 0.75);
+  color: #e8e0d4;
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+  z-index: 2;
+}
+
+#minimap.expanded .minimap-dismiss {
+  display: block;
+}
+
+.pause-banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+  padding: 10px 28px;
+  border: 2px solid rgba(201, 163, 106, 0.85);
+  border-radius: 4px;
+  background: rgba(8, 10, 14, 0.72);
+  color: #f0ebe3;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  text-shadow: 0 2px 12px #000a;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.pause-banner.visible {
+  opacity: 1;
 }
 
 .osm-badge {

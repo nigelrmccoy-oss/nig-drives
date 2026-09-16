@@ -129,7 +129,7 @@ export class BuildingBuilder {
       cz /= local.length;
 
       let area = Math.abs(signedAreaXZ(local));
-      if (area < 18 || area > 40000) continue;
+      if (area < 10 || area > 45000) continue;
 
       // Ensure CCW in shape space (x, z) so extrusion faces wind correctly after rotateX
       const ring = signedAreaXZ(local) < 0 ? local.slice().reverse() : local.slice();

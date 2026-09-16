@@ -119,7 +119,8 @@ function buildRibbonGeometry(
   yBias: number = ROAD_Y_BIAS,
 ): THREE.BufferGeometry | null {
   if (points.length < 2) return null;
-  if (!Number.isFinite(width) || width < 0.5 || width > 40) return null;
+  // Allow thin curb / lane-mark ribbons (~0.1–0.3 m); asphalt carriageways are wider.
+  if (!Number.isFinite(width) || width < 0.06 || width > 40) return null;
 
   const half = width / 2;
   const left: THREE.Vector3[] = [];
@@ -442,14 +443,16 @@ export class RoadBuilder {
         list.push(asphalt);
       }
 
-      const major =
-        highway === 'motorway' ||
-        highway === 'trunk' ||
-        highway === 'primary' ||
-        highway === 'secondary';
-      if (major && width >= 6.5 && paved) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.18, width * 0.028), ROAD_Y_BIAS + 0.025);
+      // Center dashed lane + edge paint for paved 2-lane+ roads (incl. fallback residential)
+      if (paved && width >= 5.2) {
+        const lane = buildRibbonGeometry(cleaned, Math.min(0.2, Math.max(0.12, width * 0.028)), ROAD_Y_BIAS + 0.025);
         if (lane) laneGeos.push(lane);
+        const half = width / 2;
+        const edgeW = 0.12;
+        const leftE = buildOffsetRibbonGeometry(cleaned, -(half - edgeW * 0.6), edgeW, ROAD_Y_BIAS + 0.02);
+        const rightE = buildOffsetRibbonGeometry(cleaned, half - edgeW * 0.6, edgeW, ROAD_Y_BIAS + 0.02);
+        if (leftE) edgeGeos.push(leftE);
+        if (rightE) edgeGeos.push(rightE);
       }
 
       processed++;
@@ -515,6 +518,7 @@ export class RoadBuilder {
     group.name = 'roads';
     const geosByKind = new Map<SurfaceKind, THREE.BufferGeometry[]>();
     const laneGeos: THREE.BufferGeometry[] = [];
+    const edgeGeos: THREE.BufferGeometry[] = [];
     const curbGeos: THREE.BufferGeometry[] = [];
     const centerlines: RoadCenterline[] = [];
 
@@ -590,14 +594,15 @@ export class RoadBuilder {
         list.push(asphalt);
       }
 
-      const major =
-        highway === 'motorway' ||
-        highway === 'trunk' ||
-        highway === 'primary' ||
-        highway === 'secondary';
-      if (major && width >= 6.5 && paved) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.18, width * 0.028), ROAD_Y_BIAS + 0.025);
+      if (paved && width >= 5.2) {
+        const lane = buildRibbonGeometry(cleaned, Math.min(0.2, Math.max(0.12, width * 0.028)), ROAD_Y_BIAS + 0.025);
         if (lane) laneGeos.push(lane);
+        const half = width / 2;
+        const edgeW = 0.12;
+        const leftE = buildOffsetRibbonGeometry(cleaned, -(half - edgeW * 0.6), edgeW, ROAD_Y_BIAS + 0.02);
+        const rightE = buildOffsetRibbonGeometry(cleaned, half - edgeW * 0.6, edgeW, ROAD_Y_BIAS + 0.02);
+        if (leftE) edgeGeos.push(leftE);
+        if (rightE) edgeGeos.push(rightE);
       }
     }
 
@@ -629,6 +634,15 @@ export class RoadBuilder {
         group.add(mesh);
       }
       for (const g of laneGeos) g.dispose();
+    }
+    if (edgeGeos.length) {
+      const merged = mergeGeometries(edgeGeos);
+      if (merged) {
+        const mesh = new THREE.Mesh(merged, this.edgeMat);
+        mesh.name = 'edges';
+        group.add(mesh);
+      }
+      for (const g of edgeGeos) g.dispose();
     }
 
     return { group, centerlines };

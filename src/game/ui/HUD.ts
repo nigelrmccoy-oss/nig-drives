@@ -31,6 +31,7 @@ export class HUD {
   private telemBoost: HTMLElement;
   private telemCoolant: HTMLElement;
   private rpmBar: HTMLElement;
+  private pauseBanner: HTMLElement;
   private onWeatherClick?: () => void;
   private onTimeClick?: () => void;
 
@@ -80,7 +81,8 @@ export class HUD {
         </div>
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · v1.3.1a</div>
+      <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · v1.3.1b</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;
@@ -100,6 +102,7 @@ export class HUD {
     this.telemBoost = this.root.querySelector('#telem-boost')!;
     this.telemCoolant = this.root.querySelector('#telem-coolant')!;
     this.rpmBar = this.root.querySelector('#rpm-fill')!;
+    this.pauseBanner = this.root.querySelector('#hud-paused')!;
 
     this.weatherEl.addEventListener('click', () => this.onWeatherClick?.());
     this.timeEl.addEventListener('click', () => this.onTimeClick?.());
@@ -151,7 +154,9 @@ export class HUD {
 
   setTime(label: string, paused: boolean, dayMin?: number): void {
     const day = dayMin !== undefined ? ` · ${dayMin}m day` : '';
-    this.timeEl.textContent = `Time: ${label}${paused ? ' ⏸' : ''}${day} (T/P)`;
+    this.timeEl.textContent = `Time: ${label}${paused ? ' ⏸ PAUSED' : ''}${day} (T/P)`;
+    this.pauseBanner.hidden = !paused;
+    this.pauseBanner.classList.toggle('visible', paused);
   }
 
   setAssists(flags: { abs: boolean; tcs: boolean; slide: boolean }): void {

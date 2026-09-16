@@ -9,8 +9,8 @@ const MAJOR = new Set([
   'tertiary',
 ]);
 
-const MAX_LABELS = 36;
-const SPACING_M = 95;
+const MAX_LABELS = 28;
+const SPACING_M = 110;
 
 /**
  * Performance-conscious floating street name sprites from OSM name/ref.
@@ -21,6 +21,8 @@ export class StreetLabels {
   private sprites: THREE.Sprite[] = [];
   private pool: THREE.Sprite[] = [];
   private refreshAcc = 0;
+  /** Sign-post height above road (m) — near curb height, not floaty billboards. */
+  private readonly labelClearance = 1.55;
 
   constructor() {
     this.group.name = 'street-labels';
@@ -28,7 +30,13 @@ export class StreetLabels {
 
   update(dt: number, lines: RoadCenterline[], px: number, pz: number, py: number): void {
     this.refreshAcc += dt;
-    if (this.refreshAcc < 0.45) return;
+    // Soft per-frame fade even between rebuilds
+    for (const s of this.sprites) {
+      const mat = s.material as THREE.SpriteMaterial;
+      const target = (s.userData.fadeTarget as number | undefined) ?? mat.opacity;
+      mat.opacity += (target - mat.opacity) * Math.min(1, dt * 4);
+    }
+    if (this.refreshAcc < 0.7) return;
     this.refreshAcc = 0;
 
     type Cand = { x: number; y: number; z: number; text: string; d: number };
@@ -53,9 +61,9 @@ export class StreetLabels {
           const t = (nextAt - prev) / seg;
           const x = a.x + (b.x - a.x) * t;
           const z = a.z + (b.z - a.z) * t;
-          const y = (a.y + (b.y - a.y) * t) + 3.2;
+          const y = (a.y + (b.y - a.y) * t) + this.labelClearance;
           const d = (x - px) ** 2 + (z - pz) ** 2;
-          if (d < 220 * 220) cands.push({ x, y, z, text, d });
+          if (d < 160 * 160) cands.push({ x, y, z, text, d });
           nextAt += SPACING_M;
         }
       }
@@ -75,6 +83,7 @@ export class StreetLabels {
     while (this.sprites.length > picked.length) {
       const s = this.sprites.pop()!;
       this.group.remove(s);
+      s.userData.placed = false;
       this.pool.push(s);
     }
     while (this.sprites.length < picked.length) {
@@ -86,17 +95,25 @@ export class StreetLabels {
     for (let i = 0; i < picked.length; i++) {
       const c = picked[i];
       const s = this.sprites[i];
-      s.position.set(c.x, Math.max(c.y, py + 2.5), c.z);
+      // Lerp toward target to reduce snap/jitter when the set refreshes
+      const ty = Math.max(c.y, py + 1.2);
+      if (s.userData.placed) {
+        s.position.x += (c.x - s.position.x) * 0.35;
+        s.position.y += (ty - s.position.y) * 0.35;
+        s.position.z += (c.z - s.position.z) * 0.35;
+      } else {
+        s.position.set(c.x, ty, c.z);
+        s.userData.placed = true;
+      }
       const prev = s.userData.labelText as string | undefined;
       if (prev !== c.text) {
         updateSpriteText(s, c.text);
         s.userData.labelText = c.text;
       }
       const dist = Math.sqrt(c.d);
-      const fade = dist < 40 ? 1 : dist > 180 ? 0 : 1 - (dist - 40) / 140;
-      const mat = s.material as THREE.SpriteMaterial;
-      mat.opacity = 0.35 + fade * 0.55;
-      const sc = 8 + Math.min(10, c.text.length * 0.35);
+      const fade = dist < 25 ? 1 : dist > 140 ? 0 : 1 - (dist - 25) / 115;
+      s.userData.fadeTarget = 0.2 + fade * 0.55;
+      const sc = 5.5 + Math.min(7, c.text.length * 0.28);
       s.scale.set(sc, sc * 0.28, 1);
     }
   }

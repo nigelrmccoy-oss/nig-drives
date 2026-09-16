@@ -36,8 +36,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.1a</span></h1>
-        <p class="tagline">Gears · telemetry · minimap · street signs · slower day cycle · OSM roads.</p>
+        <h1>Nig Drives <span class="ver">v1.3.1b</span></h1>
+        <p class="tagline">Critic fixes: proper fallback roads · corner minimap · denser buildings · pause cue · accel/audio.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">

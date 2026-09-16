@@ -239,8 +239,8 @@ export class OverpassClient {
         if (tags.highway) ways.push(item);
         else if (tags.building) buildings.push(item);
       }
-      if (buildings.length > 180) {
-        buildings.length = 180;
+      if (buildings.length > 360) {
+        buildings.length = 360;
       }
       return { ways, buildings };
     } finally {

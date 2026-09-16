@@ -100,29 +100,30 @@ export class EngineSound {
     const now = this.ctx.currentTime;
 
     for (const L of this.layers) {
-      L.osc.frequency.setTargetAtTime(freq * L.ratio, now, 0.04);
+      L.osc.frequency.setTargetAtTime(freq * L.ratio, now, 0.035);
+      // Load opens the note clearly under throttle; RPM still shapes pitch energy.
       const lvl =
         L.level *
-        (0.35 + load * 0.65) *
-        (0.55 + rpm * 0.55) *
+        (0.22 + load * 0.85) *
+        (0.45 + rpm * 0.7) *
         (vehicle.spec.class === 'bus' ? 0.9 : 1);
-      L.gain.gain.setTargetAtTime(lvl, now, 0.06);
+      L.gain.gain.setTargetAtTime(lvl, now, 0.05);
     }
 
     this.filter.frequency.setTargetAtTime(
-      recipe.filterHz + rpm * recipe.filterSpan + load * 200,
+      recipe.filterHz + rpm * recipe.filterSpan + load * 420,
       now,
-      0.08,
+      0.06,
     );
 
     if (this.noiseGain) {
-      const nVol = recipe.noiseLevel * (0.2 + rpm * 0.5 + load * 0.4);
-      this.noiseGain.gain.setTargetAtTime(nVol, now, 0.1);
+      const nVol = recipe.noiseLevel * (0.15 + rpm * 0.55 + load * 0.65);
+      this.noiseGain.gain.setTargetAtTime(nVol, now, 0.08);
     }
 
     const vol =
-      (0.018 + rpm * 0.04 + load * 0.028) * recipe.master * (vehicle.spec.class === 'bus' ? 0.95 : 1);
-    this.master.gain.setTargetAtTime(Math.min(0.11, vol), now, 0.07);
+      (0.022 + rpm * 0.055 + load * 0.05) * recipe.master * (vehicle.spec.class === 'bus' ? 0.95 : 1);
+    this.master.gain.setTargetAtTime(Math.min(0.16, vol), now, 0.05);
   }
 
   dispose(): void {

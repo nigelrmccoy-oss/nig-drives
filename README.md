@@ -6,6 +6,15 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.1b (package 1.3.3) — Critic playtest fixes
+
+- **Fallback / paved roads:** Lane + curb ribbons no longer silently dropped (thin-ribbon width guard was rejecting ~0.1–0.3 m marks). Center dashes + edge paint + curbs on residential-scale paved ways — same visual language as OSM roads (no more featureless slabs).
+- **Minimap:** Expanded map stays a **semi-transparent corner panel** (~220 px) instead of a centered takeover; ✕ / Esc / click to dismiss.
+- **Buildings + labels:** Higher per-tile building cap; smaller footprints allowed. Street labels anchored nearer sign height, distance-faded, less snap/jitter.
+- **P pause:** Large on-screen **PAUSED** banner when the day-cycle clock is paused (plus HUD time cue).
+- **Accel / audio:** Stick modes start in **1st** (was Neutral — felt like 0–2 km/h). Auto downshifts when crawling in a tall gear; slightly higher drive-force cap; clearer procedural load/RPM under throttle.
+- Web build only (no Windows exe rebuild).
+
 ### v1.3.1a (package 1.3.2) — Gears, telemetry, map UX
 
 - **Gears:** Auto (P/R/N/D with shift points, **G** cycles selector) or stick — sequential (**Q/E**) or H-pattern (**1–6**, **N**, **B**=reverse). Optional-lite clutch (**Shift**). Gear shown on HUD + speedo; RPM linked to gear × speed.
@@ -79,7 +88,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1a**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1b**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 

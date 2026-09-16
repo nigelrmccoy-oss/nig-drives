@@ -1,23 +1,25 @@
 import type { RoadCenterline } from '../map/RoadBuilder';
 
 /**
- * Corner minimap — click to expand/collapse a larger map overlay.
- * Draws player + nearby road centerlines.
+ * Corner minimap — click to expand a semi-transparent corner panel (not a
+ * full-screen takeover). Click again or press Escape to dismiss.
  */
 export class Minimap {
   private root: HTMLElement;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private expanded = false;
-  private size = 148;
-  private expandedSize = 360;
-  private range = 180; // meters half-extent when collapsed
-  private expandedRange = 420;
+  private size = 132;
+  /** Keep expanded map as a corner overlay so most of the 3D view stays visible. */
+  private expandedSize = 220;
+  private range = 160;
+  private expandedRange = 320;
+  private onKey: (e: KeyboardEvent) => void;
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
     this.root.id = 'minimap';
-    this.root.title = 'Click to expand / collapse map';
+    this.root.title = 'Click to expand / collapse map (Esc dismisses)';
     this.canvas = document.createElement('canvas');
     this.canvas.width = this.size;
     this.canvas.height = this.size;
@@ -26,6 +28,16 @@ export class Minimap {
     hint.className = 'minimap-hint';
     hint.textContent = 'MAP';
     this.root.appendChild(hint);
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'minimap-dismiss';
+    dismiss.textContent = '✕';
+    dismiss.title = 'Collapse map';
+    dismiss.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.expanded) this.toggle();
+    });
+    this.root.appendChild(dismiss);
     parent.appendChild(this.root);
     this.ctx = this.canvas.getContext('2d')!;
 
@@ -33,6 +45,14 @@ export class Minimap {
       e.stopPropagation();
       this.toggle();
     });
+
+    this.onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && this.expanded) {
+        e.preventDefault();
+        this.toggle();
+      }
+    };
+    window.addEventListener('keydown', this.onKey);
   }
 
   toggle(): void {
@@ -41,10 +61,17 @@ export class Minimap {
     const s = this.expanded ? this.expandedSize : this.size;
     this.canvas.width = s;
     this.canvas.height = s;
+    const hint = this.root.querySelector('.minimap-hint');
+    if (hint) hint.textContent = this.expanded ? 'MAP · Esc' : 'MAP';
+  }
+
+  collapse(): void {
+    if (this.expanded) this.toggle();
   }
 
   setVisible(v: boolean): void {
     this.root.style.display = v ? 'block' : 'none';
+    if (!v) this.collapse();
   }
 
   draw(
@@ -58,8 +85,8 @@ export class Minimap {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, s, s);
 
-    // Background
-    ctx.fillStyle = 'rgba(10, 12, 16, 0.82)';
+    // Semi-transparent so the driving view remains readable behind the panel
+    ctx.fillStyle = this.expanded ? 'rgba(10, 12, 16, 0.55)' : 'rgba(10, 12, 16, 0.78)';
     ctx.fillRect(0, 0, s, s);
     ctx.strokeStyle = 'rgba(201, 163, 106, 0.55)';
     ctx.lineWidth = 2;
@@ -67,7 +94,6 @@ export class Minimap {
 
     const scale = s / (range * 2);
     const toSx = (x: number) => (x - px) * scale + s / 2;
-    // World +Z is north; canvas +Y is down — flip Z
     const toSy = (z: number) => -(z - pz) * scale + s / 2;
 
     ctx.lineCap = 'round';
@@ -76,7 +102,6 @@ export class Minimap {
     for (const line of lines) {
       const pts = line.points;
       if (pts.length < 2) continue;
-      // Cull far lines roughly
       let near = false;
       for (const p of pts) {
         if (Math.abs(p.x - px) < range * 1.2 && Math.abs(p.z - pz) < range * 1.2) {
@@ -109,12 +134,11 @@ export class Minimap {
       ctx.stroke();
     }
 
-    // Player
     const cx = s / 2;
     const cy = s / 2;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(-heading); // heading 0 = +Z; canvas up = -Z after flip → rotate by -heading
+    ctx.rotate(-heading);
     ctx.fillStyle = '#5ad4ff';
     ctx.beginPath();
     ctx.moveTo(0, -7);
@@ -125,13 +149,13 @@ export class Minimap {
     ctx.fill();
     ctx.restore();
 
-    // North indicator
     ctx.fillStyle = 'rgba(201, 163, 106, 0.9)';
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.fillText('N', s - 16, 14);
   }
 
   dispose(): void {
+    window.removeEventListener('keydown', this.onKey);
     this.root.remove();
   }
 }

@@ -444,10 +444,12 @@ export class Vehicle {
 
     this.tcsActive = false;
     if (longDemand > 0) {
-      const driveCap = (maxFxRear * 0.92) / s.mass;
+      // Allow a bit more drive force so sustained throttle reaches highway speeds;
+      // TCS still clips egregious spin on low grip.
+      const driveCap = (maxFxRear * 1.08) / s.mass;
       if (longDemand > driveCap) {
         longDemand = driveCap;
-        this.tcsActive = throttle > 0.2;
+        this.tcsActive = throttle > 0.35 && surfaceGrip < 0.85;
       }
     }
 
