@@ -36,8 +36,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.1d</span></h1>
-        <p class="tagline">v1.3.1d: online OSM street labels fixed · curb-scale fade kept · ?fallback=1 QA.</p>
+        <h1>Nig Drives <span class="ver">v1.3.1e</span></h1>
+        <p class="tagline">v1.3.1e: Overpass mirror failover (kumi/mail.ru) · online OSM labels · ?fallback=1 QA.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">

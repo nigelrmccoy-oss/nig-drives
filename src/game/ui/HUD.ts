@@ -82,7 +82,7 @@ export class HUD {
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
       <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · v1.3.1d</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · v1.3.1e</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;

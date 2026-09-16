@@ -6,6 +6,12 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.1e (package 1.3.6) — Overpass mirror failover
+
+- **Online OSM on Cursor box / flaky TLS:** `overpass-api.de` often fails with TLS unexpected EOF here; **kumi** and **maps.mail.ru** respond. Vite primary `/api/overpass` now proxies **kumi**; secondary `/api/overpass-mailru` → mail.ru; `/api/overpass-de` last-resort only. Legacy `/api/overpass-kumi` kept as kumi alias. Exact `^…$` proxy contexts so `/api/overpass` does not steal `/api/overpass-*`.
+- **Client:** race same-origin proxies first (no CORS), then healthy directs; do not let dead de burn the first race. Offline grid fallback still applies on true outages.
+- Does not change street-label logic from 1.3.1d. Web build only (no Electron rebuild).
+
 ### v1.3.1d (package 1.3.5) — Online OSM street labels
 
 - **Street labels (online fix):** OSM ways are often short intersection fragments — 1.3.1c’s first sample at ~64 m skipped most named ways. Short ways now get a mid-segment pin; named residential/unclassified/living_street included; slightly larger curb-scale sprites + softer view-cone so labels stay visible along roads without windshield takeover. `?fallback=1` grids still label.
@@ -102,7 +108,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1d**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1e**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 
@@ -190,7 +196,7 @@ Inspired by **Forza Motorsport 4 / Gran Turismo 5** feel — not a full sim clai
 1. Spawn sets a lat/lon **geo origin** (X east, Y up, Z north, meters).
 2. **~0.01° tiles** load in a 5×5 neighborhood; distant tiles unload.
 3. Each tile: Terrarium DEM preload → Overpass highways + buildings → road ribbons + extruded footprints on elevation.
-4. In-memory tile cache; Overpass calls rate-limited; Vite proxies `/api/overpass*` if CORS fails.
+4. In-memory tile cache; Overpass calls rate-limited; Vite proxies `/api/overpass` (kumi), `/api/overpass-mailru`, optional `/api/overpass-de` if CORS/TLS fails.
 5. Per-tile offline road grid if Overpass times out (~10s); spawn never waits on the full 5×5 ring.
 
 ## Start cities
@@ -218,7 +224,7 @@ src/game/
 - Arcade/sim-cade physics, not FM/GT fidelity.
 - Visuals are Forza-**inspired** (ACES, hatch silhouette, wet roads), not FM photogrammetry — no real car scans or photo terrain.
 - Building count capped per tile for performance; no full city collision.
-- Overpass public instances can be slow or rate-limit; v1.2 / v1.2c fall back to offline grids quickly so you can still drive.
+- Overpass public instances can be slow, rate-limit, or TLS-fail (notably overpass-api.de on some clouds); v1.3.1e prefers kumi/mail.ru mirrors, then falls back to offline grids on true outages.
 - Not all OSM ways have `surface=*`; missing tags infer asphalt (or dirt for tracks).
 - Terrarium is bare-earth DEM — roads use a small height bias above it (v1.1), not surveyed pavement.
 - Single moving heightfield patch (not full streaming LOD terrain); distant hills may look flatter until recentered.

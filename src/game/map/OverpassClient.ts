@@ -20,8 +20,6 @@ const HIGHWAY_FILTER =
 
 /** Per-attempt fetch timeout (ms). Keep short so offline fallback can kick in. */
 export const OVERPASS_ATTEMPT_MS = 10_000;
-/** Max endpoint attempts per tile (sequential after a short parallel race). */
-const MAX_ATTEMPTS = 2;
 /** Cap in-flight Overpass tile fetches across the client. */
 const MAX_CONCURRENT = 3;
 /** Soft cap on memory cache entries. */
@@ -43,11 +41,25 @@ out geom;
 `.trim();
 }
 
-const ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
+/**
+ * Endpoint preference for Cursor-box / flaky-TLS envs:
+ * 1) Same-origin Vite proxies first (no CORS) — primary is healthy kumi.
+ * 2) Direct healthy mirrors (kumi, mail.ru).
+ * 3) overpass-api.de last-resort only (often TLS EOF here).
+ */
+const PROXY_ENDPOINTS = [
+  '/api/overpass', // vite → kumi
+  '/api/overpass-mailru', // vite → maps.mail.ru
+];
+
+const DIRECT_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
-  '/api/overpass',
-  '/api/overpass-kumi',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
+
+const LAST_RESORT_ENDPOINTS = [
+  '/api/overpass-de',
+  'https://overpass-api.de/api/interpreter',
 ];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -145,7 +157,8 @@ export class OverpassClient {
 
   /**
    * Fetch highways + buildings for a tile bbox.
-   * Short timeouts + limited retries so callers can fall back offline quickly.
+   * Prefer Vite proxies → healthy directs; de is last-resort only.
+   * Short timeouts so callers can fall back offline on true outages.
    * Pass expectGen to ignore results after cancelAll / dispose.
    */
   async fetchTile(
@@ -172,15 +185,16 @@ export class OverpassClient {
       const query = buildQuery(south, west, north, east);
       let lastError: unknown;
 
+      // Wave 1: race same-origin proxies (kumi primary + mail.ru) — no CORS.
       try {
         const raced = await withTimeout(
           Promise.any(
-            ENDPOINTS.slice(0, 2).map((ep) =>
+            PROXY_ENDPOINTS.map((ep) =>
               this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
             ),
           ),
           OVERPASS_ATTEMPT_MS,
-          'Overpass race',
+          'Overpass proxy race',
         );
         if (expectGen !== undefined && expectGen !== this.generation) {
           throw new Error('Overpass request cancelled (stale generation)');
@@ -192,7 +206,29 @@ export class OverpassClient {
         lastError = err;
       }
 
-      for (const endpoint of ENDPOINTS.slice(2, 2 + MAX_ATTEMPTS)) {
+      // Wave 2: race healthy directs (skip dead de so TLS EOF cannot burn the slot).
+      try {
+        const raced = await withTimeout(
+          Promise.any(
+            DIRECT_ENDPOINTS.map((ep) =>
+              this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
+            ),
+          ),
+          OVERPASS_ATTEMPT_MS,
+          'Overpass direct race',
+        );
+        if (expectGen !== undefined && expectGen !== this.generation) {
+          throw new Error('Overpass request cancelled (stale generation)');
+        }
+        this.memoryCache.set(key, raced.parsed);
+        this.trimCache();
+        return { ...raced.parsed, source: raced.source };
+      } catch (err) {
+        lastError = err;
+      }
+
+      // Wave 3: last-resort de (optional; often broken on Cursor box).
+      for (const endpoint of LAST_RESORT_ENDPOINTS) {
         if (expectGen !== undefined && expectGen !== this.generation) {
           throw new Error('Overpass request cancelled (stale generation)');
         }
