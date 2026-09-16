@@ -6,6 +6,11 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.1d (package 1.3.5) — Online OSM street labels
+
+- **Street labels (online fix):** OSM ways are often short intersection fragments — 1.3.1c’s first sample at ~64 m skipped most named ways. Short ways now get a mid-segment pin; named residential/unclassified/living_street included; slightly larger curb-scale sprites + softer view-cone so labels stay visible along roads without windshield takeover. `?fallback=1` grids still label.
+- Web build only (no Windows exe rebuild).
+
 ### v1.3.1c (package 1.3.4) — Labels, fallback QA, denser buildings
 
 - **Street labels:** Smaller world scale, curb-height anchors (less floaty), mid-range distance fade + view-cone attenuation so windshield/drive view stays clear.
@@ -97,7 +102,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1c**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1d**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 
