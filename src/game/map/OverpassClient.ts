@@ -66,6 +66,23 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
+
+/** Rough footprint size proxy from geometry span (for prefer-larger cap). */
+function footprintScore(w: OsmWay): number {
+  if (!w.geometry || w.geometry.length < 3) return 0;
+  let minLat = Infinity,
+    maxLat = -Infinity,
+    minLon = Infinity,
+    maxLon = -Infinity;
+  for (const n of w.geometry) {
+    if (n.lat < minLat) minLat = n.lat;
+    if (n.lat > maxLat) maxLat = n.lat;
+    if (n.lon < minLon) minLon = n.lon;
+    if (n.lon > maxLon) maxLon = n.lon;
+  }
+  return Math.max(0, maxLat - minLat) * Math.max(0, maxLon - minLon);
+}
+
 export class OverpassClient {
   private memoryCache = new Map<string, { ways: OsmWay[]; buildings: OsmWay[] }>();
   private generation = 0;
@@ -239,8 +256,10 @@ export class OverpassClient {
         if (tags.highway) ways.push(item);
         else if (tags.building) buildings.push(item);
       }
-      if (buildings.length > 360) {
-        buildings.length = 360;
+      // Prefer larger footprints when capping (better street fill / FPS tradeoff)
+      if (buildings.length > 520) {
+        buildings.sort((a, b) => footprintScore(b) - footprintScore(a));
+        buildings.length = 520;
       }
       return { ways, buildings };
     } finally {

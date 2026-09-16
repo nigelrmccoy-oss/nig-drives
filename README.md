@@ -6,6 +6,13 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.1c (package 1.3.4) — Labels, fallback QA, denser buildings
+
+- **Street labels:** Smaller world scale, curb-height anchors (less floaty), mid-range distance fade + view-cone attenuation so windshield/drive view stays clear.
+- **Fallback roads QA:** Force offline grids with **`?fallback=1`** (or `?offline=1`) — skips Overpass. Grid mix includes primary/secondary/residential with names, asphalt, center dashes, edge paint, and curbs. Sparse tiles get procedural block-fill buildings.
+- **Buildings:** Lower min footprint, higher per-tile Overpass cap (prefer larger footprints when trimming), procedural roadside fillers when OSM density is sparse (~220+ target feel) without floaters.
+- Web build only (no Windows exe rebuild).
+
 ### v1.3.1b (package 1.3.3) — Critic playtest fixes
 
 - **Fallback / paved roads:** Lane + curb ribbons no longer silently dropped (thin-ribbon width guard was rejecting ~0.1–0.3 m marks). Center dashes + edge paint + curbs on residential-scale paved ways — same visual language as OSM roads (no more featureless slabs).
@@ -81,6 +88,8 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
+**Offline / fallback road QA:** append `?fallback=1` (e.g. `http://localhost:5173/?fallback=1`) to skip Overpass and drive the synthetic asphalt grid (lanes, curbs, names).
+
 ```bash
 npm run build
 npm run preview
@@ -88,7 +97,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1b**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1c**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 

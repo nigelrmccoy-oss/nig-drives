@@ -100,6 +100,10 @@ export class Game {
 
     this.tiles = new TileManager(this.scene, city.lat, city.lon);
     this.tiles.setWeatherSurface(this.env.weather);
+    if (wantsForcedFallback()) {
+      this.tiles.setForceOffline(true);
+      loadingText.textContent = 'Forced offline roads (?fallback=1)…';
+    }
     this.tiles.setStatusListener((info) => {
       loadingText.textContent = info.message;
       this.hud.setStatus(info.message);
@@ -235,12 +239,21 @@ export class Game {
 
     this.tiles.update(this.vehicle.position.x, this.vehicle.position.z);
     const lines = this.tiles.getCenterlines();
+    const camFwdX = Math.sin(this.vehicle.heading);
+    const camFwdZ = Math.cos(this.vehicle.heading);
     this.tiles.streetLabels.update(
       dt,
       lines,
       this.vehicle.position.x,
       this.vehicle.position.z,
       h,
+      {
+        x: this.camera.position.x,
+        y: this.camera.position.y,
+        z: this.camera.position.z,
+        fx: camFwdX,
+        fz: camFwdZ,
+      },
     );
     this.env.update(dt, this.vehicle.position.x, this.vehicle.position.z, h);
     const night = this.env.getNightFactor();
@@ -294,5 +307,16 @@ export class Game {
     this.env.dispose();
     window.removeEventListener('resize', this.onResize);
     this.renderer.dispose();
+  }
+}
+
+/** QA / offline: ?fallback=1 or ?offline=1 forces synthetic road grids (no Overpass). */
+function wantsForcedFallback(): boolean {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const v = (q.get('fallback') ?? q.get('offline') ?? '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  } catch {
+    return false;
   }
 }

@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import type { OsmWay } from './OverpassClient';
 import type { GeoOrigin } from './geo';
+import type { RoadCenterline } from './RoadBuilder';
 import { makeBuildingFacade } from '../visuals/Textures';
 
 const BUILDING_COLORS = [0x8a9099, 0x9aa3ad, 0x7d858f, 0xa8b0b8, 0x6e7680, 0xb0a89c];
+
+/** Soft min footprint area (m²) — allow denser small lots without noise. */
+const MIN_FOOTPRINT_AREA = 5.5;
+const MAX_FOOTPRINT_AREA = 55_000;
 
 /** Stable 0–1 hash from OSM id (avoids Math.random flicker on tile reload). */
 function hash01(id: number): number {
@@ -17,7 +22,9 @@ function buildingHeight(tags: Record<string, string>, id: number): number {
   if (!Number.isNaN(h) && h > 2 && h < 250) return h;
   const levels = tags['building:levels'] ? parseFloat(tags['building:levels']) : NaN;
   if (!Number.isNaN(levels) && levels > 0) {
-    const levelH = tags['building:level_height'] ? parseFloat(tags['building:level_height']) : 3.15;
+    const levelH = tags['building:level_height']
+      ? parseFloat(tags['building:level_height'])
+      : 3.15;
     const lh = Number.isFinite(levelH) && levelH > 2 && levelH < 6 ? levelH : 3.15;
     return Math.min(levels * lh, 180);
   }
@@ -56,7 +63,8 @@ function cleanFootprint(raw: Array<{ x: number; z: number }>): Array<{ x: number
   for (const p of pts) {
     if (
       cleaned.length === 0 ||
-      (cleaned[cleaned.length - 1].x - p.x) ** 2 + (cleaned[cleaned.length - 1].z - p.z) ** 2 > 0.05
+      (cleaned[cleaned.length - 1].x - p.x) ** 2 + (cleaned[cleaned.length - 1].z - p.z) ** 2 >
+        0.05
     ) {
       cleaned.push(p);
     }
@@ -129,7 +137,7 @@ export class BuildingBuilder {
       cz /= local.length;
 
       let area = Math.abs(signedAreaXZ(local));
-      if (area < 10 || area > 45000) continue;
+      if (area < MIN_FOOTPRINT_AREA || area > MAX_FOOTPRINT_AREA) continue;
 
       // Ensure CCW in shape space (x, z) so extrusion faces wind correctly after rotateX
       const ring = signedAreaXZ(local) < 0 ? local.slice().reverse() : local.slice();
@@ -186,11 +194,118 @@ export class BuildingBuilder {
         }
         baseY = heightAt(sumLat / n, sumLon / n);
       }
-      // Tiny lift above terrain
+      // Tiny lift above terrain — avoid floaters
+      if (!Number.isFinite(baseY)) baseY = 0;
       mesh.position.set(cx, baseY + 0.02, cz);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
+    }
+
+    return group;
+  }
+
+  /**
+   * Procedural block-fill buildings along road sides when OSM density is sparse
+   * or when using offline fallback grids. Shared materials; capped count for FPS.
+   */
+  buildFillers(
+    centerlines: RoadCenterline[],
+    origin: GeoOrigin,
+    heightAt: ((lat: number, lon: number) => number) | undefined,
+    opts: { maxCount: number; seed?: number } = { maxCount: 140 },
+  ): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'buildings-fill';
+    const maxCount = Math.max(0, Math.min(220, opts.maxCount));
+    if (maxCount === 0 || centerlines.length === 0) return group;
+
+    const placed: Array<{ x: number; z: number }> = [];
+    const minSep2 = 16 * 16;
+    let seed = opts.seed ?? 42;
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0xffffffff;
+    };
+
+    let added = 0;
+    for (const line of centerlines) {
+      if (added >= maxCount) break;
+      const hwy = line.highway;
+      // Skip thin service/track for fillers
+      if (hwy === 'service' || hwy === 'track' || hwy === 'motorway_link') continue;
+      const half = Math.max(2.5, (line.width ?? 6) * 0.5);
+      const pts = line.points;
+      if (pts.length < 2) continue;
+
+      let along = 0;
+      let nextAt = 14 + rnd() * 10;
+      for (let i = 1; i < pts.length && added < maxCount; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        const seg = Math.hypot(b.x - a.x, b.z - a.z);
+        if (!Number.isFinite(seg) || seg < 1) continue;
+        const prev = along;
+        along += seg;
+        const dx = (b.x - a.x) / seg;
+        const dz = (b.z - a.z) / seg;
+        const nx = -dz;
+        const nz = dx;
+
+        while (nextAt <= along && added < maxCount) {
+          const t = (nextAt - prev) / seg;
+          const cx = a.x + (b.x - a.x) * t;
+          const cz = a.z + (b.z - a.z) * t;
+          const side = rnd() < 0.5 ? -1 : 1;
+          const setback = half + 7 + rnd() * 9;
+          const bx = cx + nx * side * setback;
+          const bz = cz + nz * side * setback;
+
+          if (
+            placed.some((p) => (p.x - bx) ** 2 + (p.z - bz) ** 2 < minSep2) ||
+            !Number.isFinite(bx) ||
+            !Number.isFinite(bz)
+          ) {
+            nextAt += 18 + rnd() * 12;
+            continue;
+          }
+
+          const w = 8 + rnd() * 14;
+          const d = 7 + rnd() * 12;
+          const h =
+            hwy === 'primary' || hwy === 'secondary'
+              ? 10 + rnd() * 22
+              : 6 + rnd() * 12;
+
+          const ll = origin.toLatLon(bx, bz);
+          let baseY = heightAt ? heightAt(ll.lat, ll.lon) : 0;
+          if (!Number.isFinite(baseY)) baseY = 0;
+
+          const geo = new THREE.BoxGeometry(w, h, d);
+          // UV stretch roughly by floors
+          const uv = geo.getAttribute('uv');
+          if (uv) {
+            const uScale = Math.max(1.2, w / 6);
+            const vScale = Math.max(1.2, h / 3.15);
+            for (let u = 0; u < uv.count; u++) {
+              uv.setXY(u, uv.getX(u) * uScale, uv.getY(u) * vScale);
+            }
+            uv.needsUpdate = true;
+          }
+
+          const mat = this.materials[added % this.materials.length];
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(bx, baseY + h * 0.5 + 0.02, bz);
+          // Align long axis roughly with road
+          mesh.rotation.y = Math.atan2(dx, dz);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          group.add(mesh);
+          placed.push({ x: bx, z: bz });
+          added++;
+          nextAt += 20 + rnd() * 14;
+        }
+      }
     }
 
     return group;

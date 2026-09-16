@@ -83,6 +83,8 @@ export class TileManager {
   private terrainCenterZ = 0;
   private terrainRefreshQueued = false;
   private usedOfflineFallback = false;
+  /** When true, skip Overpass and always use offline road grids (QA: ?fallback=1). */
+  private forceOffline = false;
   private weather: WeatherPreset = 'clear';
   private disposed = false;
   private fetchGen = 0;
@@ -127,6 +129,19 @@ export class TileManager {
     this.onStatus = listener;
   }
 
+  /** Force offline road grids (no Overpass). Useful for QA via ?fallback=1. */
+  setForceOffline(force: boolean): void {
+    this.forceOffline = force;
+  }
+
+  isForcedOffline(): boolean {
+    return this.forceOffline;
+  }
+
+  usedFallbackRoads(): boolean {
+    return this.usedOfflineFallback;
+  }
+
   setWeatherSurface(weather: WeatherPreset): void {
     this.weather = weather;
     this.builder.setWeatherSurface(weather);
@@ -147,16 +162,28 @@ export class TileManager {
     if (this.disposed) return;
 
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
-    this.emitStatus(`Loading spawn tile ${tileKey(tx, ty)}…`);
+    this.emitStatus(
+      this.forceOffline
+        ? `Forced offline roads (?fallback=1) · tile ${tileKey(tx, ty)}…`
+        : `Loading spawn tile ${tileKey(tx, ty)}…`,
+    );
     await this.loadTile(tx, ty);
     if (this.disposed) return;
 
     if (!this.hasAnyRoads()) {
       this.buildFallbackGrid();
       this.usedOfflineFallback = true;
-      this.emitStatus('Using offline roads (Overpass slow)');
+      this.emitStatus(
+        this.forceOffline
+          ? 'Forced offline roads (?fallback=1)'
+          : 'Using offline roads (Overpass slow)',
+      );
     } else if (this.usedOfflineFallback) {
-      this.emitStatus('Using offline roads (Overpass slow)');
+      this.emitStatus(
+        this.forceOffline
+          ? 'Forced offline roads (?fallback=1)'
+          : 'Using offline roads (Overpass slow)',
+      );
     }
 
     await Promise.race([
@@ -170,7 +197,11 @@ export class TileManager {
       await new Promise((r) => setTimeout(r, Math.min(500, remaining)));
     }
 
-    if (this.usedOfflineFallback) {
+    if (this.forceOffline) {
+      this.emitStatus(
+        `Forced offline roads (?fallback=1) — world ready · ${this.centerlines.length} roads`,
+      );
+    } else if (this.usedOfflineFallback) {
       this.emitStatus('Using offline roads (Overpass slow) — world ready');
     } else {
       this.emitStatus(
@@ -403,6 +434,10 @@ export class TileManager {
     }
 
     try {
+      if (this.forceOffline) {
+        this.applyTileFallback(entry, heightAt);
+        this.emitStatus(`Forced offline roads · tile ${key}`);
+      } else {
       const result = await this.client.fetchTile(
         key,
         b.south,
@@ -451,11 +486,25 @@ export class TileManager {
 
         const bldg = this.buildings.build(freshBuildings, this.origin, heightAt);
         entry.group.add(bldg);
+        let bldgCount = bldg.children.length;
+
+        // Density polish: fill sparse lots without waiting on Overpass multipolygons
+        const TARGET_PER_TILE = 380;
+        if (bldgCount < 220) {
+          const need = Math.min(180, TARGET_PER_TILE - bldgCount);
+          const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
+            maxCount: need,
+            seed: tx * 997 + ty * 131,
+          });
+          entry.group.add(fill);
+          bldgCount += fill.children.length;
+        }
 
         this.scene.add(entry.group);
         this.emitStatus(
-          `Tile ${key}: ${freshWays.length} roads, ${freshBuildings.length} buildings`,
+          `Tile ${key}: ${freshWays.length} roads, ${bldgCount} buildings`,
         );
+      }
       }
     } catch (err) {
       if (this.disposed || entry.cancelled) {
@@ -486,6 +535,12 @@ export class TileManager {
     const { group, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
     entry.centerlines = centerlines;
     entry.group.add(group);
+    // Offline tiles have no OSM footprints — seed block-fill buildings
+    const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
+      maxCount: 160,
+      seed: entry.tx * 997 + entry.ty * 131 + 7,
+    });
+    entry.group.add(fill);
     this.scene.add(entry.group);
     this.rebuildCenterlineIndex();
   }
@@ -493,9 +548,10 @@ export class TileManager {
   private makeGridWaysForTile(tx: number, ty: number): OsmWay[] {
     const b = tileBounds(tx, ty);
     const ways: OsmWay[] = [];
-    let id = 900000 + tx * 10000 + ty * 20;
-    // Short city-block segments (~80 m) — never one mega-span across the tile.
-    const blocks = 5;
+    let id = 900000 + ((tx % 2000) + 2000) * 100 + ((ty % 2000) + 2000);
+    // Short city-block segments (~80–110 m) — never one mega-span across the tile.
+    // Mix primary/secondary/residential so lane dashes + curbs are exercised.
+    const blocks = 6;
     const lats: number[] = [];
     const lons: number[] = [];
     for (let i = 0; i <= blocks; i++) {
@@ -503,20 +559,31 @@ export class TileManager {
       lats.push(b.south + (b.north - b.south) * u);
       lons.push(b.west + (b.east - b.west) * u);
     }
+    const EW_NAMES = ['Fallback Ave', 'Grid Blvd', 'Offline St', 'Ribbon Rd', 'Curb Way', 'Lane Ct', 'Mark Dr'];
+    const NS_NAMES = ['North Grid', 'Center Ave', 'South Park', 'West Line', 'East Row', 'Block St', 'Plaza Rd'];
     for (let i = 0; i <= blocks; i++) {
-      const highway = i % 3 === 0 ? 'secondary' : 'residential';
+      // Every 3rd E–W is primary (wider, lanes+curbs); else secondary / residential
+      const highwayEw =
+        i === Math.floor(blocks / 2) ? 'primary' : i % 3 === 0 ? 'secondary' : 'residential';
+      const nameEw = EW_NAMES[i % EW_NAMES.length];
       for (let j = 0; j < blocks; j++) {
         ways.push({
           id: id++,
-          tags: { highway, surface: 'asphalt' },
+          tags: { highway: highwayEw, surface: 'asphalt', name: nameEw },
           geometry: [
             { lat: lats[i], lon: lons[j] },
             { lat: lats[i], lon: lons[j + 1] },
           ],
         });
+        const highwayNs =
+          i === Math.floor(blocks / 2) ? 'secondary' : i % 2 === 0 ? 'residential' : 'tertiary';
         ways.push({
           id: id++,
-          tags: { highway: i % 2 === 0 ? 'residential' : 'tertiary', surface: 'asphalt' },
+          tags: {
+            highway: highwayNs,
+            surface: 'asphalt',
+            name: NS_NAMES[i % NS_NAMES.length],
+          },
           geometry: [
             { lat: lats[j], lon: lons[i] },
             { lat: lats[j + 1], lon: lons[i] },
@@ -634,11 +701,16 @@ export class TileManager {
       return Number.isFinite(y) ? y : 0;
     };
     const { group, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
+    const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
+      maxCount: 200,
+      seed: tx * 17 + ty * 31,
+    });
+    group.add(fill);
     this.scene.add(group);
     this.tiles.set('fallback', {
       key: 'fallback',
-      tx: 0,
-      ty: 0,
+      tx,
+      ty,
       group,
       loading: false,
       centerlines,
