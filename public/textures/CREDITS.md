@@ -24,3 +24,22 @@ R = ambient occlusion, G = roughness, B = metalness. No other edits.
 | HDRI | Poly Haven asset | Author | Notes |
 |---|---|---|---|
 | `../hdri/sky_512.hdr` | [Kloofendal 43d Clear (Pure Sky)](https://polyhaven.com/a/kloofendal_43d_clear_puresky) | Greg Zaal | 1K .hdr downsampled to 512×256 flat RGBE; image-based lighting only |
+
+### Buildings (v1.3.3)
+
+`buildings/*.webp` are ambientCG CC0 colour maps only (1K JPG → 512×512 WebP q82), packed at
+runtime into one texture array for the shared building material. `siding` and
+`roof_pitched` were converted to greyscale (and levelled) so they can be tinted per
+building from OSM `building:colour` / `roof:colour`. Windows are procedural.
+
+| File | ambientCG asset | Author | Used for |
+|---|---|---|---|
+| `brick_red.webp` | [Bricks059](https://ambientcg.com/view?id=Bricks059) | ambientCG (Lennart Demes) | red brick walls |
+| `brick_light.webp` | [Bricks090](https://ambientcg.com/view?id=Bricks090) | ambientCG (Lennart Demes) | light brick / stone walls |
+| `concrete.webp` | [Concrete034](https://ambientcg.com/view?id=Concrete034) | ambientCG (Lennart Demes) | concrete walls |
+| `plaster.webp` | [Plaster003](https://ambientcg.com/view?id=Plaster003) | ambientCG (Lennart Demes) | plaster / stucco walls |
+| `siding.webp` | [WoodSiding008](https://ambientcg.com/view?id=WoodSiding008) | ambientCG (Lennart Demes) | house siding (greyscale, tinted) |
+| `metal.webp` | [CorrugatedSteel005](https://ambientcg.com/view?id=CorrugatedSteel005) | ambientCG (Lennart Demes) | industrial cladding |
+| `glass.webp` | [Facade006](https://ambientcg.com/view?id=Facade006) | ambientCG (Lennart Demes) | curtain-wall towers |
+| `roof_flat.webp` | [Gravel022](https://ambientcg.com/view?id=Gravel022) | ambientCG (Lennart Demes) | flat gravel roofs |
+| `roof_pitched.webp` | [RoofingTiles001](https://ambientcg.com/view?id=RoofingTiles001) | ambientCG (Lennart Demes) | pitched house roofs (greyscale, tinted) |

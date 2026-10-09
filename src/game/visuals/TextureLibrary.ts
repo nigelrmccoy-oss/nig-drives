@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { QualitySettings } from './Quality';
+import { FACADE_LAYERS } from './BuildingMaterial';
 
 /**
  * v1.3.2 photo textures (CC0, Poly Haven — see public/textures/CREDITS.md).
@@ -49,6 +50,8 @@ export class TextureLibrary {
   private disposed = false;
   private q: QualitySettings;
   private loadedSplatSize = 0;
+  /** v1.3.3 building facades + roofs (CC0 ambientCG), 512 px on every quality. */
+  private facades: THREE.DataArrayTexture | null = null;
 
   constructor(quality: QualitySettings) {
     this.q = quality;
@@ -64,6 +67,10 @@ export class TextureLibrary {
 
   getRoadSet(name: RoadSetName): RoadTextureSet | null {
     return this.roads.get(name) ?? null;
+  }
+
+  getBuildingFacades(): THREE.DataArrayTexture | null {
+    return this.facades;
   }
 
   getTerrain(): TerrainArrays | null {
@@ -122,6 +129,20 @@ export class TextureLibrary {
     }
     if (this.disposed) return false;
 
+    if (!this.facades) {
+      try {
+        const bitmaps = await Promise.all(
+          FACADE_LAYERS.map((layer) => fetchBitmap(`${root}buildings/${layer}.webp`)),
+        );
+        if (this.disposed) return false;
+        this.facades = packArray(bitmaps, 512, true, this.q.anisotropy);
+        for (const b of bitmaps) b.close();
+      } catch (err) {
+        console.warn('Building facades unavailable — plain tinted walls', err);
+      }
+      await new Promise((r) => setTimeout(r, 0));
+    }
+
     // Terrain arrays: decode → resize → pack layers
     const size = this.q.splatSize;
     const arrays: Partial<TerrainArrays> = {};
@@ -168,6 +189,8 @@ export class TextureLibrary {
     this.roads.clear();
     if (this.terrain) for (const t of Object.values(this.terrain)) t.dispose();
     this.terrain = null;
+    this.facades?.dispose();
+    this.facades = null;
   }
 }
 

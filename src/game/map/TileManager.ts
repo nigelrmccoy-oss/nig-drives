@@ -143,7 +143,7 @@ export class TileManager {
   private textures: TextureLibrary | null;
   private quality: QualitySettings;
   private unsubTextures: (() => void) | null = null;
-  private buildings = new BuildingBuilder();
+  private buildings: BuildingBuilder;
   private tiles = new Map<string, TileEntry>();
   private queue: Array<{ tx: number; ty: number }> = [];
   private processing = false;
@@ -174,6 +174,7 @@ export class TileManager {
     this.textures = textures;
     this.quality = quality;
     this.builder = new RoadBuilder(textures);
+    this.buildings = new BuildingBuilder(textures);
 
     const terrainTex = makeTerrainTexture();
     this.groundMat = new THREE.MeshStandardMaterial({
