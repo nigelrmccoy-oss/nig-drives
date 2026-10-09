@@ -16,3 +16,25 @@ float nigNoise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 `;
+
+/**
+ * v1.3.3 water ripples: analytic gradient of a few directional waves (no
+ * textures), flattened with distance so far water doesn't shimmer.
+ * Returns a world-space normal.
+ */
+export const WATER_RIPPLE_GLSL = /* glsl */ `
+vec2 nigWave(vec2 p, vec2 d, float len, float steep, float t) {
+  float k = 6.2831853 / len;
+  float c = sqrt(9.81 / k);
+  return d * steep * cos(dot(d, p) * k - t * c * k);
+}
+vec3 nigWaterNormal(vec2 p, float t, float dist) {
+  vec2 g = nigWave(p, vec2(0.80, 0.60), 11.0, 0.035, t);
+  g += nigWave(p, vec2(-0.39, 0.92), 6.3, 0.03, t);
+  g += nigWave(p, vec2(0.97, -0.24), 3.7, 0.025, t);
+  g += nigWave(p, vec2(-0.71, -0.70), 2.1, 0.02, t);
+  g += nigWave(p, vec2(0.18, 0.98), 1.3, 0.015, t);
+  g *= 1.0 / (1.0 + dist * 0.006);
+  return normalize(vec3(-g.x, 1.0, -g.y));
+}
+`;

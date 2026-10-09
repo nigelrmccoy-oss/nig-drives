@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OverpassClient } from './OverpassClient';
 import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder } from './BuildingBuilder';
+import { WaterMap, assembleRings, type AreaClass, type AreaSample } from './WaterMap';
+import { isWaterTags, type OsmArea } from './OverpassClient';
 import { StreetLabels } from './StreetLabels';
 import { ElevationSampler } from './ElevationSampler';
 import {
@@ -131,7 +133,14 @@ export class TileManager {
   private rings: TerrainRing[] = [];
   private ringMats: TerrainMaterialHandle[] = [];
   private water = new WaterPlane();
+  /** Relative height of the sea / Great Lake surface (water plane). */
   private seaRel = -1e6;
+  /** v1.3.3: true when seaRel is a Great Lake level (flat DEM lake surface). */
+  private lakeMode = false;
+  private waterMap = new WaterMap();
+  private areaTmp: AreaSample = { water: 0, level: Number.NaN, park: 0, forest: 0, farm: 0 };
+  private ringWaterVersion: number[] = [-1, -1, -1];
+  private waterTime = 0;
   /** Count of heights served from a non-fine source since last reset. */
   private provisionalSamples = 0;
   private demDirty = false;
@@ -175,6 +184,7 @@ export class TileManager {
     this.quality = quality;
     this.builder = new RoadBuilder(textures);
     this.buildings = new BuildingBuilder(textures);
+    this.buildings.skipAt = (x, z) => this.isWaterLocal(x, z);
 
     const terrainTex = makeTerrainTexture();
     this.groundMat = new THREE.MeshStandardMaterial({
@@ -228,18 +238,118 @@ export class TileManager {
    */
   private demHeight(lat: number, lon: number): number {
     const fine = this.elevation.sampleRelative(lat, lon);
-    if (fine !== null) return this.clampSea(fine);
+    if (fine !== null) return this.clampSea(fine, lat, lon, this.elevation);
     this.provisionalSamples++;
     const mid = this.midElevation.sampleRelative(lat, lon);
-    if (mid !== null) return this.clampSea(mid);
+    if (mid !== null) return this.clampSea(mid, lat, lon, this.midElevation);
     const coarse = this.coarseElevation.sampleRelative(lat, lon);
-    if (coarse !== null) return this.clampSea(coarse);
+    if (coarse !== null) return this.clampSea(coarse, lat, lon, this.coarseElevation);
     return 0;
   }
 
   /** Bathymetry → just under the sea-level water plane (SF Bay is water, not a bowl). */
-  private clampSea(y: number): number {
-    return y < this.seaRel - 1.5 ? this.seaRel - 1.5 : y;
+  private clampSea(
+    y: number,
+    lat: number,
+    lon: number,
+    src: { sampleRelative(lat: number, lon: number): number | null },
+  ): number {
+    if (!this.lakeMode) return y < this.seaRel - 1.5 ? this.seaRel - 1.5 : y;
+    // Great Lakes are flat in Terrarium at their surface level: sink that
+    // surface just under the lake-level water plane so it reads as water.
+    const d = y - this.seaRel;
+    if (d < LAKE_FLAT_M) return this.seaRel - 1.5;
+    if (d > LAKE_NOISE_M) return y;
+    // DEM noise in the lake (0.4–1.3 m bumps) used to poke through as green
+    // patches: a near-level sample that is mostly surrounded by lake is lake.
+    const mLat = 1 / 111_320;
+    const mLon = mLat / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+    let wet = 0;
+    let n = 0;
+    for (const r of LAKE_PROBE_R) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + r * 0.01;
+        const v = src.sampleRelative(lat + Math.sin(a) * r * mLat, lon + Math.cos(a) * r * mLon);
+        if (v === null) continue;
+        n++;
+        if (v - this.seaRel < LAKE_FLAT_M) wet++;
+      }
+    }
+    return n > 0 && wet / n >= 0.6 ? this.seaRel - 1.5 : y;
+  }
+
+  /** Is this point under the sea / Great-Lake plane or inside an OSM water polygon? */
+  private isWaterLocal(x: number, z: number): boolean {
+    if (this.waterMap.size && this.waterMap.sample(x, z, this.areaTmp).water > 0.5) return true;
+    if (this.seaRel < -1e5) return false;
+    const before = this.provisionalSamples;
+    const y = this.demHeightLocal(x, z);
+    this.provisionalSamples = before;
+    return y <= this.seaRel - 1;
+  }
+
+  /**
+   * v1.3.3 inland water: inside an OSM lake/river polygon the ground goes to
+   * the lake level (rivers: just under the DEM), with the banks easing down.
+   * Leaves the full sample in this.areaTmp for the caller.
+   */
+  private applyWater(x: number, z: number, dem: number): number {
+    const s = this.waterMap.sample(x, z, this.areaTmp);
+    if (s.water <= 0) return dem;
+    const yW = Number.isFinite(s.level) ? s.level : dem - 0.6;
+    const t = Math.min(1, s.water * 2);
+    if (t >= 1) return yW;
+    return dem + (Math.min(dem, yW) - dem) * t;
+  }
+
+  /** Lake level from the DEM around its shore (15th percentile, a touch under). */
+  private lakeLevel(rings: Array<Array<{ x: number; z: number }>>): { level: number; provisional: boolean } {
+    const before = this.provisionalSamples;
+    const pts: number[] = [];
+    let total = 0;
+    for (const r of rings) total += r.length;
+    const step = Math.max(1, Math.floor(total / 160));
+    let k = 0;
+    for (const r of rings)
+      for (const p of r) {
+        if (k++ % step) continue;
+        const y = this.demHeightLocal(p.x, p.z);
+        if (Number.isFinite(y)) pts.push(y);
+      }
+    const provisional = this.provisionalSamples > before;
+    this.provisionalSamples = before;
+    if (!pts.length) return { level: 0, provisional: true };
+    pts.sort((a, b) => a - b);
+    return { level: pts[Math.floor(pts.length * 0.15)] - 0.15, provisional };
+  }
+
+  private addAreas(areas: OsmArea[]): void {
+    for (const a of areas) {
+      if (this.waterMap.has(a.key)) continue;
+      const cls = areaClass(a.tags);
+      if (!cls) continue;
+      const parts = a.parts.map((g) => g.map((n) => this.origin.toLocal(n.lat, n.lon)));
+      const rings = a.key.startsWith('r') ? assembleRings(parts) : parts.map((r) => {
+        const c = r.slice();
+        const f = c[0];
+        const l = c[c.length - 1];
+        if (c.length > 3 && Math.abs(f.x - l.x) < 0.05 && Math.abs(f.z - l.z) < 0.05) c.pop();
+        return c;
+      });
+      // open ways (unclosed coastline-ish pieces) aren't areas
+      if (a.key.startsWith('w')) {
+        const g = a.parts[0];
+        const f = g[0];
+        const l = g[g.length - 1];
+        if (Math.abs(f.lat - l.lat) > 1e-7 || Math.abs(f.lon - l.lon) > 1e-7) continue;
+      }
+      this.waterMap.add({ key: a.key, cls, rings }, (r) => this.lakeLevel(r));
+    }
+  }
+
+  /** Water polygon under (x, z)? (0..1) */
+  waterAt(x: number, z: number): number {
+    return this.waterMap.sample(x, z, this.areaTmp).water;
   }
 
   private demHeightLocal(x: number, z: number): number {
@@ -253,10 +363,10 @@ export class TileManager {
     if (ring === 0) return this.demHeight(ll.lat, ll.lon);
     if (ring === 1) {
       const m = this.midElevation.sampleRelative(ll.lat, ll.lon);
-      if (m !== null) return this.clampSea(m);
+      if (m !== null) return this.clampSea(m, ll.lat, ll.lon, this.midElevation);
     }
     const c = this.coarseElevation.sampleRelative(ll.lat, ll.lon);
-    if (c !== null) return this.clampSea(c);
+    if (c !== null) return this.clampSea(c, ll.lat, ll.lon, this.coarseElevation);
     this.provisionalSamples++;
     return 0;
   }
@@ -312,7 +422,7 @@ export class TileManager {
   groundHeight(x: number, z: number): number {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
     const before = this.provisionalSamples;
-    const dem = this.demHeightLocal(x, z);
+    const dem = this.applyWater(x, z, this.demHeightLocal(x, z));
     this.provisionalSamples = before;
     const y = this.carveAt(x, z, dem, this.rings[0]?.cell ?? 6.25).y;
     return Number.isFinite(y) ? y : 0;
@@ -374,10 +484,19 @@ export class TileManager {
     const originAbs = this.elevation.getOriginElevation();
     this.midElevation.setOriginElevation(originAbs);
     this.coarseElevation.setOriginElevation(originAbs);
-    this.seaRel = -originAbs;
+    const lake = greatLakeAt(this.origin.lat, this.origin.lon, originAbs);
+    if (lake) {
+      // Toronto / Chicago / Cleveland…: the plane sits at the lake surface
+      this.lakeMode = true;
+      this.seaRel = lake.level - originAbs;
+      this.water.mesh.visible = true;
+    } else {
+      this.lakeMode = false;
+      this.seaRel = -originAbs;
+      // Only bother drawing the sea where it can be seen (SF…)
+      this.water.mesh.visible = originAbs < 250;
+    }
     this.water.mesh.position.y = this.seaRel;
-    // Only bother drawing the sea where it can be seen (SF, Toronto shore…)
-    this.water.mesh.visible = originAbs < 250;
     void this.midElevation.preloadArea(
       this.origin.lat - 0.025,
       this.origin.lon - 0.035,
@@ -490,6 +609,10 @@ export class TileManager {
     this.ground.position.x = playerX;
     this.ground.position.z = playerZ;
 
+    this.waterTime = performance.now() / 1000;
+    for (const m of this.ringMats) m.setTime(this.waterTime);
+    this.water.setTime(this.waterTime);
+    this.waterMap.evict(playerX, playerZ);
     this.updateTerrain(playerX, playerZ);
     this.water.mesh.position.x = playerX;
     this.water.mesh.position.z = playerZ;
@@ -535,6 +658,11 @@ export class TileManager {
       kind: 'dirt',
     };
     if (!Number.isFinite(x) || !Number.isFinite(z)) return offRoad;
+    if (this.waterMap.size && this.waterAt(x, z) > 0.5) {
+      offRoad.label = 'Water';
+      offRoad.grip *= 0.45;
+      offRoad.noise = 0.05;
+    }
 
     const near = this.roadIndex.nearest(x, z, ROAD_HEIGHT_RADIUS + 8, undefined, preferY);
     if (!near) return offRoad;
@@ -705,6 +833,19 @@ export class TileManager {
         return true;
       });
 
+      // v1.3.3 water + landuse polygons (cheap: rasterised once, shared by all rings)
+      this.addAreas(result.areas ?? []);
+      if (result.relationIds?.length) {
+        void this.client
+          .fetchRelations(result.relationIds, gen)
+          .then((rels) => {
+            if (!this.disposed && gen === this.fetchGen) this.addAreas(rels);
+          })
+          .catch(() => {
+            /* water relations are optional */
+          });
+      }
+
       if (freshWays.length === 0) {
         await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
@@ -868,15 +1009,25 @@ export class TileManager {
       );
       if (this.disposed) return;
     }
+    const waterVersion = this.waterMap.version;
     const heightAt = (wx: number, wz: number): RingSample => {
-      const dem = this.ringDem(index, wx, wz);
-      if (index === 0) return this.carveAt(wx, wz, dem, cell);
-      return { y: dem, verge: 0 };
+      const dem = this.applyWater(wx, wz, this.ringDem(index, wx, wz));
+      const a = this.areaTmp;
+      const water = a.water;
+      const park = a.park;
+      const forest = a.forest;
+      const farm = a.farm;
+      if (index === 0) {
+        const c = this.carveAt(wx, wz, dem, cell);
+        return { y: c.y, verge: c.verge * (1 - Math.min(1, water * 2)), water, park, forest, farm };
+      }
+      return { y: dem, verge: 0, water, park, forest, farm };
     };
     const ok = await ring.build(c.x, c.z, heightAt, () => this.disposed);
     if (!ok || this.disposed) return;
     ring.provisional = this.provisionalSamples > provBefore;
     ring.roadVersion = roadVersion;
+    this.ringWaterVersion[index] = waterVersion;
     this.ground.visible = false;
     this.syncRingHoles();
   }
@@ -910,6 +1061,14 @@ export class TileManager {
       ) {
         want = true;
       }
+      // New lakes / parks streamed in (throttled like the road re-carve)
+      if (
+        !want &&
+        this.ringWaterVersion[i] !== this.waterMap.version &&
+        now - ring.lastBuildAt > CARVE_REBUILD_MS * (i + 1)
+      ) {
+        want = true;
+      }
       if (want) {
         const cx = i === 0 ? px : px;
         void this.rebuildRing(i, cx, pz);
@@ -928,7 +1087,7 @@ export class TileManager {
   private groundAtFn(): (lat: number, lon: number) => number {
     return (lat: number, lon: number) => {
       const p = this.origin.toLocal(lat, lon);
-      const dem = this.demHeight(lat, lon);
+      const dem = this.applyWater(p.x, p.z, this.demHeight(lat, lon));
       const y = this.carveAt(p.x, p.z, dem, this.rings[0]?.cell ?? 6.25).y;
       return Number.isFinite(y) ? y : 0;
     };
@@ -1008,6 +1167,7 @@ export class TileManager {
     if (now - this.reheightAcc < REHEIGHT_CHECK_S) return;
     this.reheightAcc = now;
     this.demDirty = false;
+    if (this.waterMap.hasProvisional) this.waterMap.refreshLevels((r) => this.lakeLevel(r));
 
     this.rings.forEach((ring, i) => {
       if (ring.provisional && !ring.building && ring.builtOnce) {
@@ -1147,6 +1307,7 @@ export class TileManager {
     this.ringMats = [];
     this.scene.remove(this.water.mesh);
     this.water.dispose();
+    this.waterMap.clear();
     this.roadIndex.clear();
     this.junctionRegistry.clear();
     this.scene.remove(this.ground);
@@ -1171,4 +1332,49 @@ function disposeGroup(obj: THREE.Object3D): void {
   obj.traverse((o) => {
     if (o instanceof THREE.Mesh) o.geometry.dispose();
   });
+}
+
+/** v1.3.3: OSM area tags → raster class (null = not drawn). */
+function areaClass(t: Record<string, string>): AreaClass | null {
+  if (isWaterTags(t)) {
+    const w = t.water ?? '';
+    if (t.waterway === 'riverbank' || w === 'river' || w === 'canal' || w === 'stream' || w === 'rapids') return 'river';
+    return 'lake';
+  }
+  if (t.landuse === 'forest' || t.natural === 'wood' || t.natural === 'scrub') return 'forest';
+  if (t.landuse === 'farmland' || t.landuse === 'meadow') return 'farm';
+  if (
+    t.leisure === 'park' ||
+    t.leisure === 'golf_course' ||
+    t.landuse === 'recreation_ground' ||
+    t.landuse === 'cemetery' ||
+    t.landuse === 'village_green'
+  )
+    return 'park';
+  return null;
+}
+
+/**
+ * Great Lakes: Terrarium stores them as flat surfaces at their mean level, so
+ * a lake-level water plane + sinking that flat surface draws them as water
+ * (OSM's Lake Ontario multipolygon is far too big to fetch per tile).
+ */
+const LAKE_FLAT_M = 0.35;
+const LAKE_NOISE_M = 1.4;
+const LAKE_PROBE_R = [45, 110];
+
+const GREAT_LAKES = [
+  { name: 'Ontario', s: 43.15, w: -79.95, n: 44.3, e: -76.0, level: 74.8 },
+  { name: 'Erie', s: 41.35, w: -83.55, n: 42.95, e: -78.85, level: 173.8 },
+  { name: 'Michigan-Huron', s: 41.6, w: -88.1, n: 46.4, e: -79.6, level: 175.2 },
+  { name: 'Superior', s: 46.3, w: -92.2, n: 49.1, e: -84.3, level: 183.4 },
+];
+
+function greatLakeAt(lat: number, lon: number, originAbs: number): { name: string; level: number } | null {
+  for (const l of GREAT_LAKES) {
+    if (lat < l.s || lat > l.n || lon < l.w || lon > l.e) continue;
+    // Only near the shore (inland cities in the bbox, e.g. KW, keep the sea logic)
+    if (originAbs - l.level < 120) return l;
+  }
+  return null;
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WATER_RIPPLE_GLSL } from '../visuals/ShaderChunks';
 
 /**
  * v1.3.2 terrain: three nested heightfield rings that follow the player.
@@ -30,6 +31,12 @@ export interface RingSample {
   y: number;
   /** 0..1 gravel/dirt verge factor next to roads. */
   verge: number;
+  /** v1.3.3: 0..1 water coverage (0.5 = shoreline). */
+  water?: number;
+  /** v1.3.3 landuse weights 0..1. */
+  park?: number;
+  forest?: number;
+  farm?: number;
 }
 
 export type RingHeightFn = (x: number, z: number) => RingSample;
@@ -94,6 +101,8 @@ export class TerrainRing {
       const half = size / 2;
       const heights = new Float32Array(n * n);
       const verge = new Float32Array(n * n);
+      const water = new Float32Array(n * n);
+      const land = new Float32Array(n * n * 3);
       let t0 = performance.now();
       for (let j = 0; j < n; j++) {
         const z = cz - half + j * cell;
@@ -101,7 +110,12 @@ export class TerrainRing {
           const x = cx - half + i * cell;
           const s = heightAt(x, z);
           heights[j * n + i] = Number.isFinite(s.y) ? s.y : 0;
-          verge[j * n + i] = s.verge;
+          const k0 = j * n + i;
+          verge[k0] = s.verge;
+          water[k0] = s.water ?? 0;
+          land[k0 * 3] = s.park ?? 0;
+          land[k0 * 3 + 1] = s.forest ?? 0;
+          land[k0 * 3 + 2] = s.farm ?? 0;
         }
         if (performance.now() - t0 > sliceMs) {
           await nextSlice();
@@ -117,7 +131,8 @@ export class TerrainRing {
       const pos = new Float32Array(total * 3);
       const nor = new Float32Array(total * 3);
       const col = new Float32Array(total * 3);
-      const splat = new Float32Array(total * 2);
+      const splat = new Float32Array(total * 4);
+      const landAttr = new Float32Array(total * 2);
 
       for (let j = 0; j < n; j++) {
         for (let i = 0; i < n; i++) {
@@ -146,8 +161,12 @@ export class TerrainRing {
           // Curvature (convex crest > 0, hollow < 0), scaled to ~±1
           const lap = y - (yl + yr + yd + yu) * 0.25;
           const curv = Math.max(-1, Math.min(1, (lap / cell) * 6));
-          splat[k * 2] = verge[k];
-          splat[k * 2 + 1] = curv;
+          splat[k * 4] = verge[k];
+          splat[k * 4 + 1] = curv;
+          splat[k * 4 + 2] = water[k];
+          splat[k * 4 + 3] = land[k * 3 + 1];
+          landAttr[k * 2] = land[k * 3];
+          landAttr[k * 2 + 1] = land[k * 3 + 2];
           // Fallback vertex colour (used until/unless photo textures load):
           // slope → earth, hollows a touch darker (cheap AO), crests drier.
           const slope = 1 - ny;
@@ -161,9 +180,10 @@ export class TerrainRing {
           const r = (0.3 + t * 0.16) * (1 - rock) + 0.42 * rock;
           const g = (0.38 + t * 0.15) * (1 - rock) + 0.38 * rock;
           const b = (0.2 + t * 0.07) * (1 - rock) + 0.33 * rock;
-          col[k * 3] = r * ao;
-          col[k * 3 + 1] = g * ao;
-          col[k * 3 + 2] = b * ao;
+          const wt = Math.min(1, Math.max(0, (water[k] - 0.35) * 4));
+          col[k * 3] = (r * ao) * (1 - wt) + 0.06 * wt;
+          col[k * 3 + 1] = (g * ao) * (1 - wt) + 0.12 * wt;
+          col[k * 3 + 2] = (b * ao) * (1 - wt) + 0.16 * wt;
         }
       }
 
@@ -183,6 +203,9 @@ export class TerrainRing {
         col[k * 3] = col[src * 3] * 0.8;
         col[k * 3 + 1] = col[src * 3 + 1] * 0.8;
         col[k * 3 + 2] = col[src * 3 + 2] * 0.8;
+        for (let c = 0; c < 4; c++) splat[k * 4 + c] = splat[src * 4 + c];
+        landAttr[k * 2] = landAttr[src * 2];
+        landAttr[k * 2 + 1] = landAttr[src * 2 + 1];
       }
 
       const idxCount = res * res * 6 + border.length * 6;
@@ -222,7 +245,8 @@ export class TerrainRing {
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
       geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      geo.setAttribute('aSplat', new THREE.BufferAttribute(splat, 2));
+      geo.setAttribute('aSplat', new THREE.BufferAttribute(splat, 4));
+      geo.setAttribute('aLand', new THREE.BufferAttribute(landAttr, 2));
       geo.setIndex(new THREE.BufferAttribute(index, 1));
       geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), size);
 
@@ -251,21 +275,50 @@ function nextSlice(): Promise<void> {
   return new Promise((r) => setTimeout(r, 0));
 }
 
-/** Sea-level water plane (SF Bay etc.). Terrarium has bathymetry; terrain is clamped under it. */
+/**
+ * Sea / Great-Lake level water plane (SF Bay, Lake Ontario…). Terrain under it
+ * is clamped below. v1.3.3: animated ripple normals so it reflects the sky
+ * like water instead of a flat sheet; fog comes from the standard material.
+ */
 export class WaterPlane {
   readonly mesh: THREE.Mesh;
   private mat: THREE.MeshStandardMaterial;
+  private time = { value: 0 };
 
   constructor() {
     this.mat = new THREE.MeshStandardMaterial({
-      color: 0x24465a,
-      roughness: 0.12,
-      metalness: 0.05,
-      envMapIntensity: 0.9,
+      color: 0x1d3c4c,
+      roughness: 0.06,
+      metalness: 0.0,
+      envMapIntensity: 1.0,
       polygonOffset: true,
       polygonOffsetFactor: 4,
       polygonOffsetUnits: 4,
     });
+    const time = this.time;
+    this.mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = time;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWWorld;')
+        .replace(
+          '#include <worldpos_vertex>',
+          '#include <worldpos_vertex>\nvWWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;',
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+uniform float uTime;
+varying vec3 vWWorld;
+${WATER_RIPPLE_GLSL}`,
+        )
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>
+normal = normalize((viewMatrix * vec4(nigWaterNormal(vWWorld.xz, uTime, length(vViewPosition)), 0.0)).xyz);`,
+        );
+    };
+    this.mat.customProgramCacheKey = () => 'nig-water-plane-v1';
     const geo = new THREE.PlaneGeometry(24000, 24000, 1, 1);
     geo.rotateX(-Math.PI / 2);
     this.mesh = new THREE.Mesh(geo, this.mat);
@@ -276,6 +329,10 @@ export class WaterPlane {
 
   get material(): THREE.MeshStandardMaterial {
     return this.mat;
+  }
+
+  setTime(t: number): void {
+    this.time.value = t;
   }
 
   dispose(): void {

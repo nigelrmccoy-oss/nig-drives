@@ -111,17 +111,14 @@ const SIDING_TINTS = [0xf4f2ee, 0xe6dccb, 0xc9d3d8, 0xc8cfbd, 0xd9c9ae, 0xb8c2c8
 const FLAT_ROOF_TINTS = [0x9a9690, 0x8a8a88, 0xb0aca4, 0x77787a];
 const PITCHED_ROOF_TINTS = [0x4a4c50, 0x5a5048, 0x3c3e42, 0x6a5a4c, 0x6e4a3c, 0x55585c];
 
-const tmpColor = new THREE.Color();
+const COLOR_NAMES = (THREE.Color as unknown as { NAMES: Record<string, number> }).NAMES;
 function parseColour(v: string | undefined, fallback: number): THREE.Color {
   const c = new THREE.Color(fallback);
   if (!v) return c;
-  try {
-    tmpColor.set(0xff00ff);
-    tmpColor.setStyle(v.trim().toLowerCase().replace(/_/g, ''));
-    if (tmpColor.getHex() !== 0xff00ff) c.copy(tmpColor);
-  } catch {
-    /* unknown colour name */
-  }
+  const s = v.trim().toLowerCase().replace(/[_\s-]/g, '');
+  // only well-formed values: setStyle warns on anything else (OSM has "gray;orange" etc.)
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(s)) c.setStyle(s);
+  else if (s in COLOR_NAMES) c.setHex(COLOR_NAMES[s]);
   return c;
 }
 
@@ -289,6 +286,8 @@ class BuildingAccumulator {
 export class BuildingBuilder {
   private handle: BuildingMaterialHandle;
   private unsub: (() => void) | null = null;
+  /** v1.3.3: footprints standing in water (lake / sea / OSM water polygon) are skipped. */
+  skipAt: ((x: number, z: number) => boolean) | null = null;
 
   constructor(textures: TextureLibrary | null = null) {
     this.handle = createBuildingMaterial();
@@ -328,6 +327,12 @@ export class BuildingBuilder {
     }
     cx /= ring.length;
     cz /= ring.length;
+    if (this.skipAt) {
+      if (this.skipAt(cx, cz)) return false;
+      let wet = 0;
+      for (const p of ring) if (this.skipAt(p.x, p.z)) wet++;
+      if (wet * 2 >= ring.length) return false;
+    }
 
     let minY = Infinity;
     let maxY = -Infinity;

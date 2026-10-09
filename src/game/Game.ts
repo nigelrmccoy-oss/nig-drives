@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ChaseCamera } from './camera/ChaseCamera';
-import { getCityById } from './cities';
+import { CITIES, getCityById } from './cities';
 import { Input } from './input/Input';
 import { TileManager } from './map/TileManager';
 import { HUD } from './ui/HUD';
@@ -153,6 +153,17 @@ export class Game {
       city.lat = spawn.lat;
       city.lon = spawn.lon;
       if (spawn.heading !== undefined) city.headingDeg = spawn.heading;
+      // v1.3.3: HUD names the nearest known city to the override, not the menu pick
+      const km = (c: { lat: number; lon: number }) =>
+        Math.hypot(c.lat - spawn.lat, (c.lon - spawn.lon) * Math.cos((spawn.lat * Math.PI) / 180)) * 111.32;
+      const near = [...CITIES].sort((a, b) => km(a) - km(b))[0];
+      if (near && km(near) < 60) {
+        city.name = near.name;
+        city.region = near.region;
+      } else {
+        city.name = 'Custom spawn';
+        city.region = `${spawn.lat.toFixed(3)}, ${spawn.lon.toFixed(3)}`;
+      }
     }
     this.cityName = city.name;
     this.region = city.region;

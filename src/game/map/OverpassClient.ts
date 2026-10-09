@@ -9,10 +9,37 @@ export interface OsmWay {
   geometry: OsmNode[];
 }
 
-export interface OverpassResult {
+/** v1.3.3 water / landuse polygon (way or multipolygon relation). */
+export interface OsmArea {
+  /** 'w123' / 'r456' */
+  key: string;
+  tags: Record<string, string>;
+  /** Raw member geometries; closed ways are complete rings, relation parts get joined later. */
+  parts: OsmNode[][];
+}
+
+interface ParsedTile {
   ways: OsmWay[];
   buildings: OsmWay[];
+  areas: OsmArea[];
+  /** Water multipolygons touching the tile, small enough to fetch in full. */
+  relationIds: number[];
+}
+
+export interface OverpassResult extends ParsedTile {
   source: string;
+}
+
+/** Relations spanning more than this (degrees) are skipped (Great Lakes use the DEM lake table). */
+const MAX_RELATION_SPAN_DEG = 0.3;
+
+export function isWaterTags(t: Record<string, string>): boolean {
+  return (
+    t.natural === 'water' ||
+    t.waterway === 'riverbank' ||
+    t.landuse === 'reservoir' ||
+    t.landuse === 'basin'
+  );
 }
 
 const HIGHWAY_FILTER =
@@ -36,9 +63,21 @@ function buildQuery(south: number, west: number, north: number, east: number): s
 (
   way["highway"~"^(${HIGHWAY_FILTER})$"](${s},${w},${n},${e});
   way["building"](${s},${w},${n},${e});
+  way["natural"="water"](${s},${w},${n},${e});
+  way["waterway"="riverbank"](${s},${w},${n},${e});
+  way["landuse"~"^(reservoir|basin)$"](${s},${w},${n},${e});
+  way["leisure"~"^(park|golf_course)$"](${s},${w},${n},${e});
+  way["landuse"~"^(forest|meadow|farmland|recreation_ground|cemetery|village_green)$"](${s},${w},${n},${e});
+  way["natural"~"^(wood|scrub)$"](${s},${w},${n},${e});
 );
 out geom;
+relation["natural"="water"](${s},${w},${n},${e});
+out tags bb;
 `.trim();
+}
+
+function relationQuery(ids: number[]): string {
+  return `[out:json][timeout:15];relation(id:${ids.join(',')});out geom;`;
 }
 
 /**
@@ -96,7 +135,8 @@ function footprintScore(w: OsmWay): number {
 }
 
 export class OverpassClient {
-  private memoryCache = new Map<string, { ways: OsmWay[]; buildings: OsmWay[] }>();
+  private memoryCache = new Map<string, ParsedTile>();
+  private relationCache = new Map<number, Promise<OsmArea | null>>();
   private generation = 0;
   private inFlight = 0;
   private waiters: Array<() => void> = [];
@@ -119,11 +159,11 @@ export class OverpassClient {
     return this.generation;
   }
 
-  getCached(key: string): { ways: OsmWay[]; buildings: OsmWay[] } | undefined {
+  getCached(key: string): ParsedTile | undefined {
     return this.memoryCache.get(key);
   }
 
-  setCached(key: string, data: { ways: OsmWay[]; buildings: OsmWay[] }): void {
+  setCached(key: string, data: ParsedTile): void {
     this.memoryCache.set(key, data);
     this.trimCache();
   }
@@ -183,79 +223,108 @@ export class OverpassClient {
       }
 
       const query = buildQuery(south, west, north, east);
-      let lastError: unknown;
-
-      // Wave 1: race same-origin proxies (kumi primary + mail.ru) — no CORS.
-      try {
-        const raced = await withTimeout(
-          Promise.any(
-            PROXY_ENDPOINTS.map((ep) =>
-              this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
-            ),
-          ),
-          OVERPASS_ATTEMPT_MS,
-          'Overpass proxy race',
-        );
-        if (expectGen !== undefined && expectGen !== this.generation) {
-          throw new Error('Overpass request cancelled (stale generation)');
-        }
-        this.memoryCache.set(key, raced.parsed);
-        this.trimCache();
-        return { ...raced.parsed, source: raced.source };
-      } catch (err) {
-        lastError = err;
-      }
-
-      // Wave 2: race healthy directs (skip dead de so TLS EOF cannot burn the slot).
-      try {
-        const raced = await withTimeout(
-          Promise.any(
-            DIRECT_ENDPOINTS.map((ep) =>
-              this.postQuery(ep, query).then((parsed) => ({ parsed, source: ep })),
-            ),
-          ),
-          OVERPASS_ATTEMPT_MS,
-          'Overpass direct race',
-        );
-        if (expectGen !== undefined && expectGen !== this.generation) {
-          throw new Error('Overpass request cancelled (stale generation)');
-        }
-        this.memoryCache.set(key, raced.parsed);
-        this.trimCache();
-        return { ...raced.parsed, source: raced.source };
-      } catch (err) {
-        lastError = err;
-      }
-
-      // Wave 3: last-resort de (optional; often broken on Cursor box).
-      for (const endpoint of LAST_RESORT_ENDPOINTS) {
-        if (expectGen !== undefined && expectGen !== this.generation) {
-          throw new Error('Overpass request cancelled (stale generation)');
-        }
-        try {
-          const parsed = await withTimeout(
-            this.postQuery(endpoint, query),
-            OVERPASS_ATTEMPT_MS,
-            `Overpass ${endpoint}`,
-          );
-          this.memoryCache.set(key, parsed);
-          this.trimCache();
-          return { ...parsed, source: endpoint };
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      throw lastError instanceof Error ? lastError : new Error(String(lastError));
+      const res = await this.runWaves(query, (d) => parseTile(d), expectGen);
+      this.memoryCache.set(key, res.parsed);
+      this.trimCache();
+      return { ...res.parsed, source: res.source };
     } finally {
       this.releaseSlot();
     }
   }
 
-  private async postQuery(
+  /**
+   * Same mirror order for every request: same-origin proxies race → direct
+   * mirrors race → overpass-api.de last resort (one at a time).
+   */
+  private async runWaves<T>(
+    query: string,
+    parse: (data: OverpassJson) => T,
+    expectGen?: number,
+  ): Promise<{ parsed: T; source: string }> {
+    const stale = () => expectGen !== undefined && expectGen !== this.generation;
+    let lastError: unknown;
+    // Wave 1: race same-origin proxies (kumi primary + mail.ru) — no CORS.
+    try {
+      const raced = await withTimeout(
+        Promise.any(
+          PROXY_ENDPOINTS.map((ep) => this.postQuery(ep, query, parse).then((parsed) => ({ parsed, source: ep }))),
+        ),
+        OVERPASS_ATTEMPT_MS,
+        'Overpass proxy race',
+      );
+      if (stale()) throw new Error('Overpass request cancelled (stale generation)');
+      return raced;
+    } catch (err) {
+      lastError = err;
+    }
+    // Wave 2: race healthy directs (skip dead de so TLS EOF cannot burn the slot).
+    try {
+      const raced = await withTimeout(
+        Promise.any(
+          DIRECT_ENDPOINTS.map((ep) => this.postQuery(ep, query, parse).then((parsed) => ({ parsed, source: ep }))),
+        ),
+        OVERPASS_ATTEMPT_MS,
+        'Overpass direct race',
+      );
+      if (stale()) throw new Error('Overpass request cancelled (stale generation)');
+      return raced;
+    } catch (err) {
+      lastError = err;
+    }
+    // Wave 3: last-resort de (optional; often broken on Cursor box).
+    for (const endpoint of LAST_RESORT_ENDPOINTS) {
+      if (stale()) throw new Error('Overpass request cancelled (stale generation)');
+      try {
+        const parsed = await withTimeout(
+          this.postQuery(endpoint, query, parse),
+          OVERPASS_ATTEMPT_MS,
+          `Overpass ${endpoint}`,
+        );
+        return { parsed, source: endpoint };
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  /**
+   * v1.3.3: full geometry for water multipolygons (lakes with islands, river
+   * banks). Cached by id across tiles; failures resolve to null and are retried
+   * on a later tile.
+   */
+  async fetchRelations(ids: number[], expectGen?: number): Promise<OsmArea[]> {
+    const want = ids.filter((id) => !this.relationCache.has(id));
+    if (want.length) {
+      const batch = (async () => {
+        await this.acquireSlot();
+        try {
+          const res = await this.runWaves(relationQuery(want), parseRelations, expectGen);
+          return res.parsed;
+        } finally {
+          this.releaseSlot();
+        }
+      })();
+      for (const id of want) {
+        const p = batch.then(
+          (m) => m.get(id) ?? null,
+          () => {
+            this.relationCache.delete(id);
+            return null;
+          },
+        );
+        this.relationCache.set(id, p);
+      }
+    }
+    const out = await Promise.all(ids.map((id) => this.relationCache.get(id) ?? Promise.resolve(null)));
+    return out.filter((a): a is OsmArea => !!a);
+  }
+
+  private async postQuery<T>(
     endpoint: string,
     query: string,
-  ): Promise<{ ways: OsmWay[]; buildings: OsmWay[] }> {
+    parse: (data: OverpassJson) => T,
+  ): Promise<T> {
     const ctrl = new AbortController();
     this.activeAborts.add(ctrl);
     const abortTimer = setTimeout(() => ctrl.abort(), OVERPASS_ATTEMPT_MS);
@@ -274,33 +343,69 @@ export class OverpassClient {
         throw new Error(`Overpass ${res.status} from ${endpoint}`);
       }
 
-      const data = (await res.json()) as {
-        elements?: Array<{
-          type: string;
-          id: number;
-          tags?: Record<string, string>;
-          geometry?: OsmNode[];
-        }>;
-      };
-
-      const ways: OsmWay[] = [];
-      const buildings: OsmWay[] = [];
-      for (const el of data.elements ?? []) {
-        if (el.type !== 'way' || !el.geometry || el.geometry.length < 2) continue;
-        const tags = el.tags ?? {};
-        const item: OsmWay = { id: el.id, tags, geometry: el.geometry };
-        if (tags.highway) ways.push(item);
-        else if (tags.building) buildings.push(item);
-      }
-      // Prefer larger footprints when capping (better street fill / FPS tradeoff)
-      if (buildings.length > 520) {
-        buildings.sort((a, b) => footprintScore(b) - footprintScore(a));
-        buildings.length = 520;
-      }
-      return { ways, buildings };
+      return parse((await res.json()) as OverpassJson);
     } finally {
       clearTimeout(abortTimer);
       this.activeAborts.delete(ctrl);
     }
   }
+}
+
+interface OverpassJson {
+  elements?: Array<{
+    type: string;
+    id: number;
+    tags?: Record<string, string>;
+    geometry?: Array<OsmNode | null>;
+    bounds?: { minlat: number; minlon: number; maxlat: number; maxlon: number };
+    members?: Array<{ type: string; role: string; geometry?: Array<OsmNode | null> }>;
+  }>;
+}
+
+function cleanGeom(g: Array<OsmNode | null> | undefined): OsmNode[] {
+  return (g ?? []).filter((n): n is OsmNode => !!n && Number.isFinite(n.lat) && Number.isFinite(n.lon));
+}
+
+function parseTile(data: OverpassJson): ParsedTile {
+  const ways: OsmWay[] = [];
+  const buildings: OsmWay[] = [];
+  const areas: OsmArea[] = [];
+  const relationIds: number[] = [];
+  for (const el of data.elements ?? []) {
+    const tags = el.tags ?? {};
+    if (el.type === 'relation') {
+      const b = el.bounds;
+      if (b && Math.max(b.maxlat - b.minlat, b.maxlon - b.minlon) < MAX_RELATION_SPAN_DEG) {
+        relationIds.push(el.id);
+      }
+      continue;
+    }
+    if (el.type !== 'way') continue;
+    const geom = cleanGeom(el.geometry);
+    if (geom.length < 2) continue;
+    if (tags.highway) ways.push({ id: el.id, tags, geometry: geom });
+    else if (tags.building) buildings.push({ id: el.id, tags, geometry: geom });
+    else if (geom.length >= 4) areas.push({ key: `w${el.id}`, tags, parts: [geom] });
+  }
+  // Prefer larger footprints when capping (better street fill / FPS tradeoff)
+  if (buildings.length > 520) {
+    buildings.sort((a, b) => footprintScore(b) - footprintScore(a));
+    buildings.length = 520;
+  }
+  return { ways, buildings, areas, relationIds };
+}
+
+function parseRelations(data: OverpassJson): Map<number, OsmArea> {
+  const out = new Map<number, OsmArea>();
+  for (const el of data.elements ?? []) {
+    if (el.type !== 'relation') continue;
+    const parts: OsmNode[][] = [];
+    for (const m of el.members ?? []) {
+      if (m.type !== 'way' || (m.role !== 'outer' && m.role !== 'inner' && m.role !== '')) continue;
+      const g = cleanGeom(m.geometry);
+      if (g.length >= 2) parts.push(g);
+    }
+    if (parts.length) out.set(el.id, { key: `r${el.id}`, tags: el.tags ?? {}, parts });
+  }
+  return out;
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { QualitySettings } from './Quality';
 import type { TerrainArrays } from './TextureLibrary';
-import { NIG_NOISE_GLSL } from './ShaderChunks';
+import { NIG_NOISE_GLSL, WATER_RIPPLE_GLSL } from './ShaderChunks';
 
 /**
  * Terrain ring material (v1.3.2).
@@ -20,6 +20,8 @@ export interface TerrainMaterialHandle {
   setTextures(arrays: TerrainArrays | null, q: QualitySettings): void;
   /** snow 0..1 (snow cover on flats), wet 0..1 (darker, glossier). */
   setWeather(snow: number, wet: number): void;
+  /** Seconds, drives water ripples. */
+  setTime(t: number): void;
 }
 
 /** Metres per texture repeat: grass, dirt, rock, snow. */
@@ -39,6 +41,7 @@ export function createTerrainMaterial(opts: {
     uTile: { value: TILE_M.clone() },
     uSnow: { value: 0 },
     uWet: { value: 0 },
+    uTime: { value: 0 },
   };
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -61,10 +64,12 @@ export function createTerrainMaterial(opts: {
         '#include <common>',
         `#include <common>
 uniform vec4 uInner;
-attribute vec2 aSplat;
+attribute vec4 aSplat;
+attribute vec2 aLand;
 varying vec3 vNigWPos;
 varying vec3 vNigWNormal;
-varying vec2 vNigSplat;`,
+varying vec4 vNigSplat;
+varying vec2 vNigLand;`,
       )
       .replace(
         '#include <begin_vertex>',
@@ -78,7 +83,8 @@ if (uInner.w > 0.0) {
 }
 vNigWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vNigWNormal = normalize(mat3(modelMatrix) * objectNormal);
-vNigSplat = aSplat;`,
+vNigSplat = aSplat;
+vNigLand = aLand;`,
       );
 
     if (!('NIG_SPLAT' in active)) return;
@@ -93,10 +99,13 @@ uniform sampler2DArray uArm;
 uniform vec4 uTile;
 uniform float uSnow;
 uniform float uWet;
+uniform float uTime;
 varying vec3 vNigWPos;
 varying vec3 vNigWNormal;
-varying vec2 vNigSplat;
+varying vec4 vNigSplat;
+varying vec2 vNigLand;
 ${NIG_NOISE_GLSL}
+${WATER_RIPPLE_GLSL}
 vec2 nigRot(vec2 p) { return vec2(p.x * 0.8 - p.y * 0.6, p.x * 0.6 + p.y * 0.8); }
 vec3 nigAlb(vec2 uv, float layer) {
 #ifdef NIG_FAR
@@ -133,6 +142,15 @@ vec2 uvS = vec2(nWp.x, -nWp.z) / uTile.w;
 vec3 cG = nigAlb(uvG, 0.0);
 // sun-dried / lush variation across the landscape
 cG = mix(cG, cG * vec3(1.12, 1.04, 0.8), smoothstep(0.45, 0.85, m3) * 0.35);
+// v1.3.3 landuse from OSM: parks lusher, woods darker with litter, farmland in rows
+float nForest = clamp(vNigSplat.w, 0.0, 1.0);
+float nPark = clamp(vNigLand.x, 0.0, 1.0);
+float nFarm = clamp(vNigLand.y, 0.0, 1.0);
+cG = mix(cG, cG * vec3(0.9, 1.1, 0.8), nPark * 0.6);
+cG = mix(cG, cG * vec3(0.6, 0.72, 0.52), nForest * 0.8);
+float nRows = 0.5 + 0.5 * sin(dot(nWp.xz, vec2(0.6, 0.8)) * 1.7);
+cG = mix(cG, cG * mix(vec3(1.2, 1.08, 0.7), vec3(0.98, 0.96, 0.72), nRows), nFarm * 0.7);
+wDirt = max(wDirt, nForest * 0.4 * smoothstep(0.35, 0.7, m2));
 vec3 cD = nigAlb(uvD, 1.0);
 #ifdef NIG_TRIPLANAR
 vec3 tpw = pow(abs(nWn), vec3(4.0));
@@ -153,6 +171,11 @@ nAlbedo *= mix(0.80, 1.14, nMacro);
 // hollows a touch darker (cheap AO from curvature)
 nAlbedo *= 1.0 + min(vNigSplat.y, 0.0) * 0.18;
 nAlbedo *= mix(1.0, 0.68, uWet * (1.0 - wSnow));
+// v1.3.3 inland water (OSM lakes / rivers rasterised into the ring vertices)
+float nWat = smoothstep(0.42, 0.56, vNigSplat.z);
+float nShore = smoothstep(0.15, 0.45, vNigSplat.z) * (1.0 - nWat);
+nAlbedo = mix(nAlbedo, nAlbedo * vec3(0.6, 0.58, 0.52), nShore);
+nAlbedo = mix(nAlbedo, vec3(0.045, 0.085, 0.10), nWat);
 diffuseColor.rgb *= nAlbedo;
 `,
       )
@@ -171,7 +194,17 @@ diffuseColor.rgb *= mix(1.0, nArm.r, 0.6);
 roughnessFactor *= mix(mix(0.92, 0.97, wDirt), 0.82, wRock);
 #endif
 roughnessFactor = mix(roughnessFactor, 0.55, wSnow * 0.6);
-roughnessFactor = mix(roughnessFactor, 0.32, uWet * 0.7);`,
+roughnessFactor = mix(roughnessFactor, 0.32, uWet * 0.7);
+roughnessFactor = mix(roughnessFactor, 0.45, nShore);
+roughnessFactor = mix(roughnessFactor, 0.05, nWat);`,
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `if (nWat > 0.001) {
+  vec3 nWn3 = nigWaterNormal(nWp.xz, uTime, length(vViewPosition));
+  normal = normalize(mix(normal, (viewMatrix * vec4(nWn3, 0.0)).xyz, nWat));
+}
+#include <emissivemap_fragment>`,
       );
 
     if ('NIG_NORMALS' in active) {
@@ -223,6 +256,9 @@ roughnessFactor = mix(roughnessFactor, 0.32, uWet * 0.7);`,
       material.vertexColors = !arrays;
       key = `nig-terrain-v2-${Object.keys(defs).sort().join('-') || 'vc'}`;
       material.needsUpdate = true;
+    },
+    setTime(t) {
+      uniforms.uTime.value = t;
     },
     setWeather(snow, wet) {
       uniforms.uSnow.value = snow;
