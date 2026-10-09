@@ -196,13 +196,17 @@ roughnessFactor *= mix(mix(0.92, 0.97, wDirt), 0.82, wRock);
 roughnessFactor = mix(roughnessFactor, 0.55, wSnow * 0.6);
 roughnessFactor = mix(roughnessFactor, 0.32, uWet * 0.7);
 roughnessFactor = mix(roughnessFactor, 0.45, nShore);
-roughnessFactor = mix(roughnessFactor, 0.05, nWat);`,
+// far water: a bit rougher so the sub-pixel ripples don't alias into white frost
+roughnessFactor = mix(roughnessFactor, mix(0.05, 0.2, smoothstep(120.0, 700.0, length(vViewPosition))), nWat);`,
       )
       .replace(
         '#include <emissivemap_fragment>',
         `if (nWat > 0.001) {
   vec3 nWn3 = nigWaterNormal(nWp.xz, uTime, length(vViewPosition));
   normal = normalize(mix(normal, (viewMatrix * vec4(nWn3, 0.0)).xyz, nWat));
+  // small ponds seen at grazing angles mirrored the white horizon (looked frozen):
+  // lean the normal toward the viewer a little to tame the Fresnel term
+  normal = normalize(normal + normalize(vViewPosition) * -0.45 * nWat);
 }
 #include <emissivemap_fragment>`,
       );

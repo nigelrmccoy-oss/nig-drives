@@ -34,7 +34,7 @@ vec3 nigWaterNormal(vec2 p, float t, float dist) {
   g += nigWave(p, vec2(0.97, -0.24), 3.7, 0.025, t);
   g += nigWave(p, vec2(-0.71, -0.70), 2.1, 0.02, t);
   g += nigWave(p, vec2(0.18, 0.98), 1.3, 0.015, t);
-  g *= 1.0 / (1.0 + dist * 0.006);
+  g *= 1.0 / (1.0 + dist * 0.015);
   return normalize(vec3(-g.x, 1.0, -g.y));
 }
 `;

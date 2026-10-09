@@ -114,7 +114,7 @@ if (bKind == 1.0) {
   bCol = nigFac(guv, 6.0);
   vec2 cellG = floor(vec2(vBUv.x / (bFloor * 0.8), vBUv.y / bFloor));
   nigWin = (vBUv.y > 0.3 && vBUv.y < vWin + 0.6) ? 0.85 : 0.0;
-  nigLit = step(nigHash(cellG + bSeed * 61.0), 0.3);
+  nigLit = 0.55 * step(nigHash(cellG + bSeed * 61.0), 0.2);
   nigRough = 0.2;
 } else {
   float tile = bLayer <= 1.0 ? 2.4 : (bLayer == 4.0 ? 2.0 : 3.0);
@@ -130,7 +130,8 @@ if (bKind == 1.0) {
     vec2 hi = shop > 0.5 ? vec2(0.92, 0.82) : vec2(0.78, 0.84);
     vec2 w2 = smoothstep(lo, lo + aa * 1.5, c) * (1.0 - smoothstep(hi - aa * 1.5, hi, c));
     float w = w2.x * w2.y;
-    w *= step(vBUv.y, vWin);
+    // whole windows only: drop a storey whose window would poke into the parapet
+    w *= step((floor(fy) + 0.85) * bFloor, vWin);
     // far away: average coverage instead of shimmering stripes
     float far = smoothstep(0.18, 0.45, max(aa.x, aa.y));
     w = mix(w, 0.32 * step(vBUv.y, vWin), far);
