@@ -27,6 +27,12 @@ const TERRAIN_RES = 96;
 const TERRAIN_RECENTER_M = 120;
 const TERRAIN_Y_BIAS = -0.62;
 const SPAWN_DEADLINE_MS = 14_000;
+/** How long a tile build waits for its DEM before building with provisional heights. */
+const DEM_WAIT_MS = 15_000;
+/** How often (s) to look for provisional tiles whose DEM has since arrived. */
+const REHEIGHT_CHECK_S = 0.75;
+/** Coarse DEM zoom used as a stand-in while fine tiles stream (never "last known"). */
+const COARSE_DEM_ZOOM = 11;
 /** Cap queued + loading tiles to avoid memory / Overpass storms. */
 const MAX_PENDING_TILES = 12;
 /** Max tiles kept loaded (Chebyshev neighborhood soft cap). */
@@ -58,11 +64,54 @@ interface TileEntry {
   buildingIds: number[];
   usedFallback: boolean;
   cancelled: boolean;
+  /** Source data kept so the tile can be re-heighted when late DEM tiles land. */
+  ways: OsmWay[];
+  buildings: OsmWay[];
+  /** Built with at least one height that wasn't from the fine DEM. */
+  provisional: boolean;
+  rebuilding: boolean;
+  /** Fill-building budget used for this tile (re-used on rebuild). */
+  fillCount: number;
+  fillSeed: number;
+  /** Re-height attempts so a tile can never rebuild in a loop. */
+  reheights: number;
+}
+
+const MAX_REHEIGHTS = 3;
+
+/** Lat/lon extent of the source geometry (OSM ways run past the tile bbox). */
+function dataBounds(
+  ways: OsmWay[],
+  fallback: { south: number; west: number; north: number; east: number },
+): { south: number; west: number; north: number; east: number } {
+  let south = fallback.south;
+  let west = fallback.west;
+  let north = fallback.north;
+  let east = fallback.east;
+  for (const w of ways) {
+    for (const g of w.geometry) {
+      if (!Number.isFinite(g.lat) || !Number.isFinite(g.lon)) continue;
+      if (g.lat < south) south = g.lat;
+      if (g.lat > north) north = g.lat;
+      if (g.lon < west) west = g.lon;
+      if (g.lon > east) east = g.lon;
+    }
+  }
+  const pad = 0.0004;
+  return { south: south - pad, west: west - pad, north: north + pad, east: east + pad };
 }
 
 export class TileManager {
   readonly origin: GeoOrigin;
-  readonly elevation = new ElevationSampler();
+  readonly elevation = new ElevationSampler(12, 64);
+  /** Low-zoom DEM: provisional heights while fine tiles stream. */
+  readonly coarseElevation = new ElevationSampler(COARSE_DEM_ZOOM, 16);
+  /** Count of heights served from a non-fine source since last reset. */
+  private provisionalSamples = 0;
+  private demDirty = false;
+  private reheightAcc = 0;
+  private reheightBusy = false;
+  private terrainProvisional = false;
   private scene: THREE.Scene;
   private client = new OverpassClient();
   private builder = new RoadBuilder();
@@ -119,6 +168,23 @@ export class TileManager {
     this.ground.name = 'ground-fallback';
     scene.add(this.ground);
     scene.add(this.streetLabels.group);
+    this.elevation.onTileLoaded(() => {
+      this.demDirty = true;
+    });
+  }
+
+  /**
+   * Best available relative height: fine DEM → coarse DEM → spawn level.
+   * Anything not from the fine DEM bumps provisionalSamples so the caller can
+   * flag its tile for re-heighting (v1.3.2: no more last-sampled plateaus).
+   */
+  private demHeight(lat: number, lon: number): number {
+    const fine = this.elevation.sampleRelative(lat, lon);
+    if (fine !== null) return fine;
+    this.provisionalSamples++;
+    const coarse = this.coarseElevation.sampleRelative(lat, lon);
+    if (coarse !== null) return coarse;
+    return 0;
   }
 
   getCenterlines(): RoadCenterline[] {
@@ -160,6 +226,13 @@ export class TileManager {
     this.emitStatus('Loading Terrarium elevation…');
     await this.elevation.ensureOrigin(this.origin.lat, this.origin.lon);
     if (this.disposed) return;
+    this.coarseElevation.setOriginElevation(this.elevation.getOriginElevation());
+    void this.coarseElevation.preloadArea(
+      this.origin.lat - 0.06,
+      this.origin.lon - 0.08,
+      this.origin.lat + 0.06,
+      this.origin.lon + 0.08,
+    );
 
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
     this.emitStatus(
@@ -254,6 +327,7 @@ export class TileManager {
     }
 
     void this.pumpQueue();
+    this.checkLateDem();
     this.ground.position.x = playerX;
     this.ground.position.z = playerZ;
 
@@ -285,7 +359,9 @@ export class TileManager {
   getHeight(x: number, z: number): number {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
     const ll = this.origin.toLatLon(x, z);
-    const y = this.elevation.sampleRelative(ll.lat, ll.lon);
+    const before = this.provisionalSamples;
+    const y = this.demHeight(ll.lat, ll.lon);
+    this.provisionalSamples = before;
     return Number.isFinite(y) ? y : 0;
   }
 
@@ -412,22 +488,34 @@ export class TileManager {
       buildingIds: [],
       usedFallback: false,
       cancelled: false,
+      ways: [],
+      buildings: [],
+      provisional: false,
+      rebuilding: false,
+      fillCount: 0,
+      fillSeed: tx * 997 + ty * 131,
+      reheights: 0,
     };
     this.tiles.set(key, entry);
     this.emitStatus(`Streaming OSM + DEM tile ${key}…`);
 
     const b = tileBounds(tx, ty);
-    const heightAt = (lat: number, lon: number) => {
-      const y = this.elevation.sampleRelative(lat, lon);
-      return Number.isFinite(y) ? y : 0;
-    };
+    const heightAt = this.heightAtFn();
 
     const gen = this.fetchGen;
 
-    await Promise.race([
-      this.elevation.preloadArea(b.south, b.west, b.north, b.east),
-      new Promise<void>((r) => setTimeout(r, 8_500)),
-    ]);
+    // Roads and buildings wait for their DEM (longer budget than 1.3.1e). If it
+    // still isn't there, they build provisionally and get re-heighted later.
+    const demReady = await this.elevation.preloadArea(
+      b.south,
+      b.west,
+      b.north,
+      b.east,
+      DEM_WAIT_MS,
+    );
+    if (!demReady && !this.disposed) {
+      this.emitStatus(`Elevation slow for tile ${key} — building provisionally, will re-height`);
+    }
     if (this.disposed || entry.cancelled || gen !== this.fetchGen) {
       this.finishLoading(key);
       return;
@@ -468,37 +556,31 @@ export class TileManager {
         this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
       } else {
-        const { group: roads, centerlines } = await this.builder.buildWaysAsync(
-          freshWays,
-          this.origin,
-          heightAt,
-        );
+        entry.ways = freshWays;
+        entry.buildings = freshBuildings;
+        // Ways extend past the tile bbox: make sure their DEM is in too
+        const db = dataBounds([...freshWays, ...freshBuildings], b);
+        await this.elevation.preloadArea(db.south, db.west, db.north, db.east, 6_000);
         if (this.disposed || entry.cancelled) {
-          roads.traverse((obj) => {
-            if (obj instanceof THREE.Mesh) obj.geometry.dispose();
-          });
           this.finishLoading(key);
           return;
         }
-        entry.centerlines = centerlines;
-        this.rebuildCenterlineIndex();
-        entry.group.add(roads);
-
-        const bldg = this.buildings.build(freshBuildings, this.origin, heightAt);
-        entry.group.add(bldg);
-        let bldgCount = bldg.children.length;
-
         // Density polish: fill sparse lots without waiting on Overpass multipolygons
         const TARGET_PER_TILE = 380;
-        if (bldgCount < 220) {
-          const need = Math.min(180, TARGET_PER_TILE - bldgCount);
-          const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
-            maxCount: need,
-            seed: tx * 997 + ty * 131,
-          });
-          entry.group.add(fill);
-          bldgCount += fill.children.length;
+        entry.fillCount = 0;
+        if (freshBuildings.length < 220) {
+          entry.fillCount = Math.min(180, TARGET_PER_TILE - freshBuildings.length);
         }
+        const built = await this.buildTileContent(entry);
+        if (!built || this.disposed || entry.cancelled) {
+          this.finishLoading(key);
+          return;
+        }
+        entry.group.add(built.group);
+        entry.centerlines = built.centerlines;
+        entry.provisional = built.provisional;
+        this.rebuildCenterlineIndex();
+        const bldgCount = built.buildingCount;
 
         this.scene.add(entry.group);
         this.emitStatus(
@@ -532,15 +614,21 @@ export class TileManager {
     this.usedOfflineFallback = true;
     entry.usedFallback = true;
     const ways = this.makeGridWaysForTile(entry.tx, entry.ty);
+    entry.ways = ways;
+    entry.buildings = [];
+    // Offline tiles have no OSM footprints — seed block-fill buildings
+    entry.fillCount = 160;
+    entry.fillSeed = entry.tx * 997 + entry.ty * 131 + 7;
+    const before = this.provisionalSamples;
     const { group, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
     entry.centerlines = centerlines;
     entry.group.add(group);
-    // Offline tiles have no OSM footprints — seed block-fill buildings
     const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
-      maxCount: 160,
-      seed: entry.tx * 997 + entry.ty * 131 + 7,
+      maxCount: entry.fillCount,
+      seed: entry.fillSeed,
     });
     entry.group.add(fill);
+    entry.provisional = this.provisionalSamples > before;
     this.scene.add(entry.group);
     this.rebuildCenterlineIndex();
   }
@@ -613,15 +701,13 @@ export class TileManager {
     const half = size * 0.5;
     const sw = this.origin.toLatLon(centerX - half, centerZ - half);
     const ne = this.origin.toLatLon(centerX + half, centerZ + half);
-    await Promise.race([
-      this.elevation.preloadArea(
-        Math.min(sw.lat, ne.lat),
-        Math.min(sw.lon, ne.lon),
-        Math.max(sw.lat, ne.lat),
-        Math.max(sw.lon, ne.lon),
-      ),
-      new Promise<void>((r) => setTimeout(r, 8_500)),
-    ]);
+    await this.elevation.preloadArea(
+      Math.min(sw.lat, ne.lat),
+      Math.min(sw.lon, ne.lon),
+      Math.max(sw.lat, ne.lat),
+      Math.max(sw.lon, ne.lon),
+    );
+    const provBefore = this.provisionalSamples;
     if (this.disposed) {
       geo.dispose();
       return;
@@ -636,7 +722,7 @@ export class TileManager {
         const lx = pos.getX(i) + centerX;
         const lz = pos.getZ(i) + centerZ;
         const ll = this.origin.toLatLon(lx, lz);
-        let y = this.elevation.sampleRelative(ll.lat, ll.lon);
+        let y = this.demHeight(ll.lat, ll.lon);
         if (!Number.isFinite(y)) y = 0;
         pos.setY(i, y + TERRAIN_Y_BIAS);
       }
@@ -649,6 +735,7 @@ export class TileManager {
         }
       }
     }
+    this.terrainProvisional = this.provisionalSamples > provBefore;
     geo.computeVertexNormals();
     const colors = new Float32Array(pos.count * 3);
     const col = new THREE.Color();
@@ -681,6 +768,111 @@ export class TileManager {
     this.ground.visible = false;
   }
 
+  private heightAtFn(): (lat: number, lon: number) => number {
+    return (lat: number, lon: number) => {
+      const y = this.demHeight(lat, lon);
+      return Number.isFinite(y) ? y : 0;
+    };
+  }
+
+  /** Build roads + OSM buildings + fillers for a tile from its stored source data. */
+  private async buildTileContent(entry: TileEntry): Promise<{
+    group: THREE.Group;
+    centerlines: RoadCenterline[];
+    provisional: boolean;
+    buildingCount: number;
+  } | null> {
+    const heightAt = this.heightAtFn();
+    const before = this.provisionalSamples;
+    const group = new THREE.Group();
+    const { group: roads, centerlines } = await this.builder.buildWaysAsync(
+      entry.ways,
+      this.origin,
+      heightAt,
+    );
+    if (this.disposed || entry.cancelled) {
+      disposeGroup(roads);
+      return null;
+    }
+    group.add(roads);
+    let buildingCount = 0;
+    if (entry.buildings.length) {
+      const bldg = this.buildings.build(entry.buildings, this.origin, heightAt);
+      group.add(bldg);
+      buildingCount += bldg.children.length;
+    }
+    if (entry.fillCount > 0) {
+      const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
+        maxCount: entry.fillCount,
+        seed: entry.fillSeed,
+      });
+      group.add(fill);
+      buildingCount += fill.children.length;
+    }
+    return {
+      group,
+      centerlines,
+      provisional: this.provisionalSamples > before,
+      buildingCount,
+    };
+  }
+
+  /**
+   * v1.3.2: when fine DEM tiles land after a tile was built with provisional
+   * heights, rebuild that tile's roads/buildings (and the terrain) so they
+   * can't drift apart — the 1.3.1e terrain was re-meshed but roads never were.
+   */
+  private checkLateDem(): void {
+    if (!this.demDirty || this.reheightBusy || this.disposed) return;
+    const now = performance.now() / 1000;
+    if (now - this.reheightAcc < REHEIGHT_CHECK_S) return;
+    this.reheightAcc = now;
+    this.demDirty = false;
+
+    if (this.terrainProvisional) {
+      this.queueTerrainRefresh(this.terrainCenterX, this.terrainCenterZ);
+    }
+    for (const entry of this.tiles.values()) {
+      if (!entry.provisional || entry.loading || entry.rebuilding || entry.cancelled) continue;
+      if (entry.reheights >= MAX_REHEIGHTS) continue;
+      const b = dataBounds([...entry.ways, ...entry.buildings], tileBounds(entry.tx, entry.ty));
+      if (!this.elevation.isAreaLoaded(b.south, b.west, b.north, b.east)) {
+        // Still waiting; keep checking as more tiles land
+        void this.elevation.preloadArea(b.south, b.west, b.north, b.east);
+        continue;
+      }
+      void this.reheightTile(entry);
+      return; // one at a time; the next check picks up the rest
+    }
+  }
+
+  private async reheightTile(entry: TileEntry): Promise<void> {
+    entry.rebuilding = true;
+    entry.reheights++;
+    this.reheightBusy = true;
+    try {
+      const built = await this.buildTileContent(entry);
+      if (!built || this.disposed || entry.cancelled) {
+        if (built) disposeGroup(built.group);
+        return;
+      }
+      for (const child of [...entry.group.children]) {
+        entry.group.remove(child);
+        disposeGroup(child);
+      }
+      entry.group.add(built.group);
+      entry.centerlines = built.centerlines;
+      entry.provisional = built.provisional;
+      this.rebuildCenterlineIndex();
+      this.emitStatus(`Re-heighted tile ${entry.key} with late elevation data`);
+    } finally {
+      entry.rebuilding = false;
+      this.reheightBusy = false;
+      // Another tile may be waiting
+      this.demDirty = true;
+    }
+  }
+
   private hasAnyRoads(): boolean {
     return this.centerlines.length > 0;
   }
@@ -696,15 +888,15 @@ export class TileManager {
         ways.push(...this.makeGridWaysForTile(tx + dx, ty + dy));
       }
     }
-    const heightAt = (lat: number, lon: number) => {
-      const y = this.elevation.sampleRelative(lat, lon);
-      return Number.isFinite(y) ? y : 0;
-    };
-    const { group, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
+    const heightAt = this.heightAtFn();
+    const before = this.provisionalSamples;
+    const { group: roads, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
     const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
       maxCount: 200,
       seed: tx * 17 + ty * 31,
     });
+    const group = new THREE.Group();
+    group.add(roads);
     group.add(fill);
     this.scene.add(group);
     this.tiles.set('fallback', {
@@ -718,6 +910,13 @@ export class TileManager {
       buildingIds: [],
       usedFallback: true,
       cancelled: false,
+      ways,
+      buildings: [],
+      provisional: this.provisionalSamples > before,
+      rebuilding: false,
+      fillCount: 200,
+      fillSeed: tx * 17 + ty * 31,
+      reheights: 0,
     });
     this.rebuildCenterlineIndex();
   }
@@ -765,6 +964,7 @@ export class TileManager {
     this.buildings.dispose();
     this.streetLabels.dispose();
     this.elevation.dispose();
+    this.coarseElevation.dispose();
     this.seenWayIds.clear();
     this.seenBuildingIds.clear();
     this.centerlines = [];
@@ -798,4 +998,10 @@ function distPointSegSq(
   const qx = ax + (bx - ax) * t;
   const qz = az + (bz - az) * t;
   return (px - qx) ** 2 + (pz - qz) ** 2;
+}
+
+function disposeGroup(obj: THREE.Object3D): void {
+  obj.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.geometry.dispose();
+  });
 }

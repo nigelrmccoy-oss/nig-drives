@@ -145,7 +145,9 @@ export class BuildingBuilder {
       const shape = new THREE.Shape();
       for (let k = 0; k < ring.length; k++) {
         const x = ring[k].x - cx;
-        const y = ring[k].z - cz;
+        // Shape Y becomes world -Z after rotateX(-90°); negate so footprints keep
+        // their real orientation (they were mirrored about the centroid before).
+        const y = -(ring[k].z - cz);
         if (k === 0) shape.moveTo(x, y);
         else shape.lineTo(x, y);
       }

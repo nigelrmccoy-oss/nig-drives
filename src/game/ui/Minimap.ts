@@ -78,6 +78,7 @@ export class Minimap {
     lines: RoadCenterline[],
     px: number,
     pz: number,
+    /** Compass bearing in radians (0 = north, clockwise). */
     heading: number,
   ): void {
     const s = this.canvas.width;
@@ -94,7 +95,8 @@ export class Minimap {
 
     const scale = s / (range * 2);
     const toSx = (x: number) => (x - px) * scale + s / 2;
-    const toSy = (z: number) => -(z - pz) * scale + s / 2;
+    // World is X east / Z south (v1.3.2), so north-up maps +Z straight down the canvas
+    const toSy = (z: number) => (z - pz) * scale + s / 2;
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -138,7 +140,8 @@ export class Minimap {
     const cy = s / 2;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(-heading);
+    // heading is a compass bearing; canvas rotation is clockwise-positive
+    ctx.rotate(heading);
     ctx.fillStyle = '#5ad4ff';
     ctx.beginPath();
     ctx.moveTo(0, -7);

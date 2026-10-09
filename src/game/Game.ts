@@ -7,7 +7,7 @@ import { HUD } from './ui/HUD';
 import { Minimap } from './ui/Minimap';
 import { createVehicle } from './vehicles/VehicleFactory';
 import { EngineSound } from './vehicles/EngineSound';
-import type { Vehicle } from './vehicles/Vehicle';
+import { Vehicle } from './vehicles/Vehicle';
 import type { VehicleId } from './vehicles/Vehicle';
 import type { TransmissionMode } from './vehicles/Transmission';
 import { Environment, WEATHER_LABELS } from './weather/Environment';
@@ -123,7 +123,8 @@ export class Game {
     }
 
     const snap = this.tiles.findNearestRoadPoint(0, 0);
-    const heading = (city.headingDeg * Math.PI) / 180;
+    // cities.ts headings are compass bearings (0 = north, clockwise)
+    const heading = Vehicle.compassToYaw((city.headingDeg * Math.PI) / 180);
     if (snap && Number.isFinite(snap.x) && Number.isFinite(snap.z) && Number.isFinite(snap.y)) {
       this.vehicle.setPose(snap.x, snap.z, heading);
       this.vehicle.position.y = snap.y;
@@ -282,7 +283,7 @@ export class Game {
       showBoost,
     });
 
-    this.minimap.draw(lines, this.vehicle.position.x, this.vehicle.position.z, this.vehicle.heading);
+    this.minimap.draw(lines, this.vehicle.position.x, this.vehicle.position.z, this.vehicle.getCompassHeading());
 
     this.post.render();
     this.raf = requestAnimationFrame(this.frame);

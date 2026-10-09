@@ -1,4 +1,13 @@
-/** Local ENU-ish projection: X east, Y up, Z north (meters from origin). */
+/**
+ * Local projection (meters from origin), right-handed to match Three.js:
+ * X = east, Y = up, Z = SOUTH (so north is -Z).
+ *
+ * v1.3.2: before this, Z was north, which in a right-handed Y-up scene draws
+ * every city as a mirror image (east/west swapped). This is the single choke
+ * point for OSM, DEM and building coordinates, so flipping it here un-mirrors
+ * the whole world. Compass headings (0 = north, clockwise) map to world
+ * forward (sin h, 0, -cos h); see Vehicle.compassToYaw.
+ */
 
 const EARTH_RADIUS_M = 6378137;
 
@@ -36,14 +45,14 @@ export class GeoOrigin {
   toLocal(lat: number, lon: number): Vec2 {
     return {
       x: (lon - this.lon) * this.mPerDegLon,
-      z: (lat - this.lat) * this.mPerDegLat,
+      z: -(lat - this.lat) * this.mPerDegLat,
     };
   }
 
   toLatLon(x: number, z: number): LatLon {
     return {
       lon: this.lon + x / this.mPerDegLon,
-      lat: this.lat + z / this.mPerDegLat,
+      lat: this.lat - z / this.mPerDegLat,
     };
   }
 }

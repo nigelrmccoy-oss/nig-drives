@@ -222,6 +222,11 @@ export class Vehicle {
   readonly spec: VehicleSpec;
   readonly mesh: THREE.Group;
   position = new THREE.Vector3();
+  /**
+   * Physics yaw (radians) in Three.js terms: world forward = (sin yaw, 0, cos yaw),
+   * positive = turning left. Not a compass bearing; use getCompassHeading() /
+   * Vehicle.compassToYaw() to convert (world is X east, Z south since v1.3.2).
+   */
   heading = 0;
   private vx = 0;
   private vz = 0;
@@ -555,6 +560,23 @@ export class Vehicle {
 
   getSpeedKmh(): number {
     return this.speed * 3.6;
+  }
+
+  /** Compass bearing (0 = north, clockwise, radians) → physics yaw. */
+  static compassToYaw(compassRad: number): number {
+    return Math.PI - compassRad;
+  }
+
+  /** Physics yaw → compass bearing in [0, 2π). */
+  static yawToCompass(yaw: number): number {
+    const c = Math.PI - yaw;
+    const twoPi = Math.PI * 2;
+    return ((c % twoPi) + twoPi) % twoPi;
+  }
+
+  /** Current compass bearing (0 = north, clockwise, radians). */
+  getCompassHeading(): number {
+    return Vehicle.yawToCompass(this.heading);
   }
 
   getForward(): THREE.Vector3 {
