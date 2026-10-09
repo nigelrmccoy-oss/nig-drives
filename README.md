@@ -6,6 +6,12 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.3 (package 1.3.8) — Textured buildings and real water
+
+- Buildings: shared facade texture-array material (brick, concrete, glass curtain wall), procedural whole-storey windows with faint night lights, styles from OSM tags (type, levels, colour, material), gable roofs on small houses.
+- Water: OSM lakes, rivers and multipolygons rasterised into the terrain (lake beds sunk under the surface), Great Lakes level plane for Lake Ontario, ripple water shader, landuse tints; buildings and offline grid roads skipped on water.
+- Known gaps: no arched bridges or tunnel interiors.
+
 ### v1.3.2 (package 1.3.7) — Real hills, terrain correctness, photoreal CC0 textures
 
 - **World orientation fixed:** the map was mirrored north↔south. Now X = east, Z = south (right-handed), so streets sit on the correct side; the minimap arrow and city spawn headings use compass bearings.
@@ -120,7 +126,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.2**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.3**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 

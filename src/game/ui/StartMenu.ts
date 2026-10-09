@@ -39,8 +39,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.2</span></h1>
-        <p class="tagline">v1.3.2: real hills (z14 DEM, graded roads, 8 km horizon) · photoreal CC0 terrain &amp; asphalt · quality presets.</p>
+        <h1>Nig Drives <span class="ver">v1.3.3</span></h1>
+        <p class="tagline">v1.3.3: textured buildings with windows &amp; roofs · real lakes, rivers &amp; Lake Ontario · real hills · photoreal CC0 terrain.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">

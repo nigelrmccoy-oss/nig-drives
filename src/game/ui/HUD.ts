@@ -84,7 +84,7 @@ export class HUD {
       </div>
       <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
       <div class="fps-counter" id="hud-fps">— FPS</div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.3.2</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.3.3</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;
