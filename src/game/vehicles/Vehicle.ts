@@ -249,6 +249,14 @@ export class Vehicle {
   coolant = 0.35;
   transmission: Transmission;
   private _prevVz = 0;
+  /** v1.3.2 ground contact: sin(grade) along the car (+ = nose up), body pitch/roll from the 4 wheels. */
+  private gradeSin = 0;
+  private groundPitch = 0;
+  private groundRoll = 0;
+  /** Vertical speed for the light suspension / airtime model (m/s). */
+  vy = 0;
+  /** Gravity along the grade on/off (Nigel's default: on). */
+  gradeGravity = true;
   private wheelPivots: THREE.Group[] = [];
   private spinMeshes: THREE.Object3D[] = [];
   private headlightMats: THREE.MeshStandardMaterial[] = [];
@@ -305,7 +313,28 @@ export class Vehicle {
     }
   }
 
+  /**
+   * Feed the ground under the four wheels (called by Game each frame before update).
+   * pitch/roll in radians for the body; gradeSin = sin(slope) along the heading.
+   */
+  setGroundContact(pitch: number, roll: number, gradeSin: number, dt: number): void {
+    const k = 1 - Math.exp(-dt * 12);
+    const p = THREE.MathUtils.clamp(Number.isFinite(pitch) ? pitch : 0, -0.55, 0.55);
+    const r = THREE.MathUtils.clamp(Number.isFinite(roll) ? roll : 0, -0.45, 0.45);
+    this.groundPitch += (p - this.groundPitch) * k;
+    this.groundRoll += (r - this.groundRoll) * k;
+    this.gradeSin = THREE.MathUtils.clamp(Number.isFinite(gradeSin) ? gradeSin : 0, -0.6, 0.6);
+  }
+
+  getGradeSin(): number {
+    return this.gradeSin;
+  }
+
   setPose(x: number, z: number, headingRad: number): void {
+    this.vy = 0;
+    this.gradeSin = 0;
+    this.groundPitch = 0;
+    this.groundRoll = 0;
     this.position.set(x, 0, z);
     this.heading = headingRad;
     this.vx = 0;
@@ -444,7 +473,9 @@ export class Vehicle {
       engAx = 0;
     }
 
-    const drag = 0.012 * g * Math.sign(this.vz) + 0.00045 * this.vz * Math.abs(this.vz);
+    // Rolling resistance: more on grass/dirt so a car parked on a gentle verge doesn't creep away
+    const rollC = 0.012 + (1 - THREE.MathUtils.clamp(surface.roadFactor, 0.35, 1)) * 0.06;
+    const drag = rollC * g * Math.sign(this.vz) + 0.00045 * this.vz * Math.abs(this.vz);
     let longDemand = engAx - drag + brakeAx;
 
     this.tcsActive = false;
@@ -505,8 +536,17 @@ export class Vehicle {
     const ax = Fy / s.mass + this.vz * yaw;
     const az = Fx / s.mass - this.vx * yaw;
 
+    // v1.3.2: gravity along the grade — slows you uphill, pulls you downhill.
+    // Brakes / Park hold the car at a standstill if the tyres can take it.
+    let gAlong = this.gradeGravity ? -g * this.gradeSin : 0;
+    const parked = this.transmission.mode === 'auto' && this.transmission.autoSelector === -1;
+    if ((brake > 0.2 || parked) && Math.abs(this.vz) < 0.8 && Math.abs(gAlong) < mu * g * 0.9) {
+      gAlong = 0;
+      this.vz *= Math.exp(-10 * dt);
+    }
+
     this.vx += ax * dt;
-    this.vz += az * dt;
+    this.vz += (az + gAlong) * dt;
 
     const yawMoment =
       FyFront * cos * (s.wheelbase * wRear) -
@@ -616,8 +656,9 @@ export class Vehicle {
       -0.06,
       0.06,
     );
-    this.mesh.rotation.z = roll;
-    this.mesh.rotation.x = pitch;
+    // Ground pitch: rotation.x > 0 tips the nose (+Z) down, so nose-up = negative.
+    this.mesh.rotation.z = roll + this.groundRoll;
+    this.mesh.rotation.x = pitch + this.groundPitch;
   }
 }
 

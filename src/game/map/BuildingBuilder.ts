@@ -9,6 +9,12 @@ const BUILDING_COLORS = [0x8a9099, 0x9aa3ad, 0x7d858f, 0xa8b0b8, 0x6e7680, 0xb0a
 /** Soft min footprint area (m²) — allow denser small lots without noise. */
 const MIN_FOOTPRINT_AREA = 5.5;
 const MAX_FOOTPRINT_AREA = 55_000;
+/**
+ * v1.3.2 foundations: walls start this far below the LOWEST ground point under
+ * the footprint, and the roof sits `height` above the HIGHEST, so buildings on
+ * slopes never float (downhill) or lose storeys (uphill).
+ */
+const PLINTH_M = 1.5;
 
 /** Stable 0–1 hash from OSM id (avoids Math.random flicker on tile reload). */
 function hash01(id: number): number {
@@ -154,10 +160,38 @@ export class BuildingBuilder {
       shape.closePath();
 
       const height = buildingHeight(b.tags, b.id);
+      // Ground under every footprint node (+ centroid) → plinth from min, roof from max
+      let minY = Infinity;
+      let maxY = -Infinity;
+      if (heightAt) {
+        let sumLat = 0;
+        let sumLon = 0;
+        for (const node of b.geometry) {
+          const y = heightAt(node.lat, node.lon);
+          if (Number.isFinite(y)) {
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+          }
+          sumLat += node.lat;
+          sumLon += node.lon;
+        }
+        const yc = heightAt(sumLat / b.geometry.length, sumLon / b.geometry.length);
+        if (Number.isFinite(yc)) {
+          minY = Math.min(minY, yc);
+          maxY = Math.max(maxY, yc);
+        }
+      }
+      if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+        minY = 0;
+        maxY = 0;
+      }
+      // Cap pathological relief (cliff-side footprints) so we don't make towers of plinth
+      if (maxY - minY > 25) maxY = minY + 25;
+      const depth = height + (maxY - minY) + PLINTH_M;
       let geo: THREE.ExtrudeGeometry;
       try {
         geo = new THREE.ExtrudeGeometry(shape, {
-          depth: height,
+          depth,
           bevelEnabled: false,
           steps: 1,
         });
@@ -171,7 +205,7 @@ export class BuildingBuilder {
       if (uv) {
         // ~one facade tile per ~6 m horizontally; ~one floor (~3.1 m) vertically
         const uScale = Math.max(1.4, Math.sqrt(area) * 0.1);
-        const floors = Math.max(1, height / 3.15);
+        const floors = Math.max(1, depth / 3.15);
         const vScale = Math.max(1.5, floors * 0.95);
         for (let u = 0; u < uv.count; u++) {
           uv.setXY(u, uv.getX(u) * uScale, uv.getY(u) * vScale);
@@ -183,22 +217,7 @@ export class BuildingBuilder {
       i++;
       const mesh = new THREE.Mesh(geo, mat);
 
-      // Base height at footprint centroid (not first node) to reduce float/sink on slopes
-      let baseY = 0;
-      if (heightAt) {
-        let sumLat = 0;
-        let sumLon = 0;
-        let n = 0;
-        for (const node of b.geometry) {
-          sumLat += node.lat;
-          sumLon += node.lon;
-          n++;
-        }
-        baseY = heightAt(sumLat / n, sumLon / n);
-      }
-      // Tiny lift above terrain — avoid floaters
-      if (!Number.isFinite(baseY)) baseY = 0;
-      mesh.position.set(cx, baseY + 0.02, cz);
+      mesh.position.set(cx, minY - PLINTH_M, cz);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -236,6 +255,7 @@ export class BuildingBuilder {
       const hwy = line.highway;
       // Skip thin service/track for fillers
       if (hwy === 'service' || hwy === 'track' || hwy === 'motorway_link') continue;
+      if (line.structure && line.structure !== 'ground') continue;
       const half = Math.max(2.5, (line.width ?? 6) * 0.5);
       const pts = line.points;
       if (pts.length < 2) continue;
@@ -279,16 +299,34 @@ export class BuildingBuilder {
               ? 10 + rnd() * 22
               : 6 + rnd() * 12;
 
-          const ll = origin.toLatLon(bx, bz);
-          let baseY = heightAt ? heightAt(ll.lat, ll.lon) : 0;
-          if (!Number.isFinite(baseY)) baseY = 0;
+          // Foundation: lowest/highest ground over the 4 corners + centre
+          let minY = Infinity;
+          let maxY = -Infinity;
+          const rot = Math.atan2(dx, dz);
+          const cr = Math.cos(rot);
+          const sr = Math.sin(rot);
+          for (const [ox, oz] of [[0, 0], [-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]]) {
+            // rotation.y = rot maps local (x, z) → (x cos + z sin, −x sin + z cos)
+            const wx = bx + ox * cr + oz * sr;
+            const wz = bz - ox * sr + oz * cr;
+            const ll = origin.toLatLon(wx, wz);
+            const y = heightAt ? heightAt(ll.lat, ll.lon) : 0;
+            if (Number.isFinite(y)) {
+              minY = Math.min(minY, y);
+              maxY = Math.max(maxY, y);
+            }
+          }
+          if (!Number.isFinite(minY)) minY = maxY = 0;
+          if (maxY - minY > 15) maxY = minY + 15;
+          const totalH = h + (maxY - minY) + PLINTH_M;
+          const baseY = minY - PLINTH_M;
 
-          const geo = new THREE.BoxGeometry(w, h, d);
+          const geo = new THREE.BoxGeometry(w, totalH, d);
           // UV stretch roughly by floors
           const uv = geo.getAttribute('uv');
           if (uv) {
             const uScale = Math.max(1.2, w / 6);
-            const vScale = Math.max(1.2, h / 3.15);
+            const vScale = Math.max(1.2, totalH / 3.15);
             for (let u = 0; u < uv.count; u++) {
               uv.setXY(u, uv.getX(u) * uScale, uv.getY(u) * vScale);
             }
@@ -297,9 +335,9 @@ export class BuildingBuilder {
 
           const mat = this.materials[added % this.materials.length];
           const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(bx, baseY + h * 0.5 + 0.02, bz);
+          mesh.position.set(bx, baseY + totalH * 0.5, bz);
           // Align long axis roughly with road
-          mesh.rotation.y = Math.atan2(dx, dz);
+          mesh.rotation.y = rot;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
           group.add(mesh);

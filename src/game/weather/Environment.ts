@@ -103,7 +103,8 @@ export class Environment {
       depthWrite: false,
       fog: false,
     });
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 18), this.skyMat);
+    // v1.3.2: far terrain ring reaches ±8 km, so the dome must sit beyond it
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(10500, 32, 18), this.skyMat);
     this.sky.name = 'sky-dome';
     this.sky.frustumCulled = false;
     scene.add(this.sky);
@@ -318,8 +319,9 @@ export class Environment {
       this.scene.fog = new THREE.Fog(horizon.getHex(), 160, 900);
     } else if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.color.copy(horizon);
-      this.scene.fog.near = this.weather === 'snow' ? 80 : this.weather === 'rain' ? 110 : 180;
-      this.scene.fog.far = this.weather === 'snow' ? 500 : this.weather === 'rain' ? 620 : 980;
+      // v1.3.2: pushed out so the next hill and the distant skyline read (was 180→980 m)
+      this.scene.fog.near = this.weather === 'snow' ? 90 : this.weather === 'rain' ? 150 : 350;
+      this.scene.fog.far = this.weather === 'snow' ? 900 : this.weather === 'rain' ? 1600 : 7000;
     }
 
     this.hemi.intensity = 0.22 + 0.72 * dayFactor;

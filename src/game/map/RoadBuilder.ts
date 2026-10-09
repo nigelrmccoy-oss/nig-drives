@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { OsmWay } from './OverpassClient';
-import type { GeoOrigin } from './geo';
 import {
   defaultAsphaltProfile,
   resolveSurfaceProfile,
@@ -10,6 +9,7 @@ import {
   type SurfaceProfile,
 } from './RoadSurface';
 import type { WeatherPreset } from '../weather/Environment';
+import { profileWays, type ProfileEnv, type ProfiledWay, type RoadStructure } from './RoadProfile';
 import { makeEdgeLineTexture, makeLaneTexture, makeRoadMaps, type SurfaceMaps } from '../visuals/Textures';
 
 /** Lift asphalt slightly above DEM / terrain to avoid Z-fighting and sinking. */
@@ -39,6 +39,9 @@ export interface RoadCenterline {
   ref?: string;
   /** Total paved width (m) used for scale-aware sampling. */
   width: number;
+  /** v1.3.2: OSM bridge / tunnel runs are level-interpolated and not carved into terrain. */
+  structure: RoadStructure;
+  layer: number;
 }
 
 /**
@@ -70,36 +73,6 @@ function roadWidth(highway: string | undefined): number {
 
 function finiteY(y: number): number {
   return Number.isFinite(y) ? y : 0;
-}
-
-/** Break long OSM/fallback segments so ribbons follow DEM instead of becoming giant sloped slabs. */
-function densifyNodes(
-  nodes: Array<{ lat: number; lon: number }>,
-  origin: GeoOrigin,
-  maxStep = 22,
-): Array<{ lat: number; lon: number }> {
-  if (nodes.length < 2) return nodes;
-  const out: Array<{ lat: number; lon: number }> = [nodes[0]];
-  for (let i = 1; i < nodes.length; i++) {
-    const a = nodes[i - 1];
-    const b = nodes[i];
-    const pa = origin.toLocal(a.lat, a.lon);
-    const pb = origin.toLocal(b.lat, b.lon);
-    const dist = Math.hypot(pb.x - pa.x, pb.z - pa.z);
-    if (!Number.isFinite(dist) || dist < 0.5) {
-      out.push(b);
-      continue;
-    }
-    // Skip pathological mega-spans (bad data / exploded coords)
-    if (dist > 1800) continue;
-    const steps = Math.min(40, Math.floor(dist / maxStep));
-    for (let s = 1; s <= steps; s++) {
-      const u = s / (steps + 1);
-      out.push({ lat: a.lat + (b.lat - a.lat) * u, lon: a.lon + (b.lon - a.lon) * u });
-    }
-    out.push(b);
-  }
-  return out;
 }
 
 function horizDir(from: THREE.Vector3, to: THREE.Vector3, fallback: THREE.Vector3): THREE.Vector3 {
@@ -244,6 +217,69 @@ function buildOffsetRibbonGeometry(
   return buildRibbonGeometry(shifted, width, yBias);
 }
 
+/** Vertical side walls + underside for bridge decks so they aren't paper-thin. */
+function buildBridgeSides(points: THREE.Vector3[], width: number, depth: number): THREE.BufferGeometry[] {
+  const out: THREE.BufferGeometry[] = [];
+  if (points.length < 2) return out;
+  const half = width / 2 + 0.3;
+  const defaultDir = new THREE.Vector3(1, 0, 0);
+  const L: THREE.Vector3[] = [];
+  const R: THREE.Vector3[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    let dir: THREE.Vector3;
+    if (i === 0) dir = horizDir(points[0], points[1], defaultDir);
+    else if (i === points.length - 1) dir = horizDir(points[i - 1], points[i], defaultDir);
+    else dir = horizDir(points[i - 1], points[i + 1], defaultDir);
+    const n = new THREE.Vector3(-dir.z, 0, dir.x);
+    L.push(new THREE.Vector3(p.x + n.x * half, p.y + ROAD_Y_BIAS + 0.05, p.z + n.z * half));
+    R.push(new THREE.Vector3(p.x - n.x * half, p.y + ROAD_Y_BIAS + 0.05, p.z - n.z * half));
+  }
+  const wall = (edge: THREE.Vector3[], flip: boolean): THREE.BufferGeometry => {
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const idx: number[] = [];
+    let d = 0;
+    for (let i = 0; i < edge.length; i++) {
+      if (i > 0) d += edge[i].distanceTo(edge[i - 1]);
+      const e = edge[i];
+      pos.push(e.x, e.y, e.z, e.x, e.y - depth, e.z);
+      uv.push(d * 0.25, 1, d * 0.25, 0);
+    }
+    for (let i = 0; i < edge.length - 1; i++) {
+      const a = i * 2;
+      if (flip) idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      else idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  };
+  out.push(wall(L, false), wall(R, true));
+  // Underside (faces down)
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i < L.length; i++) {
+    pos.push(L[i].x, L[i].y - depth, L[i].z, R[i].x, R[i].y - depth, R[i].z);
+    uv.push(0, i, 1, i);
+  }
+  for (let i = 0; i < L.length - 1; i++) {
+    const a = i * 2;
+    idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  out.push(g);
+  return out;
+}
+
 function yieldFrame(): Promise<void> {
   return new Promise((r) => setTimeout(r, 0));
 }
@@ -355,297 +391,151 @@ export class RoadBuilder {
 
   /**
    * Build road meshes grouped by surface kind (shared materials).
-   * Yields periodically so large tiles don't freeze the main thread.
+   * v1.3.2: heights come from the RoadProfile pass (smoothed, grade-capped,
+   * junction-pinned, bridges/tunnels level). Yields periodically so large
+   * tiles don't freeze the main thread.
    */
   async buildWaysAsync(
     ways: OsmWay[],
-    origin: GeoOrigin,
-    heightAt?: (lat: number, lon: number) => number,
+    env: ProfileEnv,
   ): Promise<{ group: THREE.Group; centerlines: RoadCenterline[] }> {
-    const group = new THREE.Group();
-    group.name = 'roads';
-
-    const geosByKind = new Map<SurfaceKind, THREE.BufferGeometry[]>();
-    const laneGeos: THREE.BufferGeometry[] = [];
-    const edgeGeos: THREE.BufferGeometry[] = [];
-    const curbGeos: THREE.BufferGeometry[] = [];
-    const centerlines: RoadCenterline[] = [];
-
+    const profiled = profileWays(ways, env);
+    const acc = this.newAccumulator();
     let processed = 0;
-    for (const way of ways) {
+    for (const pw of profiled) {
       if (this.disposed) break;
-      const highway = way.tags.highway ?? 'residential';
-      const profile = resolveSurfaceProfile(way.tags);
-      // Offline synthetic ways without surface still get asphalt
-      if (!way.tags.surface && !way.tags.highway) {
-        Object.assign(profile, defaultAsphaltProfile());
-      }
-      this.ensureMat(profile.kind);
-
-      const width = roadWidth(highway);
-      const pts: THREE.Vector3[] = [];
-      const clPoints: RoadCenterPoint[] = [];
-      for (const n of densifyNodes(way.geometry, origin)) {
-        const p = origin.toLocal(n.lat, n.lon);
-        let y = heightAt ? heightAt(n.lat, n.lon) : 0;
-        y = finiteY(y);
-        if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
-        pts.push(new THREE.Vector3(p.x, y, p.z));
-        clPoints.push({ x: p.x, y: y + ROAD_Y_BIAS, z: p.z });
-      }
-      if (clPoints.length >= 2) {
-        centerlines.push({
-          points: clPoints,
-          surface: profile,
-          highway,
-          name: way.tags.name,
-          ref: way.tags.ref,
-          width,
-        });
-      }
-
-      const cleaned: THREE.Vector3[] = [];
-      for (const p of pts) {
-        if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.36) {
-          cleaned.push(p);
-        }
-      }
-      if (cleaned.length < 2) continue;
-      if (cleaned.length > MAX_WAY_VERTS) {
-        const step = Math.ceil(cleaned.length / MAX_WAY_VERTS);
-        const dec: THREE.Vector3[] = [];
-        for (let i = 0; i < cleaned.length; i += step) dec.push(cleaned[i]);
-        if (dec[dec.length - 1] !== cleaned[cleaned.length - 1]) {
-          dec.push(cleaned[cleaned.length - 1]);
-        }
-        cleaned.length = 0;
-        cleaned.push(...dec);
-      }
-
-      const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
-      // Visible curbs along paved road edges (raised edge strips)
-      if (paved && width >= 4.2) {
-        const half = width / 2;
-        const curbW = 0.28;
-        const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06);
-        const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06);
-        if (left) curbGeos.push(left);
-        if (right) curbGeos.push(right);
-      }
-
-      const asphalt = buildRibbonGeometry(cleaned, width);
-      if (asphalt) {
-        let list = geosByKind.get(profile.kind);
-        if (!list) {
-          list = [];
-          geosByKind.set(profile.kind, list);
-        }
-        list.push(asphalt);
-      }
-
-      // Center dashed lane + edge paint for paved 2-lane+ roads (incl. fallback residential)
-      if (paved && width >= 5.2) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.2, Math.max(0.12, width * 0.028)), ROAD_Y_BIAS + 0.025);
-        if (lane) laneGeos.push(lane);
-        const half = width / 2;
-        const edgeW = 0.12;
-        const leftE = buildOffsetRibbonGeometry(cleaned, -(half - edgeW * 0.6), edgeW, ROAD_Y_BIAS + 0.02);
-        const rightE = buildOffsetRibbonGeometry(cleaned, half - edgeW * 0.6, edgeW, ROAD_Y_BIAS + 0.02);
-        if (leftE) edgeGeos.push(leftE);
-        if (rightE) edgeGeos.push(rightE);
-      }
-
+      this.addWay(pw, acc);
       processed++;
-      if (processed % YIELD_EVERY === 0) {
-        await yieldFrame();
-      }
+      if (processed % YIELD_EVERY === 0) await yieldFrame();
     }
-
-    for (const [kind, geos] of geosByKind) {
-      if (geos.length === 0) continue;
-      const merged = mergeGeometries(geos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.ensureMat(kind));
-        mesh.receiveShadow = true;
-        mesh.name = `surface-${kind}`;
-        group.add(mesh);
-      }
-      for (const g of geos) g.dispose();
-    }
-
-    if (curbGeos.length) {
-      const merged = mergeGeometries(curbGeos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.curbMat);
-        mesh.receiveShadow = true;
-        mesh.name = 'curbs';
-        group.add(mesh);
-      }
-      for (const g of curbGeos) g.dispose();
-    }
-
-    if (laneGeos.length) {
-      const merged = mergeGeometries(laneGeos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.laneMat);
-        mesh.name = 'lanes';
-        group.add(mesh);
-      }
-      for (const g of laneGeos) g.dispose();
-    }
-
-    if (edgeGeos.length) {
-      const merged = mergeGeometries(edgeGeos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.edgeMat);
-        mesh.name = 'edges';
-        group.add(mesh);
-      }
-      for (const g of edgeGeos) g.dispose();
-    }
-
-    return { group, centerlines };
+    return this.finish(acc);
   }
 
-  /** Sync wrapper for small fallback grids. */
-  buildWays(
-    ways: OsmWay[],
-    origin: GeoOrigin,
-    heightAt?: (lat: number, lon: number) => number,
-  ): { group: THREE.Group; centerlines: RoadCenterline[] } {
-    // Fire-and-forget style sync path: no yields (fallback grids are small)
-    const group = new THREE.Group();
-    group.name = 'roads';
-    const geosByKind = new Map<SurfaceKind, THREE.BufferGeometry[]>();
-    const laneGeos: THREE.BufferGeometry[] = [];
-    const edgeGeos: THREE.BufferGeometry[] = [];
-    const curbGeos: THREE.BufferGeometry[] = [];
-    const centerlines: RoadCenterline[] = [];
+  /** Sync path for small fallback grids. */
+  buildWays(ways: OsmWay[], env: ProfileEnv): { group: THREE.Group; centerlines: RoadCenterline[] } {
+    const fixed = ways.map((w) =>
+      w.tags.surface ? w : { ...w, tags: { ...w.tags, surface: 'asphalt' } },
+    );
+    const profiled = profileWays(fixed, env);
+    const acc = this.newAccumulator();
+    for (const pw of profiled) this.addWay(pw, acc);
+    return this.finish(acc);
+  }
 
-    for (const way of ways) {
-      const highway = way.tags.highway ?? 'residential';
-      const profile = way.tags.surface
-        ? resolveSurfaceProfile(way.tags)
-        : resolveSurfaceProfile({
-            ...way.tags,
-            surface: way.tags.surface ?? 'asphalt',
-          });
-      // Ensure offline defaults to asphalt
-      if (!way.tags.surface) {
-        const asphalt = defaultAsphaltProfile();
-        profile.kind = asphalt.kind;
-        profile.color = asphalt.color;
-        profile.roughness = asphalt.roughness;
-        profile.grip = asphalt.grip + (highway === 'primary' ? 0.04 : highway === 'track' ? -0.08 : 0);
-        profile.noise = asphalt.noise;
-        profile.wetRetain = asphalt.wetRetain;
-        profile.snowRetain = asphalt.snowRetain;
-        profile.label = asphalt.label;
-        profile.metalness = asphalt.metalness;
-      }
-      this.ensureMat(profile.kind);
+  private newAccumulator(): RoadAccumulator {
+    return {
+      geosByKind: new Map(),
+      laneGeos: [],
+      edgeGeos: [],
+      curbGeos: [],
+      bridgeGeos: [],
+      centerlines: [],
+    };
+  }
 
-      const width = roadWidth(highway);
-      const pts: THREE.Vector3[] = [];
-      const clPoints: RoadCenterPoint[] = [];
-      for (const n of densifyNodes(way.geometry, origin)) {
-        const p = origin.toLocal(n.lat, n.lon);
-        const y = finiteY(heightAt ? heightAt(n.lat, n.lon) : 0);
-        if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
-        pts.push(new THREE.Vector3(p.x, y, p.z));
-        clPoints.push({ x: p.x, y: y + ROAD_Y_BIAS, z: p.z });
-      }
-      if (clPoints.length >= 2) {
-        centerlines.push({
-          points: clPoints,
-          surface: profile,
-          highway,
-          name: way.tags.name,
-          ref: way.tags.ref,
-          width,
-        });
-      }
+  private addWay(pw: ProfiledWay, acc: RoadAccumulator): void {
+    const way = pw.way;
+    const highway = way.tags.highway ?? 'residential';
+    const profile = resolveSurfaceProfile(way.tags);
+    if (!way.tags.surface && !way.tags.highway) Object.assign(profile, defaultAsphaltProfile());
+    this.ensureMat(profile.kind);
 
-      const cleaned: THREE.Vector3[] = [];
-      for (const p of pts) {
-        if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.36) {
-          cleaned.push(p);
-        }
-      }
-      if (cleaned.length < 2) continue;
+    const width = roadWidth(highway);
+    const pts: THREE.Vector3[] = [];
+    const clPoints: RoadCenterPoint[] = [];
+    for (const p of pw.points) {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
+      const y = finiteY(p.y);
+      pts.push(new THREE.Vector3(p.x, y, p.z));
+      clPoints.push({ x: p.x, y: y + ROAD_Y_BIAS, z: p.z });
+    }
+    if (clPoints.length >= 2) {
+      acc.centerlines.push({
+        points: clPoints,
+        surface: profile,
+        highway,
+        name: way.tags.name,
+        ref: way.tags.ref,
+        width,
+        structure: pw.structure,
+        layer: pw.layer,
+      });
+    }
+    // Tunnels: keep the centreline for driving/minimap, but no ribbon over the hill
+    if (pw.structure === 'tunnel') return;
 
-      const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
-      if (paved && width >= 4.2) {
-        const half = width / 2;
-        const curbW = 0.28;
-        const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06);
-        const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06);
-        if (left) curbGeos.push(left);
-        if (right) curbGeos.push(right);
-      }
-
-      const asphalt = buildRibbonGeometry(cleaned, width);
-      if (asphalt) {
-        let list = geosByKind.get(profile.kind);
-        if (!list) {
-          list = [];
-          geosByKind.set(profile.kind, list);
-        }
-        list.push(asphalt);
-      }
-
-      if (paved && width >= 5.2) {
-        const lane = buildRibbonGeometry(cleaned, Math.min(0.2, Math.max(0.12, width * 0.028)), ROAD_Y_BIAS + 0.025);
-        if (lane) laneGeos.push(lane);
-        const half = width / 2;
-        const edgeW = 0.12;
-        const leftE = buildOffsetRibbonGeometry(cleaned, -(half - edgeW * 0.6), edgeW, ROAD_Y_BIAS + 0.02);
-        const rightE = buildOffsetRibbonGeometry(cleaned, half - edgeW * 0.6, edgeW, ROAD_Y_BIAS + 0.02);
-        if (leftE) edgeGeos.push(leftE);
-        if (rightE) edgeGeos.push(rightE);
+    const cleaned: THREE.Vector3[] = [];
+    for (const p of pts) {
+      if (cleaned.length === 0 || cleaned[cleaned.length - 1].distanceToSquared(p) > 0.36) {
+        cleaned.push(p);
       }
     }
+    if (cleaned.length < 2) return;
+    if (cleaned.length > MAX_WAY_VERTS) {
+      const step = Math.ceil(cleaned.length / MAX_WAY_VERTS);
+      const dec: THREE.Vector3[] = [];
+      for (let i = 0; i < cleaned.length; i += step) dec.push(cleaned[i]);
+      if (dec[dec.length - 1] !== cleaned[cleaned.length - 1]) dec.push(cleaned[cleaned.length - 1]);
+      cleaned.length = 0;
+      cleaned.push(...dec);
+    }
 
-    for (const [kind, geos] of geosByKind) {
+    const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
+    // Visible curbs along paved road edges (raised edge strips)
+    if (paved && width >= 4.2) {
+      const half = width / 2;
+      const curbW = 0.28;
+      const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06);
+      const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06);
+      if (left) acc.curbGeos.push(left);
+      if (right) acc.curbGeos.push(right);
+    }
+
+    const asphalt = buildRibbonGeometry(cleaned, width);
+    if (asphalt) {
+      let list = acc.geosByKind.get(profile.kind);
+      if (!list) {
+        list = [];
+        acc.geosByKind.set(profile.kind, list);
+      }
+      list.push(asphalt);
+    }
+
+    if (pw.structure === 'bridge') acc.bridgeGeos.push(...buildBridgeSides(cleaned, width, 1.3));
+
+    // Center dashed lane + edge paint for paved 2-lane+ roads (incl. fallback residential)
+    if (paved && width >= 5.2) {
+      const lane = buildRibbonGeometry(cleaned, Math.min(0.2, Math.max(0.12, width * 0.028)), ROAD_Y_BIAS + 0.025);
+      if (lane) acc.laneGeos.push(lane);
+      const half = width / 2;
+      const edgeW = 0.12;
+      const leftE = buildOffsetRibbonGeometry(cleaned, -(half - edgeW * 0.6), edgeW, ROAD_Y_BIAS + 0.02);
+      const rightE = buildOffsetRibbonGeometry(cleaned, half - edgeW * 0.6, edgeW, ROAD_Y_BIAS + 0.02);
+      if (leftE) acc.edgeGeos.push(leftE);
+      if (rightE) acc.edgeGeos.push(rightE);
+    }
+  }
+
+  private finish(acc: RoadAccumulator): { group: THREE.Group; centerlines: RoadCenterline[] } {
+    const group = new THREE.Group();
+    group.name = 'roads';
+    const add = (geos: THREE.BufferGeometry[], mat: THREE.Material, name: string, shadow: boolean) => {
+      if (!geos.length) return;
       const merged = mergeGeometries(geos);
       if (merged) {
-        const mesh = new THREE.Mesh(merged, this.ensureMat(kind));
-        mesh.receiveShadow = true;
-        mesh.name = `surface-${kind}`;
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.receiveShadow = shadow;
+        mesh.name = name;
         group.add(mesh);
       }
       for (const g of geos) g.dispose();
-    }
-    if (curbGeos.length) {
-      const merged = mergeGeometries(curbGeos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.curbMat);
-        mesh.receiveShadow = true;
-        mesh.name = 'curbs';
-        group.add(mesh);
-      }
-      for (const g of curbGeos) g.dispose();
-    }
-    if (laneGeos.length) {
-      const merged = mergeGeometries(laneGeos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.laneMat);
-        mesh.name = 'lanes';
-        group.add(mesh);
-      }
-      for (const g of laneGeos) g.dispose();
-    }
-    if (edgeGeos.length) {
-      const merged = mergeGeometries(edgeGeos);
-      if (merged) {
-        const mesh = new THREE.Mesh(merged, this.edgeMat);
-        mesh.name = 'edges';
-        group.add(mesh);
-      }
-      for (const g of edgeGeos) g.dispose();
-    }
-
-    return { group, centerlines };
+    };
+    for (const [kind, geos] of acc.geosByKind) add(geos, this.ensureMat(kind), `surface-${kind}`, true);
+    add(acc.curbGeos, this.curbMat, 'curbs', true);
+    add(acc.bridgeGeos, this.curbMat, 'bridge-sides', true);
+    add(acc.laneGeos, this.laneMat, 'lanes', false);
+    add(acc.edgeGeos, this.edgeMat, 'edges', false);
+    return { group, centerlines: acc.centerlines };
   }
 
   dispose(): void {
@@ -664,6 +554,15 @@ export class RoadBuilder {
     this.sharedLaneTex.dispose();
     this.sharedEdgeTex.dispose();
   }
+}
+
+interface RoadAccumulator {
+  geosByKind: Map<SurfaceKind, THREE.BufferGeometry[]>;
+  laneGeos: THREE.BufferGeometry[];
+  edgeGeos: THREE.BufferGeometry[];
+  curbGeos: THREE.BufferGeometry[];
+  bridgeGeos: THREE.BufferGeometry[];
+  centerlines: RoadCenterline[];
 }
 
 function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | null {

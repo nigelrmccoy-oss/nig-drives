@@ -11,6 +11,8 @@ export class ChaseCamera {
   private initialized = false;
   /** Optional ground height sampler to keep the lens above terrain. */
   private groundAt: ((x: number, z: number) => number) | null = null;
+  /** Smoothed sin(grade) so the view tilts with hills (v1.3.2). */
+  private grade = 0;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -25,8 +27,12 @@ export class ChaseCamera {
   }
 
   update(dt: number, vehicle: Vehicle): void {
-    const forward = vehicle.getForward();
+    const flat = vehicle.getForward();
     const spec = vehicle.spec;
+    this.grade += (vehicle.getGradeSin() - this.grade) * (1 - Math.exp(-dt * 4));
+    const cg = Math.sqrt(Math.max(0, 1 - this.grade * this.grade));
+    // Forward along the slope: camera sits down-slope behind and looks up the hill
+    const forward = new THREE.Vector3(flat.x * cg, this.grade, flat.z * cg);
 
     let desiredPos: THREE.Vector3;
     let desiredLook: THREE.Vector3;
@@ -36,7 +42,10 @@ export class ChaseCamera {
         .clone()
         .addScaledVector(forward, -spec.cameraDistance)
         .add(new THREE.Vector3(0, spec.cameraHeight, 0));
-      desiredLook = vehicle.position.clone().add(new THREE.Vector3(0, spec.height * 0.55, 0));
+      desiredLook = vehicle.position
+        .clone()
+        .add(new THREE.Vector3(0, spec.height * 0.55, 0))
+        .addScaledVector(forward, 2.5);
     } else {
       const eyeHeight = spec.class === 'bus' ? 2.4 : 1.25;
       const eyeForward = spec.class === 'bus' ? 5.2 : 0.9;

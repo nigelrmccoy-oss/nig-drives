@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OverpassClient } from './OverpassClient';
-import { RoadBuilder, ROAD_Y_BIAS, type RoadCenterline } from './RoadBuilder';
+import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder } from './BuildingBuilder';
 import { StreetLabels } from './StreetLabels';
 import { ElevationSampler } from './ElevationSampler';
@@ -18,14 +18,27 @@ import {
 import type { OsmWay } from './OverpassClient';
 import type { WeatherPreset } from '../weather/Environment';
 import { makeTerrainTexture } from '../visuals/Textures';
+import { RoadIndex } from './RoadIndex';
+import type { ProfileEnv } from './RoadProfile';
+import { TerrainRing, WaterPlane, type RingConfig, type RingSample } from './Terrain';
+import { createTerrainMaterial, type TerrainMaterialHandle } from '../visuals/TerrainMaterial';
 
 const LOAD_RADIUS = 2;
 const UNLOAD_RADIUS = 4;
+/** Car height blends from road centreline to ground within this distance of a road. */
 const ROAD_HEIGHT_RADIUS = 14;
-const TERRAIN_SIZE = 900;
-const TERRAIN_RES = 96;
-const TERRAIN_RECENTER_M = 120;
-const TERRAIN_Y_BIAS = -0.62;
+/** Terrain under the asphalt sits this far below the road surface (replaces the blanket −0.62 m sink). */
+const CARVE_UNDER_ROAD = 0.14;
+/** Flatten this far beyond each road edge (+ ~0.6 grid cell so coarse triangles can't poke through). */
+const CARVE_FLAT_EXTRA = 1.0;
+/** Then blend back to the DEM over this shoulder. */
+const CARVE_SHOULDER = 7;
+/** Re-carve the near ring at most this often (ms) as new road tiles stream in. */
+const CARVE_REBUILD_MS = 2500;
+
+const NEAR_RING: RingConfig = { name: 'near', size: 1200, res: 192, recenter: 160, skirt: 12, carve: true };
+const MID_RING: RingConfig = { name: 'mid', size: 4800, res: 160, recenter: 700, skirt: 40, carve: false };
+const FAR_RING: RingConfig = { name: 'far', size: 16000, res: 128, recenter: 2600, skirt: 120, carve: false };
 const SPAWN_DEADLINE_MS = 14_000;
 /** How long a tile build waits for its DEM before building with provisional heights. */
 const DEM_WAIT_MS = 15_000;
@@ -103,15 +116,25 @@ function dataBounds(
 
 export class TileManager {
   readonly origin: GeoOrigin;
-  readonly elevation = new ElevationSampler(12, 64);
-  /** Low-zoom DEM: provisional heights while fine tiles stream. */
+  /** v1.3.2: z14 (~9 m/px) for roads, buildings and the near terrain ring. */
+  readonly elevation = new ElevationSampler(14, 128);
+  /** z12 for the mid ring (and a provisional stand-in for z14). */
+  readonly midElevation = new ElevationSampler(12, 24);
+  /** Low-zoom DEM: far ring + last-resort provisional heights while fine tiles stream. */
   readonly coarseElevation = new ElevationSampler(COARSE_DEM_ZOOM, 16);
+  /** Spatial hash of road centreline segments (carve, car surface, nearest road). */
+  readonly roadIndex = new RoadIndex();
+  /** Junction heights shared across tiles (RoadProfile). */
+  private junctionRegistry = new Map<string, { y: number; provisional: boolean }>();
+  private rings: TerrainRing[] = [];
+  private ringMats: TerrainMaterialHandle[] = [];
+  private water = new WaterPlane();
+  private seaRel = -1e6;
   /** Count of heights served from a non-fine source since last reset. */
   private provisionalSamples = 0;
   private demDirty = false;
   private reheightAcc = 0;
   private reheightBusy = false;
-  private terrainProvisional = false;
   private scene: THREE.Scene;
   private client = new OverpassClient();
   private builder = new RoadBuilder();
@@ -121,16 +144,11 @@ export class TileManager {
   private processing = false;
   private ground: THREE.Mesh;
   private groundMat: THREE.MeshStandardMaterial;
-  private terrainMat: THREE.MeshStandardMaterial;
   private onStatus?: TileStatusListener;
   private seenWayIds = new Set<number>();
   private seenBuildingIds = new Set<number>();
   private fallbackBuilt = false;
   private centerlines: RoadCenterline[] = [];
-  private terrainMesh: THREE.Mesh | null = null;
-  private terrainCenterX = 0;
-  private terrainCenterZ = 0;
-  private terrainRefreshQueued = false;
   private usedOfflineFallback = false;
   /** When true, skip Overpass and always use offline road grids (QA: ?fallback=1). */
   private forceOffline = false;
@@ -150,16 +168,20 @@ export class TileManager {
       roughness: 0.95,
       metalness: 0,
     });
-    this.terrainMat = new THREE.MeshStandardMaterial({
-      color: 0x5a6e44,
-      map: terrainTex,
-      roughness: 0.95,
-      metalness: 0,
-      vertexColors: true,
-      polygonOffset: true,
-      polygonOffsetFactor: 2,
-      polygonOffsetUnits: 2,
+    // One material per ring (each has its own inner-ring "hole" uniform)
+    const ringCfgs = [NEAR_RING, MID_RING, FAR_RING];
+    ringCfgs.forEach((cfg, i) => {
+      const handle = createTerrainMaterial({
+        map: terrainTex,
+        polygonOffsetFactor: 2 + i * 3,
+        name: `terrain-${cfg.name}`,
+      });
+      this.ringMats.push(handle);
+      const ring = new TerrainRing(cfg, handle.material);
+      this.rings.push(ring);
+      scene.add(ring.mesh);
     });
+    scene.add(this.water.mesh);
     const groundGeo = new THREE.PlaneGeometry(3600, 3600);
     this.ground = new THREE.Mesh(groundGeo, this.groundMat);
     this.ground.rotation.x = -Math.PI / 2;
@@ -168,9 +190,11 @@ export class TileManager {
     this.ground.name = 'ground-fallback';
     scene.add(this.ground);
     scene.add(this.streetLabels.group);
-    this.elevation.onTileLoaded(() => {
-      this.demDirty = true;
-    });
+    for (const sampler of [this.elevation, this.midElevation, this.coarseElevation]) {
+      sampler.onTileLoaded(() => {
+        this.demDirty = true;
+      });
+    }
   }
 
   /**
@@ -180,11 +204,94 @@ export class TileManager {
    */
   private demHeight(lat: number, lon: number): number {
     const fine = this.elevation.sampleRelative(lat, lon);
-    if (fine !== null) return fine;
+    if (fine !== null) return this.clampSea(fine);
     this.provisionalSamples++;
+    const mid = this.midElevation.sampleRelative(lat, lon);
+    if (mid !== null) return this.clampSea(mid);
     const coarse = this.coarseElevation.sampleRelative(lat, lon);
-    if (coarse !== null) return coarse;
+    if (coarse !== null) return this.clampSea(coarse);
     return 0;
+  }
+
+  /** Bathymetry → just under the sea-level water plane (SF Bay is water, not a bowl). */
+  private clampSea(y: number): number {
+    return y < this.seaRel - 1.5 ? this.seaRel - 1.5 : y;
+  }
+
+  private demHeightLocal(x: number, z: number): number {
+    const ll = this.origin.toLatLon(x, z);
+    return this.demHeight(ll.lat, ll.lon);
+  }
+
+  /** Height source per ring: near = z14 chain, mid = z12 chain, far = z11. */
+  private ringDem(ring: number, x: number, z: number): number {
+    const ll = this.origin.toLatLon(x, z);
+    if (ring === 0) return this.demHeight(ll.lat, ll.lon);
+    if (ring === 1) {
+      const m = this.midElevation.sampleRelative(ll.lat, ll.lon);
+      if (m !== null) return this.clampSea(m);
+    }
+    const c = this.coarseElevation.sampleRelative(ll.lat, ll.lon);
+    if (c !== null) return this.clampSea(c);
+    this.provisionalSamples++;
+    return 0;
+  }
+
+  /**
+   * v1.3.2 corridor carve (replaces TERRAIN_Y_BIAS −0.62): within each road's
+   * half-width + ~1 m (+ a fraction of the grid cell) the ground sits just under
+   * the road surface; beyond that it blends back to the DEM over a shoulder.
+   * Bridges and tunnels don't carve.
+   */
+  carveAt(x: number, z: number, dem: number, cell = 6.25): RingSample {
+    const flatPad = CARVE_FLAT_EXTRA + cell * 0.6;
+    const radius = 7 + flatPad + CARVE_SHOULDER;
+    let bestW = 0;
+    let bestY = dem;
+    let bestD = Infinity;
+    let verge = 0;
+    this.roadIndex.forEachNear(x, z, radius, (ref) => {
+      const line = ref.line;
+      if (line.structure !== 'ground') return;
+      const pts = line.points;
+      const a = pts[ref.i];
+      const b = pts[ref.i + 1];
+      const abx = b.x - a.x;
+      const abz = b.z - a.z;
+      const len = abx * abx + abz * abz;
+      let t = len < 1e-8 ? 0 : ((x - a.x) * abx + (z - a.z) * abz) / len;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - (a.x + abx * t), z - (a.z + abz * t));
+      const half = (line.width ?? 6) * 0.5;
+      const flat = half + flatPad;
+      let w: number;
+      if (d <= flat) w = 1;
+      else if (d >= flat + CARVE_SHOULDER) w = 0;
+      else {
+        const u = 1 - (d - flat) / CARVE_SHOULDER;
+        w = u * u * (3 - 2 * u);
+      }
+      if (w <= 0) return;
+      // Verge (gravel/dirt strip) just beyond the edge
+      const vd = d - half;
+      if (vd > -0.5 && vd < 3.5) verge = Math.max(verge, 1 - Math.max(0, vd - 1.5) / 2);
+      if (w > bestW || (w === bestW && d < bestD)) {
+        bestW = w;
+        bestD = d;
+        bestY = a.y + (b.y - a.y) * t - CARVE_UNDER_ROAD;
+      }
+    });
+    return { y: dem + (bestY - dem) * bestW, verge };
+  }
+
+  /** Final ground height (DEM + corridor carve), consistent with the near terrain ring. */
+  groundHeight(x: number, z: number): number {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+    const before = this.provisionalSamples;
+    const dem = this.demHeightLocal(x, z);
+    this.provisionalSamples = before;
+    const y = this.carveAt(x, z, dem, this.rings[0]?.cell ?? 6.25).y;
+    return Number.isFinite(y) ? y : 0;
   }
 
   getCenterlines(): RoadCenterline[] {
@@ -214,7 +321,9 @@ export class TileManager {
     const groundHex =
       weather === 'snow' ? 0xd8e0e6 : weather === 'rain' ? 0x2f4a32 : 0x3d5a3d;
     this.groundMat.color.setHex(groundHex);
-    this.terrainMat.color.setHex(groundHex);
+    for (const m of this.ringMats) {
+      m.material.color.setHex(weather === 'snow' ? 0xe6ecf0 : weather === 'rain' ? 0xa6b0a6 : 0xffffff);
+    }
   }
 
   /**
@@ -226,12 +335,24 @@ export class TileManager {
     this.emitStatus('Loading Terrarium elevation…');
     await this.elevation.ensureOrigin(this.origin.lat, this.origin.lon);
     if (this.disposed) return;
-    this.coarseElevation.setOriginElevation(this.elevation.getOriginElevation());
+    const originAbs = this.elevation.getOriginElevation();
+    this.midElevation.setOriginElevation(originAbs);
+    this.coarseElevation.setOriginElevation(originAbs);
+    this.seaRel = -originAbs;
+    this.water.mesh.position.y = this.seaRel;
+    // Only bother drawing the sea where it can be seen (SF, Toronto shore…)
+    this.water.mesh.visible = originAbs < 250;
+    void this.midElevation.preloadArea(
+      this.origin.lat - 0.025,
+      this.origin.lon - 0.035,
+      this.origin.lat + 0.025,
+      this.origin.lon + 0.035,
+    );
     void this.coarseElevation.preloadArea(
-      this.origin.lat - 0.06,
-      this.origin.lon - 0.08,
-      this.origin.lat + 0.06,
-      this.origin.lon + 0.08,
+      this.origin.lat - 0.08,
+      this.origin.lon - 0.11,
+      this.origin.lat + 0.08,
+      this.origin.lon + 0.11,
     );
 
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
@@ -260,9 +381,11 @@ export class TileManager {
     }
 
     await Promise.race([
-      this.refreshTerrainMesh(0, 0),
-      new Promise<void>((r) => setTimeout(r, 4_000)),
+      this.rebuildRing(0, 0, 0),
+      new Promise<void>((r) => setTimeout(r, 6_000)),
     ]);
+    void this.rebuildRing(1, 0, 0);
+    void this.rebuildRing(2, 0, 0);
     if (this.disposed) return;
 
     const remaining = Math.max(0, SPAWN_DEADLINE_MS - (Date.now() - t0));
@@ -331,11 +454,9 @@ export class TileManager {
     this.ground.position.x = playerX;
     this.ground.position.z = playerZ;
 
-    const dx = playerX - this.terrainCenterX;
-    const dz = playerZ - this.terrainCenterZ;
-    if (dx * dx + dz * dz > TERRAIN_RECENTER_M * TERRAIN_RECENTER_M) {
-      this.queueTerrainRefresh(playerX, playerZ);
-    }
+    this.updateTerrain(playerX, playerZ);
+    this.water.mesh.position.x = playerX;
+    this.water.mesh.position.z = playerZ;
   }
 
   private unloadTile(key: string, entry: TileEntry): void {
@@ -349,6 +470,7 @@ export class TileManager {
     });
     entry.group.clear();
 
+    this.roadIndex.remove(entry.centerlines);
     for (const id of entry.wayIds) this.seenWayIds.delete(id);
     for (const id of entry.buildingIds) this.seenBuildingIds.delete(id);
 
@@ -356,54 +478,39 @@ export class TileManager {
     this.rebuildCenterlineIndex();
   }
 
+  /** Ground height incl. road corridor carve (camera clamp, spawn, off-road). */
   getHeight(x: number, z: number): number {
-    if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
-    const ll = this.origin.toLatLon(x, z);
-    const before = this.provisionalSamples;
-    const y = this.demHeight(ll.lat, ll.lon);
-    this.provisionalSamples = before;
-    return Number.isFinite(y) ? y : 0;
+    return this.groundHeight(x, z);
   }
 
-  sampleSurface(x: number, z: number): SurfaceSample {
-    const demY = this.getHeight(x, z);
+  /**
+   * Surface under (x, z). v1.3.2: spatial-hash lookup (was every segment of every
+   * road), carved ground off-road, and `preferY` keeps a car on its own deck when
+   * roads stack (bridges over roads, tunnels under hills).
+   */
+  sampleSurface(x: number, z: number, preferY?: number): SurfaceSample {
+    const groundY = this.groundHeight(x, z);
     const offRoad: SurfaceSample = {
       roadFactor: 0.35,
-      height: demY,
+      height: groundY,
       grip: effectiveGrip(defaultAsphaltProfile(), 0.35, this.weather) * 0.85,
       noise: 0.2,
       label: 'Off-road',
       kind: 'dirt',
     };
-
     if (!Number.isFinite(x) || !Number.isFinite(z)) return offRoad;
 
-    let bestD = Infinity;
-    let bestY = demY;
-    let bestProfile: SurfaceProfile = defaultAsphaltProfile();
-    let bestHalf = 3.2;
-
-    for (const line of this.centerlines) {
-      const pts = line.points;
-      const half = Math.max(1.5, (line.width ?? 6.4) * 0.5);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i];
-        const b = pts[i + 1];
-        const d = distPointSegSq(x, z, a.x, a.z, b.x, b.z);
-        if (d < bestD) {
-          bestD = d;
-          const t = projectT(x, z, a.x, a.z, b.x, b.z);
-          const y = a.y + (b.y - a.y) * t;
-          bestY = Number.isFinite(y) ? y : demY;
-          bestProfile = line.surface;
-          bestHalf = half;
-        }
-      }
+    const near = this.roadIndex.nearest(x, z, ROAD_HEIGHT_RADIUS + 8, undefined, preferY);
+    if (!near) return offRoad;
+    const line = near.line;
+    // A tunnel only counts once you're actually down at its level (through the portal)
+    if (line.structure === 'tunnel' && (preferY === undefined || Math.abs(near.y - preferY) > 3)) {
+      return offRoad;
     }
-
-    const dist = Number.isFinite(bestD) ? Math.sqrt(bestD) : Infinity;
-    const onRoad = bestHalf + 0.4;
-    const soft = bestHalf + 3.5;
+    const dist = Math.sqrt(near.distSq);
+    const half = Math.max(1.5, (line.width ?? 6.4) * 0.5);
+    const onRoad = half + 0.4;
+    const soft = half + 3.5;
     const roadFactor =
       dist < onRoad
         ? 1
@@ -412,28 +519,35 @@ export class TileManager {
           : 0.35;
 
     let height: number;
-    if (dist <= ROAD_HEIGHT_RADIUS) {
-      const w = THREE.MathUtils.clamp(1 - dist / ROAD_HEIGHT_RADIUS, 0, 1);
-      height = bestY * w + (demY + ROAD_Y_BIAS * 0.25) * (1 - w);
+    if (line.structure !== 'ground') {
+      // Decks/tunnels: no blending to the ground below/above
+      height = dist <= half + 1.5 ? near.y : groundY;
+    } else if (dist <= onRoad) {
+      height = near.y;
+    } else if (dist <= ROAD_HEIGHT_RADIUS) {
+      const w = THREE.MathUtils.clamp(1 - (dist - onRoad) / (ROAD_HEIGHT_RADIUS - onRoad), 0, 1);
+      height = near.y * w + groundY * (1 - w);
     } else {
-      height = demY;
+      height = groundY;
     }
-    if (!Number.isFinite(height)) height = 0;
+    if (!Number.isFinite(height)) height = groundY;
 
-    const grip = effectiveGrip(bestProfile, roadFactor, this.weather);
+    const profile: SurfaceProfile = line.surface;
+    const grip = effectiveGrip(profile, roadFactor, this.weather);
     return {
       roadFactor,
       height,
       grip,
-      noise: bestProfile.noise * (roadFactor > 0.5 ? 1 : 1.4),
-      label: roadFactor > 0.5 ? bestProfile.label : 'Off-road',
-      kind: roadFactor > 0.5 ? bestProfile.kind : 'dirt',
+      noise: profile.noise * (roadFactor > 0.5 ? 1 : 1.4),
+      label: roadFactor > 0.5 ? profile.label : 'Off-road',
+      kind: roadFactor > 0.5 ? profile.kind : 'dirt',
     };
   }
 
   findNearestRoadPoint(x: number, z: number): { x: number; z: number; y: number } | null {
     let best: { x: number; z: number; y: number; d: number } | null = null;
     for (const line of this.centerlines) {
+      if (line.structure !== 'ground') continue; // never spawn on a bridge deck / in a tunnel
       for (const p of line.points) {
         if (!Number.isFinite(p.x) || !Number.isFinite(p.z) || !Number.isFinite(p.y)) continue;
         const d = (p.x - x) ** 2 + (p.z - z) ** 2;
@@ -573,6 +687,10 @@ export class TileManager {
         }
         const built = await this.buildTileContent(entry);
         if (!built || this.disposed || entry.cancelled) {
+          if (built) {
+            this.roadIndex.remove(built.centerlines);
+            disposeGroup(built.group);
+          }
           this.finishLoading(key);
           return;
         }
@@ -620,10 +738,12 @@ export class TileManager {
     entry.fillCount = 160;
     entry.fillSeed = entry.tx * 997 + entry.ty * 131 + 7;
     const before = this.provisionalSamples;
-    const { group, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
+    void heightAt;
+    const { group, centerlines } = this.builder.buildWays(ways, this.profileEnv());
     entry.centerlines = centerlines;
+    this.roadIndex.add(centerlines);
     entry.group.add(group);
-    const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
+    const fill = this.buildings.buildFillers(centerlines, this.origin, this.groundAtFn(), {
       maxCount: entry.fillCount,
       seed: entry.fillSeed,
     });
@@ -682,96 +802,101 @@ export class TileManager {
     return ways;
   }
 
-  private queueTerrainRefresh(x: number, z: number): void {
-    if (this.terrainRefreshQueued || this.disposed) return;
-    this.terrainRefreshQueued = true;
-    void this.refreshTerrainMesh(x, z).finally(() => {
-      this.terrainRefreshQueued = false;
-    });
+  /** Rebuild one terrain ring around (x, z) (snapped), time-sliced. */
+  private async rebuildRing(index: number, x: number, z: number): Promise<void> {
+    const ring = this.rings[index];
+    if (!ring || this.disposed) return;
+    const c = ring.snapCenter(x, z);
+    const cell = ring.cell;
+    const provBefore = this.provisionalSamples;
+    const roadVersion = this.roadIndex.version;
+    if (index === 0) {
+      const half = ring.cfg.size / 2;
+      const a = this.origin.toLatLon(c.x - half, c.z - half);
+      const b = this.origin.toLatLon(c.x + half, c.z + half);
+      await this.elevation.preloadArea(
+        Math.min(a.lat, b.lat),
+        Math.min(a.lon, b.lon),
+        Math.max(a.lat, b.lat),
+        Math.max(a.lon, b.lon),
+        6_000,
+      );
+      if (this.disposed) return;
+    }
+    const heightAt = (wx: number, wz: number): RingSample => {
+      const dem = this.ringDem(index, wx, wz);
+      if (index === 0) return this.carveAt(wx, wz, dem, cell);
+      return { y: dem, verge: 0 };
+    };
+    const ok = await ring.build(c.x, c.z, heightAt, () => this.disposed);
+    if (!ok || this.disposed) return;
+    ring.provisional = this.provisionalSamples > provBefore;
+    ring.roadVersion = roadVersion;
+    this.ground.visible = false;
+    this.syncRingHoles();
   }
 
-  private async refreshTerrainMesh(centerX: number, centerZ: number): Promise<void> {
-    if (this.disposed) return;
-    const res = TERRAIN_RES;
-    const size = TERRAIN_SIZE;
-    const geo = new THREE.PlaneGeometry(size, size, res, res);
-    geo.rotateX(-Math.PI / 2);
-    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-
-    const half = size * 0.5;
-    const sw = this.origin.toLatLon(centerX - half, centerZ - half);
-    const ne = this.origin.toLatLon(centerX + half, centerZ + half);
-    await this.elevation.preloadArea(
-      Math.min(sw.lat, ne.lat),
-      Math.min(sw.lon, ne.lon),
-      Math.max(sw.lat, ne.lat),
-      Math.max(sw.lon, ne.lon),
-    );
-    const provBefore = this.provisionalSamples;
-    if (this.disposed) {
-      geo.dispose();
-      return;
-    }
-
-    // Chunk vertex updates to reduce main-thread stalls
-    const count = pos.count;
-    const CHUNK = 1024;
-    for (let start = 0; start < count; start += CHUNK) {
-      const end = Math.min(count, start + CHUNK);
-      for (let i = start; i < end; i++) {
-        const lx = pos.getX(i) + centerX;
-        const lz = pos.getZ(i) + centerZ;
-        const ll = this.origin.toLatLon(lx, lz);
-        let y = this.demHeight(ll.lat, ll.lon);
-        if (!Number.isFinite(y)) y = 0;
-        pos.setY(i, y + TERRAIN_Y_BIAS);
+  /** Point each outer ring's vertex-shader hole at the current inner ring. */
+  private syncRingHoles(): void {
+    for (let i = 1; i < this.rings.length; i++) {
+      const inner = this.rings[i - 1];
+      const h = this.ringMats[i].inner;
+      if (!inner.builtOnce) {
+        h.set(0, 0, 0, 0);
+        continue;
       }
-      pos.needsUpdate = true;
-      if (end < count) {
-        await new Promise<void>((r) => setTimeout(r, 0));
-        if (this.disposed) {
-          geo.dispose();
-          return;
-        }
+      // Hole slightly inside the inner footprint; fade over one outer cell
+      h.set(inner.centerX, inner.centerZ, inner.cfg.size / 2 - inner.cell, this.rings[i].cell);
+    }
+  }
+
+  private updateTerrain(px: number, pz: number): void {
+    const now = performance.now();
+    for (let i = 0; i < this.rings.length; i++) {
+      const ring = this.rings[i];
+      if (ring.building) continue;
+      let want = ring.needsRecentre(px, pz);
+      // Near ring: re-carve when new roads streamed in nearby (throttled)
+      if (
+        !want &&
+        i === 0 &&
+        ring.roadVersion !== this.roadIndex.version &&
+        now - ring.lastBuildAt > CARVE_REBUILD_MS
+      ) {
+        want = true;
+      }
+      if (want) {
+        const cx = i === 0 ? px : px;
+        void this.rebuildRing(i, cx, pz);
       }
     }
-    this.terrainProvisional = this.provisionalSamples > provBefore;
-    geo.computeVertexNormals();
-    const colors = new Float32Array(pos.count * 3);
-    const col = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const lx = pos.getX(i) + centerX;
-      const lz = pos.getZ(i) + centerZ;
-      const y = pos.getY(i);
-      const n =
-        Math.sin(lx * 0.021 + lz * 0.017) * 0.5 +
-        Math.sin(lx * 0.007 - lz * 0.011) * 0.5;
-      const t = 0.45 + n * 0.22 + Math.max(-0.1, Math.min(0.2, y * 0.012));
-      col.setRGB(0.28 + t * 0.18, 0.36 + t * 0.16, 0.18 + t * 0.08);
-      colors[i * 3] = col.r;
-      colors[i * 3 + 1] = col.g;
-      colors[i * 3 + 2] = col.b;
-    }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    if (this.terrainMesh) {
-      this.scene.remove(this.terrainMesh);
-      this.terrainMesh.geometry.dispose();
-    }
-    this.terrainMesh = new THREE.Mesh(geo, this.terrainMat);
-    this.terrainMesh.position.set(centerX, 0, centerZ);
-    this.terrainMesh.receiveShadow = true;
-    this.terrainMesh.name = 'terrain';
-    this.scene.add(this.terrainMesh);
-    this.terrainCenterX = centerX;
-    this.terrainCenterZ = centerZ;
-    this.ground.visible = false;
   }
 
   private heightAtFn(): (lat: number, lon: number) => number {
     return (lat: number, lon: number) => {
       const y = this.demHeight(lat, lon);
       return Number.isFinite(y) ? y : 0;
+    };
+  }
+
+  /** Carved ground by lat/lon — what buildings stand on. */
+  private groundAtFn(): (lat: number, lon: number) => number {
+    return (lat: number, lon: number) => {
+      const p = this.origin.toLocal(lat, lon);
+      const dem = this.demHeight(lat, lon);
+      const y = this.carveAt(p.x, p.z, dem, this.rings[0]?.cell ?? 6.25).y;
+      return Number.isFinite(y) ? y : 0;
+    };
+  }
+
+  private profileEnv(): ProfileEnv {
+    if (this.junctionRegistry.size > 200_000) this.junctionRegistry.clear();
+    return {
+      origin: this.origin,
+      heightAt: this.heightAtFn(),
+      seaRel: this.seaRel,
+      registry: this.junctionRegistry,
+      provisionalCounter: () => this.provisionalSamples,
     };
   }
 
@@ -782,19 +907,24 @@ export class TileManager {
     provisional: boolean;
     buildingCount: number;
   } | null> {
-    const heightAt = this.heightAtFn();
     const before = this.provisionalSamples;
     const group = new THREE.Group();
     const { group: roads, centerlines } = await this.builder.buildWaysAsync(
       entry.ways,
-      this.origin,
-      heightAt,
+      this.profileEnv(),
     );
     if (this.disposed || entry.cancelled) {
       disposeGroup(roads);
       return null;
     }
     group.add(roads);
+    // Buildings stand on the carved ground, so the new roads must be indexed first
+    const tmpIndexed = !entry.centerlines.length || entry.centerlines !== centerlines;
+    if (tmpIndexed) {
+      this.roadIndex.remove(entry.centerlines);
+      this.roadIndex.add(centerlines);
+    }
+    const heightAt = this.groundAtFn();
     let buildingCount = 0;
     if (entry.buildings.length) {
       const bldg = this.buildings.build(entry.buildings, this.origin, heightAt);
@@ -829,9 +959,11 @@ export class TileManager {
     this.reheightAcc = now;
     this.demDirty = false;
 
-    if (this.terrainProvisional) {
-      this.queueTerrainRefresh(this.terrainCenterX, this.terrainCenterZ);
-    }
+    this.rings.forEach((ring, i) => {
+      if (ring.provisional && !ring.building && ring.builtOnce) {
+        void this.rebuildRing(i, ring.centerX, ring.centerZ);
+      }
+    });
     for (const entry of this.tiles.values()) {
       if (!entry.provisional || entry.loading || entry.rebuilding || entry.cancelled) continue;
       if (entry.reheights >= MAX_REHEIGHTS) continue;
@@ -853,7 +985,10 @@ export class TileManager {
     try {
       const built = await this.buildTileContent(entry);
       if (!built || this.disposed || entry.cancelled) {
-        if (built) disposeGroup(built.group);
+        if (built) {
+          this.roadIndex.remove(built.centerlines);
+          disposeGroup(built.group);
+        }
         return;
       }
       for (const child of [...entry.group.children]) {
@@ -888,10 +1023,10 @@ export class TileManager {
         ways.push(...this.makeGridWaysForTile(tx + dx, ty + dy));
       }
     }
-    const heightAt = this.heightAtFn();
     const before = this.provisionalSamples;
-    const { group: roads, centerlines } = this.builder.buildWays(ways, this.origin, heightAt);
-    const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
+    const { group: roads, centerlines } = this.builder.buildWays(ways, this.profileEnv());
+    this.roadIndex.add(centerlines);
+    const fill = this.buildings.buildFillers(centerlines, this.origin, this.groundAtFn(), {
       maxCount: 200,
       seed: tx * 17 + ty * 31,
     });
@@ -951,54 +1086,33 @@ export class TileManager {
       entry.cancelled = true;
       this.unloadTile(key, entry);
     }
-    if (this.terrainMesh) {
-      this.scene.remove(this.terrainMesh);
-      this.terrainMesh.geometry.dispose();
-      this.terrainMesh = null;
+    for (const ring of this.rings) {
+      this.scene.remove(ring.mesh);
+      ring.dispose();
     }
+    this.rings = [];
+    for (const m of this.ringMats) m.material.dispose();
+    this.ringMats = [];
+    this.scene.remove(this.water.mesh);
+    this.water.dispose();
+    this.roadIndex.clear();
+    this.junctionRegistry.clear();
     this.scene.remove(this.ground);
     this.ground.geometry.dispose();
     this.groundMat.dispose();
-    this.terrainMat.dispose();
     this.builder.dispose();
     this.buildings.dispose();
     this.streetLabels.dispose();
     this.elevation.dispose();
     this.coarseElevation.dispose();
+    this.midElevation.dispose();
     this.seenWayIds.clear();
     this.seenBuildingIds.clear();
     this.centerlines = [];
   }
 }
 
-function projectT(
-  px: number,
-  pz: number,
-  ax: number,
-  az: number,
-  bx: number,
-  bz: number,
-): number {
-  const abx = bx - ax;
-  const abz = bz - az;
-  const len = abx * abx + abz * abz;
-  if (len < 1e-8) return 0;
-  return Math.max(0, Math.min(1, ((px - ax) * abx + (pz - az) * abz) / len));
-}
 
-function distPointSegSq(
-  px: number,
-  pz: number,
-  ax: number,
-  az: number,
-  bx: number,
-  bz: number,
-): number {
-  const t = projectT(px, pz, ax, az, bx, bz);
-  const qx = ax + (bx - ax) * t;
-  const qz = az + (bz - az) * t;
-  return (px - qx) ** 2 + (pz - qz) ** 2;
-}
 
 function disposeGroup(obj: THREE.Object3D): void {
   obj.traverse((o) => {
