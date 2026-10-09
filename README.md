@@ -6,6 +6,18 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.2 (package 1.3.7) — Real hills, terrain correctness, photoreal CC0 textures
+
+- **World orientation fixed:** the map was mirrored north↔south. Now X = east, Z = south (right-handed), so streets sit on the correct side; the minimap arrow and city spawn headings use compass bearings.
+- **Elevation:** Terrarium z14 (was z12) with pixel-centre bilinear sampling (half-pixel fix), no "last sampled" plateau fill, and roads/buildings re-heighted when a late DEM tile arrives.
+- **Roads follow real grades:** each way is densified, smoothed and grade-capped by class (motorway 8 %, links 10 %, primary/secondary 15 %, tertiary 22 %, residential 35 % — SF's 22nd St reads ~32 %), junctions pinned so ways meet, bridges/tunnels level between their ends.
+- **Terrain:** near (1.2 km, carved), mid (4.8 km) and far (16 km) rings, built in time slices; road corridors flattened ~1 m past the edge with blended shoulders (replaces the old −0.62 m sink); sea-level water plane (SF Bay); fog pushed out to ~7 km so the next hill and skyline read.
+- **Car on slopes:** body pitch/roll from four wheel contacts, gravity along the grade, engine braking in gear, brake/Park hold, and a hold after spawn/teleport until you touch a control. Buildings get foundations sized to the slope.
+- **Photoreal CC0 textures** (Poly Haven + ambientCG, ~6 MB WebP + 0.5 MB HDRI, see `public/textures/CREDITS.md`): grass/dirt/rock/snow terrain splat (slope, verge, curvature, macro noise; triplanar rock; anti-tiling), photo asphalt/concrete/paving/gravel/dirt roads with world-space UVs, rain puddles/gloss, snow cover; sky HDRI lighting with lower ambient.
+- **Graphics preset** in the start menu: Low / **Medium (default)** / High — pixel ratio 1.0/1.25/1.5, shadow map, near-terrain resolution, normal/triplanar/ARM maps, bloom. Saved locally; `?quality=low|medium|high` overrides. **FPS counter** on the HUD.
+- **Performance:** buildings merged into one mesh per material per tile and built in 5 ms slices; road surface/nearest-road lookups use a spatial index; geometry disposed on unload.
+- QA: `?spawn=lat,lon[,heading]` spawns anywhere (e.g. `?spawn=37.7553,-122.4290,90` for 22nd St). `?fallback=1` unchanged. Web build only (no Electron rebuild).
+
 ### v1.3.1e (package 1.3.6) — Overpass mirror failover
 
 - **Online OSM on Cursor box / flaky TLS:** `overpass-api.de` often fails with TLS unexpected EOF here; **kumi** and **maps.mail.ru** respond. Vite primary `/api/overpass` now proxies **kumi**; secondary `/api/overpass-mailru` → mail.ru; `/api/overpass-de` last-resort only. Legacy `/api/overpass-kumi` kept as kumi alias. Exact `^…$` proxy contexts so `/api/overpass` does not steal `/api/overpass-*`.
@@ -108,7 +120,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.1e**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.2**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 
@@ -171,7 +183,8 @@ HUD buttons also switch weather and time of day. Click the **minimap** to expand
 - **Source:** [AWS Open Data Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) in **Terrarium** PNG encoding (Mapzen/Joerd lineage).
 - **URL pattern:** `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`
 - **Decode:** `(R * 256 + G + B / 256) - 32768` → meters.
-- No API key. Tiles stream with map chunks; roads/buildings follow DEM grades; a local heightfield mesh shows surrounding hills.
+- No API key. z14 for roads and the near terrain, z12 mid ring, z11 far ring (to ~8 km). Pixel-centre bilinear sampling; nothing is built from guessed heights — provisional tiles are re-heighted when the fine DEM arrives.
+- Roads use smoothed, grade-capped profiles; the near terrain is carved to the road corridor. Sea level is drawn as water.
 - Heights are relative to the spawn city’s elevation so the vehicle starts near y≈0.
 
 ## Weather & day/night
@@ -193,7 +206,7 @@ Inspired by **Forza Motorsport 4 / Gran Turismo 5** feel — not a full sim clai
 
 ## Streaming architecture
 
-1. Spawn sets a lat/lon **geo origin** (X east, Y up, Z north, meters).
+1. Spawn sets a lat/lon **geo origin** (X east, Y up, Z south, meters — right-handed; fixed in v1.3.2, it used to be mirrored).
 2. **~0.01° tiles** load in a 5×5 neighborhood; distant tiles unload.
 3. Each tile: Terrarium DEM preload → Overpass highways + buildings → road ribbons + extruded footprints on elevation.
 4. In-memory tile cache; Overpass calls rate-limited; Vite proxies `/api/overpass` (kumi), `/api/overpass-mailru`, optional `/api/overpass-de` if CORS/TLS fails.
@@ -211,7 +224,8 @@ src/game/
   weather/Environment.ts
   map/{geo,OverpassClient,ElevationSampler,RoadBuilder,RoadSurface,BuildingBuilder,TileManager}.ts
   vehicles/{Vehicle,VehicleFactory,Transmission,EngineSound}.ts
-  visuals/{Textures,PostFX}.ts
+  map/{RoadProfile,RoadIndex,Terrain}.ts
+  visuals/{Textures,PostFX,Quality,TextureLibrary,TerrainMaterial,ShaderChunks}.ts
   camera/ChaseCamera.ts
   input/Input.ts
   ui/{HUD,StartMenu,Minimap}.ts
@@ -222,14 +236,14 @@ src/game/
 ## Known limitations
 
 - Arcade/sim-cade physics, not FM/GT fidelity.
-- Visuals are Forza-**inspired** (ACES, hatch silhouette, wet roads), not FM photogrammetry — no real car scans or photo terrain.
+- Visuals are Forza-**inspired**: CC0 photo textures on terrain/roads, but no satellite imagery, real car scans or landuse (parks, lakes) polygons yet.
 - Building count capped per tile for performance; no full city collision.
 - Overpass public instances can be slow, rate-limit, or TLS-fail (notably overpass-api.de on some clouds); v1.3.1e prefers kumi/mail.ru mirrors, then falls back to offline grids on true outages.
 - Not all OSM ways have `surface=*`; missing tags infer asphalt (or dirt for tracks).
-- Terrarium is bare-earth DEM — roads use a small height bias above it (v1.1), not surveyed pavement.
-- Single moving heightfield patch (not full streaming LOD terrain); distant hills may look flatter until recentered.
+- Terrarium is a ~10 m bare-earth DEM — road grades are smoothed estimates, not surveyed pavement. Bridges are level between their ends (no arch); tunnels have no interior.
+- Inland lakes aren't drawn (only sea level); Lake Ontario shoreline in Toronto shows as terrain.
 - Local ENU projection is for regional driving, not continental precision.
 
 ## License note
 
-Game code for this project. Map data © OpenStreetMap contributors (ODbL). Elevation © contributors to the AWS Terrain Tiles / Mapzen Terrarium dataset.
+Game code for this project. Map data © OpenStreetMap contributors (ODbL). Elevation © contributors to the AWS Terrain Tiles / Mapzen Terrarium dataset. Textures and HDRI: CC0 (Poly Haven, ambientCG) — see `public/textures/CREDITS.md`.
