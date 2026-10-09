@@ -216,9 +216,10 @@ export function makeBuildingFacade(seed: number): { map: THREE.CanvasTexture; em
       const x = gapX + col * (cellW + gapX);
       const y = gapY + row * (cellH + gapY);
       // Window frame
-      ctx.fillStyle = '#2a3038';
+      ctx.fillStyle = '#4a5058';
       ctx.fillRect(x - 1, y - 1, cellW + 2, cellH * 0.78);
-      ctx.fillStyle = lit ? '#e0c988' : '#151c28';
+      // v1.3.2: daytime glass reads as reflected sky, not a black hole
+      ctx.fillStyle = lit ? '#e0c988' : '#56667a';
       ctx.fillRect(x, y, cellW, cellH * 0.72);
       // Mullion
       ctx.fillStyle = 'rgba(40,45,55,0.55)';

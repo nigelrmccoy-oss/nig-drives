@@ -13,11 +13,15 @@ import type { TransmissionMode } from './vehicles/Transmission';
 import { Environment, WEATHER_LABELS } from './weather/Environment';
 import { PostFX } from './visuals/PostFX';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel, type QualitySettings } from './visuals/Quality';
+import { TextureLibrary } from './visuals/TextureLibrary';
 
 export interface GameStartOptions {
   vehicle: VehicleId;
   cityId: string;
   transmission?: TransmissionMode;
+  quality?: QualityLevel;
 }
 
 export class Game {
@@ -41,9 +45,16 @@ export class Game {
   private post: PostFX;
   private pmrem: THREE.PMREMGenerator;
   private lastGroundY = 0;
+  private quality: QualitySettings;
+  readonly textures: TextureLibrary;
+  private fpsFrames = 0;
+  private fpsAcc = 0;
+  private fps = 0;
   constructor(parent: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.quality = QUALITY[loadQualityLevel()];
+    // SMAA in PostFX does the anti-aliasing (the composer renders off-screen)
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.pixelRatioCap));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -66,9 +77,14 @@ export class Game {
     this.scene.environment = this.pmrem.fromScene(room, 0.04).texture;
     this.scene.environmentIntensity = 0.48;
     room.dispose();
+    this.loadSkyHdri();
 
     this.env = new Environment(this.scene);
     this.post = new PostFX(this.renderer, this.scene, this.camera);
+    this.textures = new TextureLibrary(this.quality);
+    // Start fetching the CC0 photo textures while the menu is up
+    void this.textures.load();
+    this.applyQuality(this.quality);
 
     this.hud = new HUD(parent);
     this.minimap = new Minimap(parent);
@@ -86,9 +102,47 @@ export class Game {
     window.addEventListener('resize', this.onResize);
   }
 
+  /** Cheap Poly Haven sky (CC0) as image-based lighting; RoomEnvironment until it arrives. */
+  private loadSkyHdri(): void {
+    const base = (import.meta.env?.BASE_URL as string | undefined) ?? './';
+    new HDRLoader().load(
+      `${base.endsWith('/') ? base : base + '/'}hdri/sky_512.hdr`,
+      (tex) => {
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        const env = this.pmrem.fromEquirectangular(tex).texture;
+        const old = this.scene.environment;
+        this.scene.environment = env;
+        old?.dispose();
+        tex.dispose();
+      },
+      undefined,
+      (err) => console.warn('Sky HDRI unavailable — keeping RoomEnvironment', err),
+    );
+  }
+
+  getQuality(): QualitySettings {
+    return this.quality;
+  }
+
+  /** Pixel ratio, shadow map, bloom and texture sizes; near-ring resolution applies on next start. */
+  applyQuality(q: QualitySettings): void {
+    this.quality = q;
+    const pr = Math.min(window.devicePixelRatio, q.pixelRatioCap);
+    this.renderer.setPixelRatio(pr);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.post.setSize(window.innerWidth, window.innerHeight, pr);
+    this.post.setBloomEnabled(q.bloom);
+    this.env.setShadowMapSize(q.shadowMapSize);
+    this.textures?.setQuality(q);
+  }
+
   async start(opts: GameStartOptions): Promise<void> {
     this.stopLoop();
     this.clearWorld();
+    if (opts.quality && opts.quality !== this.quality.level) {
+      saveQualityLevel(opts.quality);
+      this.applyQuality(QUALITY[opts.quality]);
+    }
     const trans: TransmissionMode = opts.transmission ?? 'auto';
     this.engineSound.start(opts.vehicle);
 
@@ -107,7 +161,7 @@ export class Game {
     const loadingText = this.loadingEl.querySelector('#loading-text')!;
     loadingText.textContent = `Loading ${city.name}: OSM roads + Terrarium elevation…`;
 
-    this.tiles = new TileManager(this.scene, city.lat, city.lon);
+    this.tiles = new TileManager(this.scene, city.lat, city.lon, this.textures, this.quality);
     this.tiles.setWeatherSurface(this.env.weather);
     if (wantsForcedFallback()) {
       this.tiles.setForceOffline(true);
@@ -205,8 +259,17 @@ export class Game {
 
   private frame = (t: number): void => {
     if (!this.running || !this.vehicle || !this.tiles) return;
-    const dt = Math.min(0.05, (t - this.lastT) / 1000);
+    const rawDt = Math.max(0, (t - this.lastT) / 1000);
+    const dt = Math.min(0.05, rawDt);
     this.lastT = t;
+    this.fpsFrames++;
+    this.fpsAcc += rawDt;
+    if (this.fpsAcc >= 0.5) {
+      this.fps = this.fpsFrames / this.fpsAcc;
+      this.fpsFrames = 0;
+      this.fpsAcc = 0;
+      this.hud.setFps(this.fps, this.quality.label);
+    }
 
     if (this.input.consumeCameraToggle()) {
       this.chase.toggle();
@@ -367,6 +430,7 @@ export class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.post.setSize(window.innerWidth, window.innerHeight, this.renderer.getPixelRatio());
   };
 
   dispose(): void {
@@ -376,7 +440,13 @@ export class Game {
     this.input.dispose();
     this.env.dispose();
     window.removeEventListener('resize', this.onResize);
+    this.textures.dispose();
     this.renderer.dispose();
+  }
+
+  /** Last measured frame rate (QA). */
+  getFps(): number {
+    return this.fps;
   }
 }
 

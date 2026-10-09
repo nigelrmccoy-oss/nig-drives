@@ -257,6 +257,8 @@ export class Vehicle {
   vy = 0;
   /** Gravity along the grade on/off (Nigel's default: on). */
   gradeGravity = true;
+  /** Handbrake-style hold after spawn/teleport until the driver touches a control. */
+  private spawnHold = true;
   private wheelPivots: THREE.Group[] = [];
   private spinMeshes: THREE.Object3D[] = [];
   private headlightMats: THREE.MeshStandardMaterial[] = [];
@@ -331,6 +333,7 @@ export class Vehicle {
   }
 
   setPose(x: number, z: number, headingRad: number): void {
+    this.spawnHold = true;
     this.vy = 0;
     this.gradeSin = 0;
     this.groundPitch = 0;
@@ -476,7 +479,17 @@ export class Vehicle {
     // Rolling resistance: more on grass/dirt so a car parked on a gentle verge doesn't creep away
     const rollC = 0.012 + (1 - THREE.MathUtils.clamp(surface.roadFactor, 0.35, 1)) * 0.06;
     const drag = rollC * g * Math.sign(this.vz) + 0.00045 * this.vz * Math.abs(this.vz);
-    let longDemand = engAx - drag + brakeAx;
+    // v1.3.2 engine braking with the throttle closed in gear (weaker through an
+    // auto's torque converter) + over-rev limiter, so a hill doesn't become a launch ramp
+    let engBrake = 0;
+    if (drive.engaged && !this.transmission.clutchIn && throttle < 0.05 && Math.abs(this.vz) > 0.3) {
+      const revs = ((Math.abs(this.vz) / 0.32) * drive.ratio) / 520;
+      const k = this.transmission.mode === 'auto' ? 0.5 : 1;
+      engBrake =
+        -Math.sign(this.vz) *
+        ((0.25 + 0.9 * Math.min(revs, 1)) * this.transmission.torqueMul() * k + Math.max(0, revs - 1) * 25);
+    }
+    let longDemand = engAx - drag + brakeAx + engBrake;
 
     this.tcsActive = false;
     if (longDemand > 0) {
@@ -540,7 +553,10 @@ export class Vehicle {
     // Brakes / Park hold the car at a standstill if the tyres can take it.
     let gAlong = this.gradeGravity ? -g * this.gradeSin : 0;
     const parked = this.transmission.mode === 'auto' && this.transmission.autoSelector === -1;
-    if ((brake > 0.2 || parked) && Math.abs(this.vz) < 0.8 && Math.abs(gAlong) < mu * g * 0.9) {
+    if (this.spawnHold && (throttle > 0 || brake > 0 || input.left || input.right || input.back)) {
+      this.spawnHold = false;
+    }
+    if ((brake > 0.2 || parked || this.spawnHold) && Math.abs(this.vz) < 0.8 && Math.abs(gAlong) < mu * g * 0.9) {
       gAlong = 0;
       this.vz *= Math.exp(-10 * dt);
     }

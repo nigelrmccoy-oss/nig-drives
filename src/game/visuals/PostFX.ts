@@ -34,6 +34,10 @@ export class PostFX {
     this.bloom.threshold = 0.88 - n * 0.18;
   }
 
+  setBloomEnabled(on: boolean): void {
+    this.bloom.enabled = on;
+  }
+
   setSize(width: number, height: number, pixelRatio: number): void {
     this.composer.setPixelRatio(pixelRatio);
     this.composer.setSize(width, height);

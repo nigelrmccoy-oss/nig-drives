@@ -595,3 +595,21 @@ canvas.game-canvas {
 .hud-bottom {
   bottom: 8px;
 }
+
+/* v1.3.2 FPS counter (always visible while driving) */
+.fps-counter {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(10, 14, 20, 0.55);
+  color: #9fe6a0;
+  font: 600 11px/1.4 ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.fps-counter.low {
+  color: #ffb36b;
+}

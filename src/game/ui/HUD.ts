@@ -19,6 +19,7 @@ export class HUD {
   private vehicleEl: HTMLElement;
   private placeEl: HTMLElement;
   private statusEl: HTMLElement;
+  private fpsEl: HTMLElement;
   private camEl: HTMLElement;
   private weatherEl: HTMLElement;
   private timeEl: HTMLElement;
@@ -82,7 +83,8 @@ export class HUD {
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
       <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · v1.3.1e</div>
+      <div class="fps-counter" id="hud-fps">— FPS</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.3.2</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;
@@ -103,6 +105,7 @@ export class HUD {
     this.telemCoolant = this.root.querySelector('#telem-coolant')!;
     this.rpmBar = this.root.querySelector('#rpm-fill')!;
     this.pauseBanner = this.root.querySelector('#hud-paused')!;
+    this.fpsEl = this.root.querySelector('#hud-fps')!;
 
     this.weatherEl.addEventListener('click', () => this.onWeatherClick?.());
     this.timeEl.addEventListener('click', () => this.onTimeClick?.());
@@ -138,6 +141,12 @@ export class HUD {
   setSurface(label: string, grip: number): void {
     const g = Number.isFinite(grip) ? Math.round(grip * 100) : 0;
     this.surfaceEl.textContent = `Surface: ${label} · grip ${g}%`;
+  }
+
+  setFps(fps: number, qualityLabel: string): void {
+    const v = Number.isFinite(fps) ? Math.round(fps) : 0;
+    this.fpsEl.textContent = `${v} FPS · ${qualityLabel}`;
+    this.fpsEl.classList.toggle('low', v < 45);
   }
 
   setStatus(msg: string): void {

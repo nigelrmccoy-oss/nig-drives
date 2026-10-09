@@ -255,7 +255,15 @@ export class Environment {
   }
 
   getEnvIntensity(): number {
-    return 0.18 + (1 - this._night) * 0.42;
+    return 0.15 + (1 - this._night) * 0.4;
+  }
+
+  /** v1.3.2 quality presets. */
+  setShadowMapSize(size: number): void {
+    if (this.sun.shadow.mapSize.x === size) return;
+    this.sun.shadow.mapSize.set(size, size);
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
   }
 
   update(dt: number, followX: number, followZ: number, followY = 0): void {
@@ -324,11 +332,12 @@ export class Environment {
       this.scene.fog.far = this.weather === 'snow' ? 900 : this.weather === 'rain' ? 1600 : 7000;
     }
 
-    this.hemi.intensity = 0.22 + 0.72 * dayFactor;
+    // v1.3.2: lower ambient so photo textures keep their contrast; sun carries the scene
+    this.hemi.intensity = 0.15 + 0.5 * dayFactor;
     this.hemi.color.set(dayFactor > 0.28 ? 0xb8d4ff : 0x1a2448);
     this.hemi.groundColor.set(dayFactor > 0.28 ? 0x3a4a32 : 0x0a100c);
 
-    this.sun.intensity = Math.max(0.04, dayFactor * (this.weather === 'clear' ? 1.35 : 0.72));
+    this.sun.intensity = Math.max(0.04, dayFactor * (this.weather === 'clear' ? 1.52 : 0.8));
     this.sun.color.set(dayFactor > 0.38 ? 0xfff3d8 : dayFactor > 0.18 ? 0xffb070 : 0x8899cc);
     this.sun.castShadow = dayFactor > 0.12;
     this.ambient.intensity = 0.08 + night * 0.22 + (this.weather !== 'clear' ? 0.04 : 0);

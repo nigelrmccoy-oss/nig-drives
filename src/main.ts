@@ -1,5 +1,6 @@
 import './style.css';
-import * as THREE from 'three';
+// Named imports only: `import * as THREE` here would defeat tree-shaking (+200 kB)
+import { Raycaster, Vector3 } from 'three';
 import { Game } from './game/Game';
 import { StartMenu, type StartSelection } from './game/ui/StartMenu';
 
@@ -16,7 +17,7 @@ const menu = new StartMenu(app, async (sel) => {
 if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')) {
   (window as unknown as { __nig: unknown }).__nig = {
     game,
-    THREE,
+    THREE: { Raycaster, Vector3 },
     start: async (sel: StartSelection) => {
       menu.hide();
       await game.start(sel);

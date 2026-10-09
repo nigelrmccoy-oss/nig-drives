@@ -7,11 +7,13 @@ import {
   type VehicleClass,
 } from '../vehicles/Vehicle';
 import type { TransmissionMode } from '../vehicles/Transmission';
+import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel } from '../visuals/Quality';
 
 export interface StartSelection {
   vehicle: VehicleId;
   cityId: string;
   transmission: TransmissionMode;
+  quality: QualityLevel;
 }
 
 export class StartMenu {
@@ -20,6 +22,7 @@ export class StartMenu {
   private vehicle: VehicleId = 'golf_20aba';
   private cityId = CITIES[0].id;
   private transmission: TransmissionMode = 'auto';
+  private quality: QualityLevel = loadQualityLevel();
   private onStart: (sel: StartSelection) => void;
 
   constructor(parent: HTMLElement, onStart: (sel: StartSelection) => void) {
@@ -36,8 +39,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.1e</span></h1>
-        <p class="tagline">v1.3.1e: Overpass mirror failover (kumi/mail.ru) · online OSM labels · ?fallback=1 QA.</p>
+        <h1>Nig Drives <span class="ver">v1.3.2</span></h1>
+        <p class="tagline">v1.3.2: real hills (z14 DEM, graded roads, 8 km horizon) · photoreal CC0 terrain &amp; asphalt · quality presets.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">
@@ -80,6 +83,19 @@ export class StartMenu {
             <strong>Stick · H-pattern</strong>
             <span>1–6 / N / B=R · Q/E also</span>
           </button>
+        </div>
+
+        <div class="section-label">Graphics</div>
+        <div class="choice-row" id="quality-choices">
+          ${(['low', 'medium', 'high'] as QualityLevel[])
+            .map(
+              (q) => `
+            <button type="button" class="choice ${q === this.quality ? 'selected' : ''}" data-quality="${q}">
+              <strong>${QUALITY[q].label}</strong>
+              <span>${qualityHint(q)}</span>
+            </button>`,
+            )
+            .join('')}
         </div>
 
         <div class="section-label">Start city</div>
@@ -128,6 +144,15 @@ export class StartMenu {
       });
     });
 
+    this.root.querySelectorAll('[data-quality]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.quality = (btn as HTMLElement).dataset.quality as QualityLevel;
+        saveQualityLevel(this.quality);
+        this.root.querySelectorAll('[data-quality]').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
     this.root.querySelectorAll('[data-city]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.cityId = (btn as HTMLElement).dataset.city!;
@@ -141,6 +166,7 @@ export class StartMenu {
         vehicle: this.vehicle,
         cityId: this.cityId,
         transmission: this.transmission,
+        quality: this.quality,
       });
     });
   }
@@ -170,5 +196,16 @@ function variantHint(id: VehicleId): string {
       return 'Lighter · regen brake · roof pack';
     default:
       return '';
+  }
+}
+
+function qualityHint(q: QualityLevel): string {
+  switch (q) {
+    case 'low':
+      return 'Older iGPUs · 1.0× res · no normal maps';
+    case 'medium':
+      return 'Default · laptop iGPU · 1.25× res';
+    case 'high':
+      return 'Discrete GPU · 1.5× res · 1K splat';
   }
 }

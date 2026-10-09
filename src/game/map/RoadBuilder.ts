@@ -11,6 +11,29 @@ import {
 import type { WeatherPreset } from '../weather/Environment';
 import { profileWays, type ProfileEnv, type ProfiledWay, type RoadStructure } from './RoadProfile';
 import { makeEdgeLineTexture, makeLaneTexture, makeRoadMaps, type SurfaceMaps } from '../visuals/Textures';
+import type { RoadSetName, TextureLibrary } from '../visuals/TextureLibrary';
+import { NIG_NOISE_GLSL } from '../visuals/ShaderChunks';
+
+/** Photo texture set + tint + metres-per-repeat for each OSM surface kind. */
+const PHOTO_BY_KIND: Partial<Record<SurfaceKind, { set: RoadSetName; tint: number }>> = {
+  asphalt: { set: 'asphalt', tint: 0xffffff },
+  unknown: { set: 'asphalt', tint: 0xffffff },
+  concrete: { set: 'concrete', tint: 0xf2f2f2 },
+  paving_stones: { set: 'paving', tint: 0xffffff },
+  cobblestone: { set: 'paving', tint: 0xd8ccc0 },
+  gravel: { set: 'gravel', tint: 0xffffff },
+  compacted: { set: 'gravel', tint: 0xcfc2ac },
+  dirt: { set: 'dirt', tint: 0xffffff },
+  sand: { set: 'dirt', tint: 0xffe2b8 },
+  grass: { set: 'dirt', tint: 0xa8c08a },
+};
+const TILE_M_BY_SET: Record<RoadSetName, number> = {
+  asphalt: 3.5,
+  concrete: 3.0,
+  paving: 2.4,
+  gravel: 3.0,
+  dirt: 3.0,
+};
 
 /** Lift asphalt slightly above DEM / terrain to avoid Z-fighting and sinking. */
 export const ROAD_Y_BIAS = 0.2;
@@ -90,6 +113,7 @@ function buildRibbonGeometry(
   points: THREE.Vector3[],
   width: number,
   yBias: number = ROAD_Y_BIAS,
+  metricUv = false,
 ): THREE.BufferGeometry | null {
   if (points.length < 2) return null;
   // Allow thin curb / lane-mark ribbons (~0.1–0.3 m); asphalt carriageways are wider.
@@ -160,11 +184,15 @@ function buildRibbonGeometry(
   let dist = 0;
   for (let i = 0; i < points.length; i++) {
     if (i > 0) dist += points[i].distanceTo(points[i - 1]);
-    const u = dist * 0.12;
     positions.push(left[i].x, left[i].y, left[i].z);
-    uvs.push(0, u);
     positions.push(right[i].x, right[i].y, right[i].z);
-    uvs.push(1, u);
+    if (metricUv) {
+      // v1.3.2: metres (lateral, along) — textures repeat in world units
+      uvs.push(-half, dist, half, dist);
+    } else {
+      const u = dist * 0.12;
+      uvs.push(0, u, 1, u);
+    }
   }
 
   for (let i = 0; i < points.length - 1; i++) {
@@ -193,6 +221,7 @@ function buildOffsetRibbonGeometry(
   width: number,
   yBias: number = ROAD_Y_BIAS,
   yRaise = 0,
+  metricUv = false,
 ): THREE.BufferGeometry | null {
   if (points.length < 2 || !Number.isFinite(width) || width < 0.08) return null;
   const shifted: THREE.Vector3[] = [];
@@ -214,7 +243,7 @@ function buildOffsetRibbonGeometry(
       new THREE.Vector3(p.x + n.x * offset, finiteY(p.y) + yRaise, p.z + n.z * offset),
     );
   }
-  return buildRibbonGeometry(shifted, width, yBias);
+  return buildRibbonGeometry(shifted, width, yBias, metricUv);
 }
 
 /** Vertical side walls + underside for bridge decks so they aren't paper-thin. */
@@ -244,7 +273,7 @@ function buildBridgeSides(points: THREE.Vector3[], width: number, depth: number)
       if (i > 0) d += edge[i].distanceTo(edge[i - 1]);
       const e = edge[i];
       pos.push(e.x, e.y, e.z, e.x, e.y - depth, e.z);
-      uv.push(d * 0.25, 1, d * 0.25, 0);
+      uv.push(d, depth, d, 0);
     }
     for (let i = 0; i < edge.length - 1; i++) {
       const a = i * 2;
@@ -265,7 +294,7 @@ function buildBridgeSides(points: THREE.Vector3[], width: number, depth: number)
   const idx: number[] = [];
   for (let i = 0; i < L.length; i++) {
     pos.push(L[i].x, L[i].y - depth, L[i].z, R[i].x, R[i].y - depth, R[i].z);
-    uv.push(0, i, 1, i);
+    uv.push(0, i * 4, width, i * 4);
   }
   for (let i = 0; i < L.length - 1; i++) {
     const a = i * 2;
@@ -295,8 +324,14 @@ export class RoadBuilder {
   private sharedEdgeTex: THREE.CanvasTexture;
   private weather: WeatherPreset = 'clear';
   private disposed = false;
+  private textures: TextureLibrary | null;
+  private photoKinds = new Set<SurfaceKind>();
+  private unsubTextures: (() => void) | null = null;
+  /** Shared wetness uniform for all photo road materials (puddles / gloss). */
+  private wetUniform = { value: 0 };
 
-  constructor() {
+  constructor(textures: TextureLibrary | null = null) {
+    this.textures = textures;
     this.sharedLaneTex = makeLaneTexture();
     this.sharedEdgeTex = makeEdgeLineTexture();
     this.laneMat = new THREE.MeshStandardMaterial({
@@ -320,6 +355,7 @@ export class RoadBuilder {
     });
     this.curbMat = new THREE.MeshStandardMaterial({
       color: 0x9a9690,
+      name: 'curb',
       roughness: 0.78,
       metalness: 0.06,
       polygonOffset: true,
@@ -338,6 +374,101 @@ export class RoadBuilder {
       'compacted',
     ] as SurfaceKind[]) {
       this.ensureMat(kind);
+    }
+    if (textures) this.unsubTextures = textures.onReady(() => this.applyPhotoTextures());
+  }
+
+  /** Swap procedural canvas maps for the CC0 photo sets (world-space metric UVs). */
+  private applyPhotoTextures(): void {
+    if (this.disposed || !this.textures) return;
+    for (const [kind, mat] of this.matsByKind) this.applyPhoto(kind, mat);
+    const concrete = this.textures.getRoadSet('concrete');
+    if (concrete) {
+      this.curbMat.map = concrete.albedo;
+      this.curbMat.normalMap = concrete.normal;
+      this.curbMat.roughnessMap = concrete.arm;
+      this.curbMat.color.setHex(0xd8d6d2);
+      this.curbMat.roughness = 1;
+      this.curbMat.needsUpdate = true;
+    }
+  }
+
+  private applyPhoto(kind: SurfaceKind, mat: THREE.MeshStandardMaterial): void {
+    const pick = PHOTO_BY_KIND[kind];
+    const set = pick && this.textures?.getRoadSet(pick.set);
+    if (!pick || !set) return;
+    const tile = TILE_M_BY_SET[pick.set];
+    for (const t of [set.albedo, set.normal, set.arm]) t.repeat.set(1 / tile, 1 / tile);
+    mat.map = set.albedo;
+    mat.normalMap = set.normal;
+    mat.normalScale.set(0.8, 0.8);
+    mat.roughnessMap = set.arm;
+    mat.aoMap = set.arm;
+    mat.aoMapIntensity = 0.55;
+    mat.metalness = 0;
+    mat.userData.photoTint = pick.tint;
+    this.photoKinds.add(kind);
+    this.installRoadShader(mat);
+    this.tintFor(kind, mat);
+    mat.needsUpdate = true;
+  }
+
+  /**
+   * Anti-tiling (second rotated large-scale sample), macro wear variation and
+   * rain puddles, all in world space so neighbouring ways line up.
+   */
+  private installRoadShader(mat: THREE.MeshStandardMaterial): void {
+    const wet = this.wetUniform;
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uWet = wet;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec2 vNigRoadXZ;')
+        .replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\nvNigRoadXZ = (modelMatrix * vec4(transformed, 1.0)).xz;',
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+uniform float uWet;
+varying vec2 vNigRoadXZ;
+${NIG_NOISE_GLSL}`,
+        )
+        .replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+  vec4 nigS1 = texture2D(map, vMapUv);
+  vec2 nigUv2 = vec2(vMapUv.x * 0.8 - vMapUv.y * 0.6, vMapUv.x * 0.6 + vMapUv.y * 0.8) * 0.27 + vec2(0.37, 0.61);
+  vec4 nigS2 = texture2D(map, nigUv2);
+  float nigMv = nigNoise(vNigRoadXZ / 19.0);
+  diffuseColor *= mix(nigS1, nigS2, 0.25 + 0.3 * nigMv);
+  float nigWear = nigNoise(vNigRoadXZ / 43.0 + 3.7) * 0.6 + nigNoise(vNigRoadXZ / 7.0) * 0.4;
+  diffuseColor.rgb *= mix(0.84, 1.12, nigWear);
+#endif
+float nigPuddle = uWet * (0.35 + 0.65 * smoothstep(0.55, 0.75, nigNoise(vNigRoadXZ / 5.5 + 11.0)));
+diffuseColor.rgb *= mix(1.0, 0.7, nigPuddle);`,
+        )
+        .replace(
+          '#include <roughnessmap_fragment>',
+          `#include <roughnessmap_fragment>
+roughnessFactor = mix(roughnessFactor, 0.08, nigPuddle);`,
+        );
+    };
+    mat.customProgramCacheKey = () => 'nig-road-photo-v1';
+  }
+
+  private tintFor(kind: SurfaceKind, mat: THREE.MeshStandardMaterial): void {
+    const p = this.profilesByKind.get(kind) ?? defaultAsphaltProfile();
+    if (this.photoKinds.has(kind)) {
+      const tint = (mat.userData.photoTint as number | undefined) ?? 0xffffff;
+      mat.color.setHex(this.weather === 'snow' ? weatherTintColor(tint, 'snow') : tint);
+      // ARM green channel carries roughness; this scales it
+      mat.roughness = this.weather === 'rain' ? 0.62 : 1.0;
+    } else {
+      mat.color.setHex(weatherTintColor(p.color, this.weather));
+      mat.roughness = weatherRoughness(p.roughness, this.weather);
+      mat.metalness = this.weather === 'rain' ? Math.min(0.35, p.metalness + 0.2) : p.metalness;
     }
   }
 
@@ -366,19 +497,20 @@ export class RoadBuilder {
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,
     });
+    mat.name = `road-${kind}`;
     this.matsByKind.set(kind, mat);
+    if (this.textures?.ready) this.applyPhoto(kind, mat);
     return mat;
   }
 
   setWeatherSurface(weather: WeatherPreset): void {
     this.weather = weather;
     for (const [kind, mat] of this.matsByKind) {
-      const p = this.profilesByKind.get(kind) ?? defaultAsphaltProfile();
-      mat.color.setHex(weatherTintColor(p.color, weather));
-      mat.roughness = weatherRoughness(p.roughness, weather);
-      mat.metalness = weather === 'rain' ? Math.min(0.35, p.metalness + 0.2) : p.metalness;
+      this.tintFor(kind, mat);
       mat.needsUpdate = true;
     }
+    // Wet look follows the same weather state that sets grip (rain → puddles + gloss)
+    this.wetUniform.value = weather === 'rain' ? 1 : weather === 'snow' ? 0.25 : 0;
     if (weather === 'rain') {
       this.laneMat.roughness = 0.4;
     } else if (weather === 'snow') {
@@ -485,13 +617,13 @@ export class RoadBuilder {
     if (paved && width >= 4.2) {
       const half = width / 2;
       const curbW = 0.28;
-      const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06);
-      const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06);
+      const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06, true);
+      const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06, true);
       if (left) acc.curbGeos.push(left);
       if (right) acc.curbGeos.push(right);
     }
 
-    const asphalt = buildRibbonGeometry(cleaned, width);
+    const asphalt = buildRibbonGeometry(cleaned, width, ROAD_Y_BIAS, true);
     if (asphalt) {
       let list = acc.geosByKind.get(profile.kind);
       if (!list) {
@@ -540,6 +672,8 @@ export class RoadBuilder {
 
   dispose(): void {
     this.disposed = true;
+    this.unsubTextures?.();
+    this.unsubTextures = null;
     for (const mat of this.matsByKind.values()) mat.dispose();
     this.matsByKind.clear();
     for (const maps of this.mapsByKind.values()) {

@@ -22,6 +22,8 @@ import { RoadIndex } from './RoadIndex';
 import type { ProfileEnv } from './RoadProfile';
 import { TerrainRing, WaterPlane, type RingConfig, type RingSample } from './Terrain';
 import { createTerrainMaterial, type TerrainMaterialHandle } from '../visuals/TerrainMaterial';
+import type { TextureLibrary } from '../visuals/TextureLibrary';
+import { QUALITY, type QualitySettings } from '../visuals/Quality';
 
 const LOAD_RADIUS = 2;
 const UNLOAD_RADIUS = 4;
@@ -137,7 +139,10 @@ export class TileManager {
   private reheightBusy = false;
   private scene: THREE.Scene;
   private client = new OverpassClient();
-  private builder = new RoadBuilder();
+  private builder: RoadBuilder;
+  private textures: TextureLibrary | null;
+  private quality: QualitySettings;
+  private unsubTextures: (() => void) | null = null;
   private buildings = new BuildingBuilder();
   private tiles = new Map<string, TileEntry>();
   private queue: Array<{ tx: number; ty: number }> = [];
@@ -157,9 +162,18 @@ export class TileManager {
   private fetchGen = 0;
   readonly streetLabels = new StreetLabels();
 
-  constructor(scene: THREE.Scene, originLat: number, originLon: number) {
+  constructor(
+    scene: THREE.Scene,
+    originLat: number,
+    originLon: number,
+    textures: TextureLibrary | null = null,
+    quality: QualitySettings = QUALITY.medium,
+  ) {
     this.scene = scene;
     this.origin = new GeoOrigin(originLat, originLon);
+    this.textures = textures;
+    this.quality = quality;
+    this.builder = new RoadBuilder(textures);
 
     const terrainTex = makeTerrainTexture();
     this.groundMat = new THREE.MeshStandardMaterial({
@@ -172,16 +186,25 @@ export class TileManager {
     const ringCfgs = [NEAR_RING, MID_RING, FAR_RING];
     ringCfgs.forEach((cfg, i) => {
       const handle = createTerrainMaterial({
-        map: terrainTex,
         polygonOffsetFactor: 2 + i * 3,
         name: `terrain-${cfg.name}`,
+        variant: i === 0 ? 'near' : 'far',
       });
       this.ringMats.push(handle);
-      const ring = new TerrainRing(cfg, handle.material);
+      const ringCfg = i === 0 ? { ...cfg, res: quality.nearRingRes } : cfg;
+      const ring = new TerrainRing(ringCfg, handle.material);
       this.rings.push(ring);
       scene.add(ring.mesh);
     });
     scene.add(this.water.mesh);
+    if (textures) {
+      this.unsubTextures = textures.onReady(() => {
+        if (this.disposed) return;
+        const arrays = textures.getTerrain();
+        for (const m of this.ringMats) m.setTextures(arrays, this.quality);
+        this.applyTerrainWeather();
+      });
+    }
     const groundGeo = new THREE.PlaneGeometry(3600, 3600);
     this.ground = new THREE.Mesh(groundGeo, this.groundMat);
     this.ground.rotation.x = -Math.PI / 2;
@@ -321,8 +344,20 @@ export class TileManager {
     const groundHex =
       weather === 'snow' ? 0xd8e0e6 : weather === 'rain' ? 0x2f4a32 : 0x3d5a3d;
     this.groundMat.color.setHex(groundHex);
+    this.applyTerrainWeather();
+  }
+
+  private applyTerrainWeather(): void {
+    const weather = this.weather;
+    const textured = !!this.textures?.ready;
     for (const m of this.ringMats) {
-      m.material.color.setHex(weather === 'snow' ? 0xe6ecf0 : weather === 'rain' ? 0xa6b0a6 : 0xffffff);
+      if (textured) {
+        // Splat shader handles snow cover / wet darkening itself
+        m.material.color.setHex(0xffffff);
+        m.setWeather(weather === 'snow' ? 1 : 0, weather === 'rain' ? 1 : 0);
+      } else {
+        m.material.color.setHex(weather === 'snow' ? 0xe6ecf0 : weather === 'rain' ? 0xa6b0a6 : 0xffffff);
+      }
     }
   }
 
@@ -1091,6 +1126,8 @@ export class TileManager {
       ring.dispose();
     }
     this.rings = [];
+    this.unsubTextures?.();
+    this.unsubTextures = null;
     for (const m of this.ringMats) m.material.dispose();
     this.ringMats = [];
     this.scene.remove(this.water.mesh);
