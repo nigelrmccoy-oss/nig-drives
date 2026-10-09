@@ -347,6 +347,17 @@ export class TileManager {
     }
   }
 
+  /** ≥ 40 % of a 5×5 sample grid over the tile is sea / lake / OSM water. */
+  private tileMostlyWater(b: { south: number; west: number; north: number; east: number }): boolean {
+    let wet = 0;
+    for (let j = 0; j < 5; j++)
+      for (let i = 0; i < 5; i++) {
+        const p = this.origin.toLocal(b.south + ((j + 0.5) / 5) * (b.north - b.south), b.west + ((i + 0.5) / 5) * (b.east - b.west));
+        if (this.isWaterLocal(p.x, p.z)) wet++;
+      }
+    return wet >= 10;
+  }
+
   /** Water polygon under (x, z)? (0..1) */
   waterAt(x: number, z: number): number {
     return this.waterMap.sample(x, z, this.areaTmp).water;
@@ -846,7 +857,10 @@ export class TileManager {
           });
       }
 
-      if (freshWays.length === 0) {
+      if (freshWays.length === 0 && this.tileMostlyWater(b)) {
+        // v1.3.3: OSM answered and the tile is open water (SF Bay, Lake
+        // Ontario): no offline grid roads floating on the water.
+      } else if (freshWays.length === 0) {
         await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
       } else {
