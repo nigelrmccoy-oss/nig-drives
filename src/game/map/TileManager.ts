@@ -675,7 +675,7 @@ export class TileManager {
 
     try {
       if (this.forceOffline) {
-        this.applyTileFallback(entry, heightAt);
+        await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Forced offline roads · tile ${key}`);
       } else {
       const result = await this.client.fetchTile(
@@ -705,7 +705,7 @@ export class TileManager {
       });
 
       if (freshWays.length === 0) {
-        this.applyTileFallback(entry, heightAt);
+        await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
       } else {
         entry.ways = freshWays;
@@ -750,7 +750,7 @@ export class TileManager {
         return;
       }
       console.warn('Tile load failed — offline fallback', key, err);
-      this.applyTileFallback(entry, heightAt);
+      await this.applyTileFallback(entry, heightAt);
       this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
     } finally {
       this.finishLoading(key);
@@ -762,10 +762,10 @@ export class TileManager {
     if (current) current.loading = false;
   }
 
-  private applyTileFallback(
+  private async applyTileFallback(
     entry: TileEntry,
     heightAt: (lat: number, lon: number) => number,
-  ): void {
+  ): Promise<void> {
     if (entry.cancelled || this.disposed) return;
     this.usedOfflineFallback = true;
     entry.usedFallback = true;
@@ -777,7 +777,13 @@ export class TileManager {
     entry.fillSeed = entry.tx * 997 + entry.ty * 131 + 7;
     const before = this.provisionalSamples;
     void heightAt;
-    const { group, centerlines } = this.builder.buildWays(ways, this.profileEnv());
+    // P3: yields between ways so a 5×5 offline grid doesn't stall the frame
+    const fixed = ways.map((w) => (w.tags.surface ? w : { ...w, tags: { ...w.tags, surface: 'asphalt' } }));
+    const { group, centerlines } = await this.builder.buildWaysAsync(fixed, this.profileEnv());
+    if (entry.cancelled || this.disposed) {
+      disposeGroup(group);
+      return;
+    }
     entry.centerlines = centerlines;
     this.roadIndex.add(centerlines);
     entry.group.add(group);
