@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const SLICE_MS = 5;
+function nextSlice(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 0));
+}
 import type { OsmWay } from './OverpassClient';
 import type { GeoOrigin } from './geo';
 import type { RoadCenterline } from './RoadBuilder';
@@ -112,16 +118,33 @@ export class BuildingBuilder {
     for (const m of this.materials) m.emissiveIntensity = e;
   }
 
-  build(
+  /**
+   * v1.3.2 P3: built in ~5 ms slices (no long main-thread stalls on dense
+   * tiles) and merged into one mesh per shared material (draw calls per tile
+   * drop from hundreds to ≤ the palette size).
+   */
+  async buildAsync(
     buildings: OsmWay[],
     origin: GeoOrigin,
     heightAt?: (lat: number, lon: number) => number,
-  ): THREE.Group {
+    isCancelled: () => boolean = () => false,
+  ): Promise<THREE.Group> {
     const group = new THREE.Group();
     group.name = 'buildings';
+    const byMat: THREE.BufferGeometry[][] = this.materials.map(() => []);
+    let count = 0;
+    let t0 = performance.now();
 
     let i = 0;
     for (const b of buildings) {
+      if (performance.now() - t0 > SLICE_MS) {
+        await nextSlice();
+        t0 = performance.now();
+        if (isCancelled()) {
+          for (const list of byMat) for (const g of list) g.dispose();
+          return group;
+        }
+      }
       if (b.geometry.length < 3) continue;
 
       const localRaw: Array<{ x: number; z: number; lat: number; lon: number }> = [];
@@ -213,17 +236,29 @@ export class BuildingBuilder {
         uv.needsUpdate = true;
       }
 
-      const mat = this.materials[i % this.materials.length];
+      geo.translate(cx, minY - PLINTH_M, cz);
+      byMat[i % this.materials.length].push(geo);
       i++;
-      const mesh = new THREE.Mesh(geo, mat);
+      count++;
+    }
 
-      mesh.position.set(cx, minY - PLINTH_M, cz);
+    this.addMerged(group, byMat);
+    group.userData.count = count;
+    return group;
+  }
+
+  private addMerged(group: THREE.Group, byMat: THREE.BufferGeometry[][]): void {
+    byMat.forEach((list, mi) => {
+      if (!list.length) return;
+      const merged = list.length === 1 ? list[0] : mergeGeometries(list, false);
+      if (list.length > 1) for (const g of list) g.dispose();
+      if (!merged) return;
+      merged.computeBoundingSphere();
+      const mesh = new THREE.Mesh(merged, this.materials[mi]);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
-    }
-
-    return group;
+    });
   }
 
   /**
@@ -238,6 +273,8 @@ export class BuildingBuilder {
   ): THREE.Group {
     const group = new THREE.Group();
     group.name = 'buildings-fill';
+    group.userData.count = 0;
+    const byMat: THREE.BufferGeometry[][] = this.materials.map(() => []);
     const maxCount = Math.max(0, Math.min(220, opts.maxCount));
     if (maxCount === 0 || centerlines.length === 0) return group;
 
@@ -333,14 +370,10 @@ export class BuildingBuilder {
             uv.needsUpdate = true;
           }
 
-          const mat = this.materials[added % this.materials.length];
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(bx, baseY + totalH * 0.5, bz);
-          // Align long axis roughly with road
-          mesh.rotation.y = rot;
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          group.add(mesh);
+          // Align long axis roughly with road, then bake the transform for merging
+          geo.rotateY(rot);
+          geo.translate(bx, baseY + totalH * 0.5, bz);
+          byMat[added % this.materials.length].push(geo);
           placed.push({ x: bx, z: bz });
           added++;
           nextAt += 20 + rnd() * 14;
@@ -348,6 +381,8 @@ export class BuildingBuilder {
       }
     }
 
+    this.addMerged(group, byMat);
+    group.userData.count = added;
     return group;
   }
 

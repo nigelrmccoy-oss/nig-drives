@@ -487,7 +487,7 @@ export class Vehicle {
       const k = this.transmission.mode === 'auto' ? 0.5 : 1;
       engBrake =
         -Math.sign(this.vz) *
-        ((0.25 + 0.9 * Math.min(revs, 1)) * this.transmission.torqueMul() * k + Math.max(0, revs - 1) * 25);
+        ((0.25 + 0.9 * Math.min(revs, 1)) * this.transmission.torqueMul() * k + Math.min(Math.max(0, revs - 1), 1) * 3);
     }
     let longDemand = engAx - drag + brakeAx + engBrake;
 

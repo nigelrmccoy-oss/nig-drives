@@ -580,6 +580,9 @@ export class TileManager {
   }
 
   findNearestRoadPoint(x: number, z: number): { x: number; z: number; y: number } | null {
+    // v1.3.2 P3: spatial index first (snaps onto the segment, not just a vertex)
+    const hit = this.roadIndex.nearest(x, z, 600, (l) => l.structure === 'ground');
+    if (hit && Number.isFinite(hit.y)) return { x: hit.x, z: hit.z, y: hit.y };
     let best: { x: number; z: number; y: number; d: number } | null = null;
     for (const line of this.centerlines) {
       if (line.structure !== 'ground') continue; // never spawn on a bridge deck / in a tunnel
@@ -962,9 +965,14 @@ export class TileManager {
     const heightAt = this.groundAtFn();
     let buildingCount = 0;
     if (entry.buildings.length) {
-      const bldg = this.buildings.build(entry.buildings, this.origin, heightAt);
+      const bldg = await this.buildings.buildAsync(
+        entry.buildings,
+        this.origin,
+        heightAt,
+        () => this.disposed || entry.cancelled,
+      );
       group.add(bldg);
-      buildingCount += bldg.children.length;
+      buildingCount += (bldg.userData.count as number | undefined) ?? 0;
     }
     if (entry.fillCount > 0) {
       const fill = this.buildings.buildFillers(centerlines, this.origin, heightAt, {
@@ -972,7 +980,7 @@ export class TileManager {
         seed: entry.fillSeed,
       });
       group.add(fill);
-      buildingCount += fill.children.length;
+      buildingCount += (fill.userData.count as number | undefined) ?? 0;
     }
     return {
       group,
@@ -1136,6 +1144,7 @@ export class TileManager {
     this.junctionRegistry.clear();
     this.scene.remove(this.ground);
     this.ground.geometry.dispose();
+    this.groundMat.map?.dispose();
     this.groundMat.dispose();
     this.builder.dispose();
     this.buildings.dispose();
