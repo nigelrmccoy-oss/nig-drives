@@ -1,17 +1,25 @@
 import * as THREE from 'three';
 import type { RoadCenterline } from './RoadBuilder';
 
-/** Highways that get world name/ref sprites when tagged. */
+/**
+ * Highways that get world name/ref sprites when tagged. v1.3.4 owner rule:
+ * street labels stay cleared, so only major roads (as in 1.3.1e) are named;
+ * residential / living_street / service / unclassified names never show.
+ */
 const LABELABLE = new Set([
   'motorway',
   'trunk',
   'primary',
   'secondary',
   'tertiary',
-  'unclassified',
-  'residential',
-  'living_street',
 ]);
+/** Never labelled, even if a future edit widens LABELABLE. */
+const NEVER_LABEL = new Set(['residential', 'living_street', 'service', 'unclassified', 'track']);
+
+export function isLabelableHighway(highway: string | undefined): boolean {
+  if (!highway || NEVER_LABEL.has(highway)) return false;
+  return LABELABLE.has(highway);
+}
 
 const MAX_LABELS = 18;
 const SPACING_M = 140;
@@ -60,7 +68,7 @@ export class StreetLabels {
     const cands: Cand[] = [];
 
     for (const line of lines) {
-      if (!LABELABLE.has(line.highway)) continue;
+      if (!isLabelableHighway(line.highway)) continue;
       const text = (line.name || line.ref || '').trim();
       if (!text || text.length > 36) continue;
       const pts = line.points;
