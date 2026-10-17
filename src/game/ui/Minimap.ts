@@ -39,6 +39,7 @@ export class Minimap {
     });
     this.root.appendChild(dismiss);
     parent.appendChild(this.root);
+    this.publishWidth();
     this.ctx = this.canvas.getContext('2d')!;
 
     this.root.addEventListener('click', (e) => {
@@ -63,6 +64,17 @@ export class Minimap {
     this.canvas.height = s;
     const hint = this.root.querySelector('.minimap-hint');
     if (hint) hint.textContent = this.expanded ? 'MAP · Esc' : 'MAP';
+    this.publishWidth();
+  }
+
+  /**
+   * v1.3.4: the HUD top row reserves the minimap's corner (CSS --minimap-w),
+   * so the Weather / Time buttons are never underneath the map canvas,
+   * collapsed or expanded.
+   */
+  private publishWidth(): void {
+    const s = this.expanded ? this.expandedSize : this.size;
+    document.documentElement.style.setProperty('--minimap-w', `${s}px`);
   }
 
   collapse(): void {

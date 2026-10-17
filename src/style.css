@@ -195,7 +195,9 @@ canvas.game-canvas {
   position: absolute;
   top: 14px;
   left: 14px;
-  right: 14px;
+  /* v1.3.4: keep clear of the minimap corner (collapsed 132 px / expanded 220 px) */
+  right: calc(var(--minimap-w, 132px) + 28px);
+  transition: right 0.12s ease-out;
   display: flex;
   justify-content: space-between;
   gap: 12px;
