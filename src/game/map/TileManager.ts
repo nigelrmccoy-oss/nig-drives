@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { OverpassClient } from './OverpassClient';
 import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
-import { BuildingBuilder } from './BuildingBuilder';
+import { BuildingBuilder, type Footprint } from './BuildingBuilder';
+import { ShoreMask, SHORE_HALF_M, type ShoreClass, type ShoreLines } from './ShoreMask';
+import type { OsmNode } from './OverpassClient';
 import { WaterMap, assembleRings, type AreaClass, type AreaSample } from './WaterMap';
 import { isWaterTags, type OsmArea } from './OverpassClient';
 import { StreetLabels } from './StreetLabels';
@@ -54,6 +56,16 @@ const COARSE_DEM_ZOOM = 11;
 const MAX_PENDING_TILES = 12;
 /** Max tiles kept loaded (Chebyshev neighborhood soft cap). */
 const MAX_LOADED_TILES = 36;
+/** v1.3.4: OSM-dry shore cells the DEM had sunk are lifted to at least this far above the lake. */
+const SHORE_LAND_M = 0.3;
+/** Terrain vertices are kept at least this far off the lake / sea plane (z-fighting). */
+const WATER_PLANE_GAP_M = 0.15;
+/** Re-centre the shore mask when the player is this far from its centre. */
+const SHORE_RECENTRE_M = 350;
+/** OSM shore lines are fetched for the mask window plus this margin. */
+const SHORE_FETCH_PAD_M = 1200;
+/** Car wheel contact sits this far under the lake / sea surface when it drives in. */
+const WATER_WADE_M = 0.55;
 
 export type TileStatusListener = (info: {
   loading: number;
@@ -92,6 +104,15 @@ interface TileEntry {
   fillSeed: number;
   /** Re-height attempts so a tile can never rebuild in a loop. */
   reheights: number;
+  /** Solid building footprints in this tile (push-out collision). */
+  footprints?: Footprint[];
+}
+
+export interface WaterInfo {
+  /** Height the car wades at. */
+  y: number;
+  /** Water surface height. */
+  surface: number;
 }
 
 const MAX_REHEIGHTS = 3;
@@ -139,7 +160,13 @@ export class TileManager {
   private lakeMode = false;
   private waterMap = new WaterMap();
   private areaTmp: AreaSample = { water: 0, level: Number.NaN, park: 0, forest: 0, farm: 0 };
-  private ringWaterVersion: number[] = [-1, -1, -1];
+  private ringWaterVersion: string[] = ['', '', ''];
+  /** v1.3.4 near-camera Great-Lake shoreline (DEM + OSM shore lines). */
+  private shore = new ShoreMask();
+  private shoreLines: { minX: number; minZ: number; maxX: number; maxZ: number; lines: ShoreLines } | null = null;
+  private shoreFetching = false;
+  private shoreFetchRetryAt = 0;
+  private shoreStale = false;
   private waterTime = 0;
   /** Count of heights served from a non-fine source since last reset. */
   private provisionalSamples = 0;
@@ -185,6 +212,10 @@ export class TileManager {
     this.builder = new RoadBuilder(textures);
     this.buildings = new BuildingBuilder(textures);
     this.buildings.skipAt = (x, z) => this.isWaterLocal(x, z);
+    this.buildings.roadAt = (x, z) => {
+      const hit = this.roadIndex.nearest(x, z, 16);
+      return !!hit && Math.sqrt(hit.distSq) < (hit.line.width ?? 6) * 0.5 + 1.5;
+    };
 
     const terrainTex = makeTerrainTexture();
     this.groundMat = new THREE.MeshStandardMaterial({
@@ -283,9 +314,47 @@ export class TileManager {
     if (this.waterMap.size && this.waterMap.sample(x, z, this.areaTmp).water > 0.5) return true;
     if (this.seaRel < -1e5) return false;
     const before = this.provisionalSamples;
-    const y = this.demHeightLocal(x, z);
+    const y = this.shoreAdjust(x, z, this.demHeightLocal(x, z));
     this.provisionalSamples = before;
     return y <= this.seaRel - 1;
+  }
+
+  /**
+   * v1.3.4: inside the near-camera shore mask the lake / land split follows
+   * OSM (and the 2.5 m raster), not the 7 m DEM: water cells are sunk under
+   * the plane, dry cells the DEM had sunk are lifted just above it.
+   */
+  private shoreAdjust(x: number, z: number, dem: number): number {
+    if (!this.lakeMode || !this.shore.ready) return dem;
+    const w = this.shore.sample(x, z);
+    if (Number.isNaN(w)) return dem;
+    const sunk = this.seaRel - 1.5;
+    const landY = dem < this.seaRel + SHORE_LAND_M ? this.seaRel + SHORE_LAND_M : dem;
+    if (w <= 0.3) return landY;
+    if (w >= 0.7) return sunk;
+    const t = (w - 0.3) / 0.4;
+    return landY + (sunk - landY) * t * t * (3 - 2 * t);
+  }
+
+  /** Lake / sea / OSM water under (x, z) → wading height, else null. */
+  waterInfo(x: number, z: number, groundY?: number): WaterInfo | null {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    if (this.waterMap.size) {
+      const s = this.waterMap.sample(x, z, this.areaTmp);
+      if (s.water > 0.5) {
+        const g = groundY ?? this.groundHeight(x, z);
+        const surf = Number.isFinite(s.level) ? s.level : g + 0.6;
+        return { y: g, surface: surf };
+      }
+    }
+    if (this.seaRel < -1e5) return null;
+    if (!this.isWaterLocal(x, z)) return null;
+    return { y: this.seaRel - WATER_WADE_M, surface: this.seaRel };
+  }
+
+  /** Relative height of the lake / sea plane (−1e6 when there is none). */
+  getSeaLevel(): number {
+    return this.seaRel;
   }
 
   /**
@@ -294,6 +363,7 @@ export class TileManager {
    * Leaves the full sample in this.areaTmp for the caller.
    */
   private applyWater(x: number, z: number, dem: number): number {
+    dem = this.shoreAdjust(x, z, dem);
     const s = this.waterMap.sample(x, z, this.areaTmp);
     if (s.water <= 0) return dem;
     const yW = Number.isFinite(s.level) ? s.level : dem - 0.6;
@@ -521,6 +591,13 @@ export class TileManager {
       this.origin.lon + 0.11,
     );
 
+    if (this.lakeMode) {
+      // v1.3.4: DEM shore mask before anything is placed (OSM lines follow in the background)
+      this.emitStatus('Mapping the shoreline…');
+      await Promise.race([this.refreshShore(0, 0), new Promise<void>((r) => setTimeout(r, 8_000))]);
+      if (this.disposed) return;
+    }
+
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
     this.emitStatus(
       this.forceOffline
@@ -531,6 +608,17 @@ export class TileManager {
     if (this.disposed) return;
 
     if (!this.hasAnyRoads()) {
+      // Fallback grid is masked against water: make sure the 3×3 DEM is in
+      const tb0 = tileBounds(tx - 1, ty + 1);
+      const tb1 = tileBounds(tx + 1, ty - 1);
+      await this.elevation.preloadArea(
+        Math.min(tb0.south, tb1.south),
+        Math.min(tb0.west, tb1.west),
+        Math.max(tb0.north, tb1.north),
+        Math.max(tb0.east, tb1.east),
+        6_000,
+      );
+      if (this.disposed) return;
       this.buildFallbackGrid();
       this.usedOfflineFallback = true;
       this.emitStatus(
@@ -617,6 +705,15 @@ export class TileManager {
 
     void this.pumpQueue();
     this.checkLateDem();
+    if (
+      this.lakeMode &&
+      !this.shore.building &&
+      (this.shoreStale ||
+        !this.shore.ready ||
+        Math.max(Math.abs(playerX - this.shore.centerX), Math.abs(playerZ - this.shore.centerZ)) > SHORE_RECENTRE_M)
+    ) {
+      void this.refreshShore(playerX, playerZ);
+    }
     this.ground.position.x = playerX;
     this.ground.position.z = playerZ;
 
@@ -669,18 +766,20 @@ export class TileManager {
       kind: 'dirt',
     };
     if (!Number.isFinite(x) || !Number.isFinite(z)) return offRoad;
-    if (this.waterMap.size && this.waterAt(x, z) > 0.5) {
-      offRoad.label = 'Water';
-      offRoad.grip *= 0.45;
-      offRoad.noise = 0.05;
-    }
+    // v1.3.4: lake / sea / river → 'Water': almost no traction, the car wades
+    // (Game adds drag, a splash and a reset to the last dry road point).
+    const wet = (): SurfaceSample => {
+      const wi = this.waterInfo(x, z, groundY);
+      if (!wi) return offRoad;
+      return { roadFactor: 0, height: wi.y, grip: 0.1, noise: 0.05, label: 'Water', kind: 'water' };
+    };
 
     const near = this.roadIndex.nearest(x, z, ROAD_HEIGHT_RADIUS + 8, undefined, preferY);
-    if (!near) return offRoad;
+    if (!near) return wet();
     const line = near.line;
     // A tunnel only counts once you're actually down at its level (through the portal)
     if (line.structure === 'tunnel' && (preferY === undefined || Math.abs(near.y - preferY) > 3)) {
-      return offRoad;
+      return wet();
     }
     const dist = Math.sqrt(near.distSq);
     const half = Math.max(1.5, (line.width ?? 6.4) * 0.5);
@@ -707,6 +806,11 @@ export class TileManager {
     }
     if (!Number.isFinite(height)) height = groundY;
 
+    // Off the asphalt (and not on a bridge deck): water wins over dirt
+    if (roadFactor <= 0.5 && !(line.structure !== 'ground' && dist <= half + 1.5)) {
+      const w = wet();
+      if (w.kind === 'water') return w;
+    }
     const profile: SurfaceProfile = line.surface;
     const grip = effectiveGrip(profile, roadFactor, this.weather);
     return {
@@ -891,6 +995,7 @@ export class TileManager {
         entry.group.add(built.group);
         entry.centerlines = built.centerlines;
         entry.provisional = built.provisional;
+        this.collectFootprints(entry);
         this.rebuildCenterlineIndex();
         const bldgCount = built.buildingCount;
 
@@ -925,7 +1030,7 @@ export class TileManager {
     if (entry.cancelled || this.disposed) return;
     this.usedOfflineFallback = true;
     entry.usedFallback = true;
-    const ways = this.makeGridWaysForTile(entry.tx, entry.ty);
+    const ways = this.maskWaysAgainstWater(this.makeGridWaysForTile(entry.tx, entry.ty));
     entry.ways = ways;
     entry.buildings = [];
     // Offline tiles have no OSM footprints — seed block-fill buildings
@@ -948,6 +1053,7 @@ export class TileManager {
       seed: entry.fillSeed,
     });
     entry.group.add(fill);
+    this.collectFootprints(entry);
     entry.provisional = this.provisionalSamples > before;
     this.scene.add(entry.group);
     this.rebuildCenterlineIndex();
@@ -1023,7 +1129,15 @@ export class TileManager {
       );
       if (this.disposed) return;
     }
-    const waterVersion = this.waterMap.version;
+    const waterVersion = this.areaVersion();
+    const plane = this.water.mesh.visible && this.seaRel > -1e5 ? this.seaRel : Number.NaN;
+    // v1.3.4: keep vertices off the lake / sea plane so the shore band can't z-fight
+    const offPlane = (y: number): number => {
+      if (Number.isNaN(plane)) return y;
+      const d = y - plane;
+      if (d > -WATER_PLANE_GAP_M && d < WATER_PLANE_GAP_M) return d >= 0 ? plane + WATER_PLANE_GAP_M : plane - WATER_PLANE_GAP_M;
+      return y;
+    };
     const heightAt = (wx: number, wz: number): RingSample => {
       const dem = this.applyWater(wx, wz, this.ringDem(index, wx, wz));
       const a = this.areaTmp;
@@ -1033,9 +1147,9 @@ export class TileManager {
       const farm = a.farm;
       if (index === 0) {
         const c = this.carveAt(wx, wz, dem, cell);
-        return { y: c.y, verge: c.verge * (1 - Math.min(1, water * 2)), water, park, forest, farm };
+        return { y: offPlane(c.y), verge: c.verge * (1 - Math.min(1, water * 2)), water, park, forest, farm };
       }
-      return { y: dem, verge: 0, water, park, forest, farm };
+      return { y: offPlane(dem), verge: 0, water, park, forest, farm };
     };
     const ok = await ring.build(c.x, c.z, heightAt, () => this.disposed);
     if (!ok || this.disposed) return;
@@ -1078,7 +1192,7 @@ export class TileManager {
       // New lakes / parks streamed in (throttled like the road re-carve)
       if (
         !want &&
-        this.ringWaterVersion[i] !== this.waterMap.version &&
+        this.ringWaterVersion[i] !== this.areaVersion() &&
         now - ring.lastBuildAt > CARVE_REBUILD_MS * (i + 1)
       ) {
         want = true;
@@ -1088,6 +1202,217 @@ export class TileManager {
         void this.rebuildRing(i, cx, pz);
       }
     }
+  }
+
+  /** Water polygons + shore mask version (rings re-sample when it changes). */
+  private areaVersion(): string {
+    return `${this.waterMap.version}:${this.shore.version}`;
+  }
+
+  /** DEM class for the shore mask (fine z14, z12 stand-in; 3 = no DEM yet). */
+  private shoreClass = (x: number, z: number): ShoreClass => {
+    const ll = this.origin.toLatLon(x, z);
+    let v = this.elevation.sampleRelative(ll.lat, ll.lon);
+    if (v === null) v = this.midElevation.sampleRelative(ll.lat, ll.lon);
+    if (v === null) return 3;
+    const d = v - this.seaRel;
+    return d < LAKE_FLAT_M ? 1 : d < LAKE_NOISE_M ? 2 : 0;
+  };
+
+  private shoreLinesFor(cx: number, cz: number): ShoreLines | null {
+    const c = this.shoreLines;
+    if (!c) return null;
+    if (cx - SHORE_HALF_M < c.minX || cx + SHORE_HALF_M > c.maxX || cz - SHORE_HALF_M < c.minZ || cz + SHORE_HALF_M > c.maxZ) {
+      return null;
+    }
+    return c.lines;
+  }
+
+  /** (Re)build the near-camera shore mask around (px, pz); fetch OSM shore lines in the background. */
+  private async refreshShore(px: number, pz: number): Promise<void> {
+    if (!this.lakeMode || this.shore.building || this.disposed) return;
+    this.shore.building = true;
+    this.shoreStale = false;
+    try {
+      const cx = Math.round(px / 25) * 25;
+      const cz = Math.round(pz / 25) * 25;
+      const a = this.origin.toLatLon(cx - SHORE_HALF_M, cz - SHORE_HALF_M);
+      const b = this.origin.toLatLon(cx + SHORE_HALF_M, cz + SHORE_HALF_M);
+      await this.elevation.preloadArea(
+        Math.min(a.lat, b.lat),
+        Math.min(a.lon, b.lon),
+        Math.max(a.lat, b.lat),
+        Math.max(a.lon, b.lon),
+        6_000,
+      );
+      if (this.disposed) return;
+      const lines = this.shoreLinesFor(cx, cz);
+      await this.shore.build(cx, cz, this.shoreClass, lines, () => this.disposed);
+      if (!lines && !this.forceOffline) void this.fetchShoreLines(cx, cz);
+    } finally {
+      this.shore.building = false;
+    }
+  }
+
+  private async fetchShoreLines(cx: number, cz: number): Promise<void> {
+    if (this.shoreFetching || this.disposed || performance.now() < this.shoreFetchRetryAt) return;
+    this.shoreFetching = true;
+    const r = SHORE_HALF_M + SHORE_FETCH_PAD_M;
+    const a = this.origin.toLatLon(cx - r, cz - r);
+    const b = this.origin.toLatLon(cx + r, cz + r);
+    const gen = this.fetchGen;
+    try {
+      const res = await this.client.fetchShore(
+        Math.min(a.lat, b.lat),
+        Math.min(a.lon, b.lon),
+        Math.max(a.lat, b.lat),
+        Math.max(a.lon, b.lon),
+        gen,
+      );
+      if (this.disposed || gen !== this.fetchGen) return;
+      const loc = (g: OsmNode[]) => g.map((n) => this.origin.toLocal(n.lat, n.lon));
+      this.shoreLines = {
+        minX: cx - r,
+        minZ: cz - r,
+        maxX: cx + r,
+        maxZ: cz + r,
+        lines: { barriers: res.barriers.map(loc), landAreas: res.landAreas.map(loc), landLines: res.landLines.map(loc) },
+      };
+      this.shoreStale = true;
+      this.emitStatus(`OSM shoreline: ${res.barriers.length} water edges, ${res.landAreas.length + res.landLines.length} piers`);
+    } catch {
+      // Overpass down: keep the DEM mask, try again later
+      this.shoreFetchRetryAt = performance.now() + 30_000;
+    } finally {
+      this.shoreFetching = false;
+    }
+  }
+
+  /** Shore-mask stats for QA (`__nig.game.tiles.shoreInfo()`). */
+  shoreInfo(): { ready: boolean; osm: boolean; centerX: number; centerZ: number; version: number } {
+    return { ready: this.shore.ready, osm: this.shore.osm, centerX: this.shore.centerX, centerZ: this.shore.centerZ, version: this.shore.version };
+  }
+
+  /**
+   * v1.3.4 P4: offline grid ways are cut per ~6 m against water (lake, sea,
+   * OSM water) so no fallback road deck runs across open water; dry runs
+   * shorter than 12 m are dropped.
+   */
+  private maskWaysAgainstWater(ways: OsmWay[]): OsmWay[] {
+    if (this.seaRel < -1e5 && !this.waterMap.size) return ways;
+    const out: OsmWay[] = [];
+    for (const w of ways) {
+      const g = w.geometry;
+      if (g.length < 2) continue;
+      const pa = this.origin.toLocal(g[0].lat, g[0].lon);
+      const pb = this.origin.toLocal(g[g.length - 1].lat, g[g.length - 1].lon);
+      const len = Math.hypot(pb.x - pa.x, pb.z - pa.z);
+      if (!(len > 1)) continue;
+      const n = Math.max(2, Math.ceil(len / 6));
+      const nx = -(pb.z - pa.z) / len;
+      const nz = (pb.x - pa.x) / len;
+      const dry: boolean[] = [];
+      for (let k = 0; k <= n; k++) {
+        const x = pa.x + ((pb.x - pa.x) * k) / n;
+        const z = pa.z + ((pb.z - pa.z) * k) / n;
+        dry.push(
+          !this.isWaterLocal(x, z) && !this.isWaterLocal(x + nx * 6, z + nz * 6) && !this.isWaterLocal(x - nx * 6, z - nz * 6),
+        );
+      }
+      if (dry.every(Boolean)) {
+        out.push(w);
+        continue;
+      }
+      let run = 0;
+      let k0 = -1;
+      for (let k = 0; k <= n + 1; k++) {
+        if (k <= n && dry[k]) {
+          if (k0 < 0) k0 = k;
+          continue;
+        }
+        if (k0 >= 0 && ((k - 1 - k0) * len) / n >= 12) {
+          const t0 = k0 / n;
+          const t1 = (k - 1) / n;
+          const lerp = (t: number) => ({
+            lat: g[0].lat + (g[g.length - 1].lat - g[0].lat) * t,
+            lon: g[0].lon + (g[g.length - 1].lon - g[0].lon) * t,
+          });
+          out.push({ id: w.id * 16 + run++, tags: w.tags, geometry: [lerp(t0), lerp(t1)] });
+        }
+        k0 = -1;
+      }
+    }
+    return out;
+  }
+
+  private collectFootprints(entry: TileEntry): void {
+    const fps: Footprint[] = [];
+    entry.group.traverse((o) => {
+      const f = o.userData.footprints as Footprint[] | undefined;
+      if (f) fps.push(...f);
+    });
+    entry.footprints = fps;
+  }
+
+  /**
+   * v1.3.4 P2: building push-out. Returns the displacement + outward normal
+   * that moves a car of radius `r` at (x, z) out of the nearest solid
+   * footprint, or null. OSM buildings only collide off-road (some OSM
+   * footprints overlap carriageways); procedural fillers always do.
+   */
+  pushOutOfBuildings(x: number, z: number, r: number, onRoad: boolean): { dx: number; dz: number; nx: number; nz: number } | null {
+    const ll = this.origin.toLatLon(x, z);
+    const { tx, ty } = latLonToTile(ll.lat, ll.lon);
+    let best: { dx: number; dz: number; nx: number; nz: number; d: number } | null = null;
+    for (const e of this.tiles.values()) {
+      if (e.key !== 'fallback' && Math.max(Math.abs(e.tx - tx), Math.abs(e.ty - ty)) > 1) continue;
+      if (!e.footprints) continue;
+      for (const f of e.footprints) {
+        if (x < f.minX - r || x > f.maxX + r || z < f.minZ - r || z > f.maxZ + r) continue;
+        if (onRoad && !f.always) continue;
+        const pts = f.pts;
+        let inside = false;
+        let qd = Infinity;
+        let qx = 0;
+        let qz = 0;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const a = pts[j];
+          const b = pts[i];
+          if ((b.z > z) !== (a.z > z) && x < ((a.x - b.x) * (z - b.z)) / (a.z - b.z) + b.x) inside = !inside;
+          const abx = b.x - a.x;
+          const abz = b.z - a.z;
+          const l2 = abx * abx + abz * abz;
+          let t = l2 > 1e-9 ? ((x - a.x) * abx + (z - a.z) * abz) / l2 : 0;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const px = a.x + abx * t;
+          const pz = a.z + abz * t;
+          const d = (x - px) ** 2 + (z - pz) ** 2;
+          if (d < qd) {
+            qd = d;
+            qx = px;
+            qz = pz;
+          }
+        }
+        const dist = Math.sqrt(qd);
+        if (!inside && dist >= r) continue;
+        let nx: number;
+        let nz: number;
+        if (dist < 1e-4) {
+          nx = 1;
+          nz = 0;
+        } else if (inside) {
+          nx = (qx - x) / dist;
+          nz = (qz - z) / dist;
+        } else {
+          nx = (x - qx) / dist;
+          nz = (z - qz) / dist;
+        }
+        const push = inside ? dist + r : r - dist;
+        const cand = { dx: nx * push, dz: nz * push, nx, nz, d: push };
+        if (!best || cand.d > best.d) best = cand;
+      }
+    }
+    return best ? { dx: best.dx, dz: best.dz, nx: best.nx, nz: best.nz } : null;
   }
 
   private heightAtFn(): (lat: number, lon: number) => number {
@@ -1222,6 +1547,7 @@ export class TileManager {
       entry.group.add(built.group);
       entry.centerlines = built.centerlines;
       entry.provisional = built.provisional;
+      this.collectFootprints(entry);
       this.rebuildCenterlineIndex();
       this.emitStatus(`Re-heighted tile ${entry.key} with late elevation data`);
     } finally {
@@ -1244,7 +1570,7 @@ export class TileManager {
     const ways: OsmWay[] = [];
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        ways.push(...this.makeGridWaysForTile(tx + dx, ty + dy));
+        ways.push(...this.maskWaysAgainstWater(this.makeGridWaysForTile(tx + dx, ty + dy)));
       }
     }
     const before = this.provisionalSamples;
@@ -1258,7 +1584,7 @@ export class TileManager {
     group.add(roads);
     group.add(fill);
     this.scene.add(group);
-    this.tiles.set('fallback', {
+    const fbEntry: TileEntry = {
       key: 'fallback',
       tx,
       ty,
@@ -1276,7 +1602,9 @@ export class TileManager {
       fillCount: 200,
       fillSeed: tx * 17 + ty * 31,
       reheights: 0,
-    });
+    };
+    this.collectFootprints(fbEntry);
+    this.tiles.set('fallback', fbEntry);
     this.rebuildCenterlineIndex();
   }
 

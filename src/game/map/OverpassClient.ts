@@ -320,6 +320,34 @@ export class OverpassClient {
     return out.filter((a): a is OsmArea => !!a);
   }
 
+  /**
+   * v1.3.4: water-boundary ways (members of water multipolygons such as Lake
+   * Ontario, closed water ways, coastline) plus piers / breakwaters in a bbox,
+   * for the near-camera Great-Lake shoreline mask. Same mirror order as tiles.
+   */
+  async fetchShore(
+    south: number,
+    west: number,
+    north: number,
+    east: number,
+    expectGen?: number,
+  ): Promise<ShoreWays> {
+    const bb = `${south},${west},${north},${east}`;
+    const query = `[out:json][timeout:20];
+rel["natural"="water"](${bb})->.r;
+(way(r.r)(${bb});way["natural"="water"](${bb});way["natural"="coastline"](${bb}););
+out geom;
+way["man_made"~"^(pier|breakwater|groyne)$"](${bb});
+out geom;`;
+    await this.acquireSlot();
+    try {
+      const res = await this.runWaves(query, parseShore, expectGen);
+      return res.parsed;
+    } finally {
+      this.releaseSlot();
+    }
+  }
+
   private async postQuery<T>(
     endpoint: string,
     query: string,
@@ -393,6 +421,33 @@ function parseTile(data: OverpassJson): ParsedTile {
     buildings.length = 520;
   }
   return { ways, buildings, areas, relationIds };
+}
+
+export interface ShoreWays {
+  barriers: OsmNode[][];
+  landAreas: OsmNode[][];
+  landLines: OsmNode[][];
+}
+
+function parseShore(data: OverpassJson): ShoreWays {
+  const out: ShoreWays = { barriers: [], landAreas: [], landLines: [] };
+  const seen = new Set<number>();
+  for (const el of data.elements ?? []) {
+    if (el.type !== 'way' || seen.has(el.id)) continue;
+    seen.add(el.id);
+    const g = cleanGeom(el.geometry);
+    if (g.length < 2) continue;
+    const t = el.tags ?? {};
+    const closed =
+      g.length >= 4 && Math.abs(g[0].lat - g[g.length - 1].lat) < 1e-7 && Math.abs(g[0].lon - g[g.length - 1].lon) < 1e-7;
+    if (t.man_made === 'pier' || t.man_made === 'breakwater' || t.man_made === 'groyne') {
+      if (closed && t.area !== 'no') out.landAreas.push(g);
+      else out.landLines.push(g);
+      continue;
+    }
+    out.barriers.push(g);
+  }
+  return out;
 }
 
 function parseRelations(data: OverpassJson): Map<number, OsmArea> {

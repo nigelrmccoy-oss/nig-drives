@@ -16,6 +16,12 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel, type QualitySettings } from './visuals/Quality';
 import { TextureLibrary } from './visuals/TextureLibrary';
+import { Splash } from './visuals/Splash';
+
+/** v1.3.4: seconds in water before the car is put back on the last dry road point. */
+const WATER_RESET_S = 2.2;
+/** Car "radius" for building push-out (m). */
+const CAR_COLLIDE_R = 1.3;
 
 export interface GameStartOptions {
   vehicle: VehicleId;
@@ -45,6 +51,11 @@ export class Game {
   private post: PostFX;
   private pmrem: THREE.PMREMGenerator;
   private lastGroundY = 0;
+  /** v1.3.4 water stop: time in water, last dry on-road pose, splash. */
+  private waterTime = 0;
+  private lastDry: { x: number; z: number; y: number; heading: number } | null = null;
+  private lastDryAcc = 0;
+  private splash = new Splash();
   private quality: QualitySettings;
   readonly textures: TextureLibrary;
   private fpsFrames = 0;
@@ -204,6 +215,7 @@ export class Game {
       this.vehicle.position.y = snap.y;
       this.vehicle.mesh.position.y = snap.y;
       this.lastGroundY = snap.y;
+      this.lastDry = { x: snap.x, z: snap.z, y: snap.y, heading };
     } else {
       let y = this.tiles.getHeight(0, 0);
       if (!Number.isFinite(y)) y = 0;
@@ -222,9 +234,63 @@ export class Game {
     this.minimap.setVisible(true);
     this.loadingEl.classList.remove('visible');
 
+    this.waterTime = 0;
     this.running = true;
     this.lastT = performance.now();
     this.raf = requestAnimationFrame(this.frame);
+  }
+
+  /**
+   * v1.3.4 P1: water stops the car. In water: near-zero grip (TileManager),
+   * strong drag, a splash on entry, then after WATER_RESET_S it is put back on
+   * the last dry road point it drove over (or the nearest road).
+   */
+  private updateWater(dt: number, surfaceKind: string, roadFactor: number): void {
+    const v = this.vehicle!;
+    const tiles = this.tiles!;
+    if (this.splash.points.parent !== this.scene) this.scene.add(this.splash.points);
+    this.splash.update(dt);
+    if (surfaceKind === 'water') {
+      if (this.waterTime === 0) {
+        const sea = tiles.getSeaLevel();
+        const y = sea > -1e5 && Math.abs(sea - v.position.y) < 3 ? sea : v.position.y + 0.4;
+        this.splash.trigger(v.position.x, y, v.position.z, v.speed, Math.sin(v.heading), Math.cos(v.heading));
+        this.hud.setStatus('Water! The car will be reset to the road…');
+      }
+      this.waterTime += dt;
+      v.applyWaterDrag(dt);
+      if (this.waterTime >= WATER_RESET_S) this.resetToDry();
+      return;
+    }
+    this.waterTime = 0;
+    this.lastDryAcc += dt;
+    if (roadFactor > 0.5 && this.lastDryAcc > 0.4) {
+      this.lastDryAcc = 0;
+      // only real ground roads (not decks/tunnels) that are not themselves wet
+      const p = tiles.findNearestRoadPoint(v.position.x, v.position.z);
+      if (p && Math.hypot(p.x - v.position.x, p.z - v.position.z) < 4 && !tiles.waterInfo(p.x, p.z)) {
+        this.lastDry = { x: p.x, z: p.z, y: p.y, heading: v.heading };
+      }
+    }
+  }
+
+  private resetToDry(): void {
+    const v = this.vehicle!;
+    const tiles = this.tiles!;
+    let d = this.lastDry;
+    if (!d) {
+      const p = tiles.findNearestRoadPoint(v.position.x, v.position.z);
+      if (p) d = { x: p.x, z: p.z, y: p.y, heading: v.heading };
+    }
+    if (!d) return;
+    v.setPose(d.x, d.z, d.heading);
+    v.position.y = d.y;
+    v.vy = 0;
+    v.mesh.position.y = d.y;
+    this.lastGroundY = d.y;
+    this.waterTime = 0;
+    this.chase.reset();
+    this.hud.setStatus('Reset to the last dry road point');
   }
 
   private cycleWeather(): void {
@@ -315,6 +381,16 @@ export class Game {
     );
     h = this.applyVertical(v, h, dt);
     this.vehicle.mesh.position.y = h;
+    this.updateWater(dt, surface.kind, surface.roadFactor);
+    // v1.3.4 P2: push the car out of building walls
+    const push = this.tiles.pushOutOfBuildings(v.position.x, v.position.z, CAR_COLLIDE_R, surface.roadFactor > 0.5);
+    if (push) {
+      v.position.x += push.dx;
+      v.position.z += push.dz;
+      v.blockAlong(push.nx, push.nz);
+      v.mesh.position.x = v.position.x;
+      v.mesh.position.z = v.position.z;
+    }
 
     if (
       !Number.isFinite(this.vehicle.position.x) ||
@@ -446,6 +522,7 @@ export class Game {
 
   dispose(): void {
     this.stopLoop();
+    this.splash.dispose();
     this.engineSound.dispose();
     this.minimap.dispose();
     this.input.dispose();

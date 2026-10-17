@@ -614,6 +614,34 @@ export class Vehicle {
     this.syncMesh();
   }
 
+  /** v1.3.4: water — heavy drag on every axis (no traction comes from the 0.1 grip). */
+  applyWaterDrag(dt: number, k = 3.2): void {
+    const f = Math.exp(-k * dt);
+    this.vx *= f;
+    this.vz *= f;
+    this.yawRate *= f;
+    this.speed = Math.hypot(this.vx, this.vz);
+  }
+
+  /** v1.3.4: wall contact — remove the velocity into the wall (world normal points out of it). */
+  blockAlong(nx: number, nz: number): void {
+    const c = Math.cos(this.heading);
+    const sn = Math.sin(this.heading);
+    let wx = sn * this.vz + c * this.vx;
+    let wz = c * this.vz - sn * this.vx;
+    const into = wx * nx + wz * nz;
+    if (into < 0) {
+      wx -= into * nx * 1.15;
+      wz -= into * nz * 1.15;
+      // scrub some speed along the wall too
+      wx *= 0.9;
+      wz *= 0.9;
+      this.vz = sn * wx + c * wz;
+      this.vx = c * wx - sn * wz;
+      this.speed = Math.hypot(this.vx, this.vz);
+    }
+  }
+
   getSpeedKmh(): number {
     return this.speed * 3.6;
   }
