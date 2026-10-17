@@ -20,6 +20,25 @@ const MAX_FOOTPRINT_AREA = 55_000;
  * slopes never float (downhill) or lose storeys (uphill).
  */
 const PLINTH_M = 1.5;
+/**
+ * v1.3.4 foundations: walls are sampled along each edge at most this far apart
+ * and each wall vertex starts PLINTH_M under ITS OWN ground (not the lowest
+ * point of the whole footprint), so walls neither sink metres under the uphill
+ * side nor float over dips between corners.
+ */
+const WALL_SAMPLE_M = 7;
+/** Footprint for building push-out collision (local metres, CCW). */
+export interface Footprint {
+  pts: Pt[];
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+  /** Procedural fillers are never on a road, so they always collide; OSM ones only off-road. */
+  always: boolean;
+}
+/** OSM building types that are roofs over open ground — never solid. */
+const NON_SOLID = new Set(['roof', 'carport', 'canopy', 'no', 'construction', 'ruins', 'bridge']);
 
 /** Stable 0–1 hash from OSM id (avoids Math.random flicker on tile reload). */
 function hash01(id: number): number {
@@ -229,14 +248,15 @@ class BuildingAccumulator {
     }
   }
 
-  wallQuad(p: Pt, q: Pt, yb: number, yt: number, u0: number, u1: number, base: number, c: THREE.Color, b: number[], w: number): void {
+  wallQuad(p: Pt, q: Pt, ybP: number, ybQ: number, yt: number, u0: number, u1: number, base: number, c: THREE.Color, b: number[], w: number): void {
     const dx = q.x - p.x;
     const dz = q.z - p.z;
     const len = Math.hypot(dx, dz) || 1;
     const nx = dz / len;
     const nz = -dx / len;
-    const a = this.vert(p.x, yb, p.z, nx, 0, nz, u0, yb - base, c, b, w);
-    const bb = this.vert(q.x, yb, q.z, nx, 0, nz, u1, yb - base, c, b, w);
+    // v stays world-height based (y − base) so per-vertex bottoms never stretch the facade
+    const a = this.vert(p.x, ybP, p.z, nx, 0, nz, u0, ybP - base, c, b, w);
+    const bb = this.vert(q.x, ybQ, q.z, nx, 0, nz, u1, ybQ - base, c, b, w);
     const cc = this.vert(q.x, yt, q.z, nx, 0, nz, u1, yt - base, c, b, w);
     const d = this.vert(p.x, yt, p.z, nx, 0, nz, u0, yt - base, c, b, w);
     this.idx.push(a, cc, bb, a, d, cc);
@@ -288,6 +308,10 @@ export class BuildingBuilder {
   private unsub: (() => void) | null = null;
   /** v1.3.3: footprints standing in water (lake / sea / OSM water polygon) are skipped. */
   skipAt: ((x: number, z: number) => boolean) | null = null;
+  /** v1.3.4: true when (x, z) is on / right next to a road surface (filler placement). */
+  roadAt: ((x: number, z: number) => boolean) | null = null;
+  /** Footprints of the solid buildings added since the last takeFootprints(). */
+  private footprints: Footprint[] = [];
 
   constructor(textures: TextureLibrary | null = null) {
     this.handle = createBuildingMaterial();
@@ -312,6 +336,7 @@ export class BuildingBuilder {
     tags: Record<string, string>,
     id: number,
     groundAt: ((x: number, z: number) => number) | null,
+    strict = false,
   ): boolean {
     const pts = cleanFootprint(local);
     if (pts.length < 3) return false;
@@ -327,30 +352,56 @@ export class BuildingBuilder {
     }
     cx /= ring.length;
     cz /= ring.length;
-    if (this.skipAt) {
-      if (this.skipAt(cx, cz)) return false;
-      let wet = 0;
-      for (const p of ring) if (this.skipAt(p.x, p.z)) wet++;
-      if (wet * 2 >= ring.length) return false;
+    // Densified outline: wall bottoms follow the ground every ≤ WALL_SAMPLE_M
+    let perim = 0;
+    for (let k = 0; k < ring.length; k++) {
+      const p = ring[k];
+      const q = ring[(k + 1) % ring.length];
+      perim += Math.hypot(q.x - p.x, q.z - p.z);
+    }
+    const step = Math.max(WALL_SAMPLE_M, perim / 64);
+    const dense: Pt[] = [];
+    for (let k = 0; k < ring.length; k++) {
+      const p = ring[k];
+      const q = ring[(k + 1) % ring.length];
+      const len = Math.hypot(q.x - p.x, q.z - p.z);
+      const n = Math.max(1, Math.ceil(len / step));
+      for (let i = 0; i < n; i++) dense.push({ x: p.x + ((q.x - p.x) * i) / n, z: p.z + ((q.z - p.z) * i) / n });
     }
 
+    if (this.skipAt) {
+      // v1.3.4: OSM footprints go if the centre or ≥ 1/3 of the outline is wet;
+      // procedural fillers (strict) if ANY outline sample is wet.
+      if (this.skipAt(cx, cz)) return false;
+      let wet = 0;
+      for (const p of dense) if (this.skipAt(p.x, p.z)) wet++;
+      if (strict ? wet > 0 : wet * 3 >= dense.length) return false;
+    }
+
+    const ys = new Array<number>(dense.length);
     let minY = Infinity;
     let maxY = -Infinity;
+    for (let i = 0; i < dense.length; i++) {
+      const y = groundAt ? groundAt(dense[i].x, dense[i].z) : 0;
+      ys[i] = Number.isFinite(y) ? y : Number.NaN;
+      if (Number.isFinite(y)) {
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
     if (groundAt) {
-      for (const p of [...ring, { x: cx, z: cz }]) {
-        const y = groundAt(p.x, p.z);
-        if (Number.isFinite(y)) {
-          minY = Math.min(minY, y);
-          maxY = Math.max(maxY, y);
-        }
+      const yc = groundAt(cx, cz);
+      if (Number.isFinite(yc)) {
+        minY = Math.min(minY, yc);
+        maxY = Math.max(maxY, yc);
       }
     }
     if (!Number.isFinite(minY) || !Number.isFinite(maxY)) minY = maxY = 0;
+    for (let i = 0; i < ys.length; i++) if (!Number.isFinite(ys[i])) ys[i] = minY;
     if (maxY - minY > 25) maxY = minY + 25;
 
     const height = buildingHeight(tags, id);
     const st = styleFor(tags, id, height, area);
-    const yb = minY - PLINTH_M;
     const yt = maxY + height;
     const seed = hash01(id * 3 + 1) * 0.999;
     const layer = LAYER_INDEX[st.layer];
@@ -358,12 +409,23 @@ export class BuildingBuilder {
     const winTop = yt - minY - 0.7;
 
     let u = 0;
-    for (let k = 0; k < ring.length; k++) {
-      const p = ring[k];
-      const q = ring[(k + 1) % ring.length];
+    for (let k = 0; k < dense.length; k++) {
+      const k2 = (k + 1) % dense.length;
+      const p = dense[k];
+      const q = dense[k2];
       const len = Math.hypot(q.x - p.x, q.z - p.z);
-      acc.wallQuad(p, q, yb, yt, u, u + len, minY, st.tint, wallB, winTop);
+      acc.wallQuad(p, q, ys[k] - PLINTH_M, ys[k2] - PLINTH_M, yt, u, u + len, minY, st.tint, wallB, winTop);
       u += len;
+    }
+    if (!NON_SOLID.has(tags.building ?? '') && !tags.layer?.startsWith('-')) {
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (const p of ring) {
+        if (p.x < x0) x0 = p.x;
+        if (p.x > x1) x1 = p.x;
+        if (p.z < z0) z0 = p.z;
+        if (p.z > z1) z1 = p.z;
+      }
+      this.footprints.push({ pts: ring.slice(), minX: x0, minZ: z0, maxX: x1, maxZ: z1, always: strict });
     }
 
     if (!(st.pitched && this.addGable(acc, ring, area, cx, cz, yt, minY, st, wallB))) {
@@ -480,6 +542,7 @@ export class BuildingBuilder {
     const mesh = acc.build(this.handle.material);
     if (mesh) group.add(mesh);
     group.userData.count = acc.count;
+    group.userData.footprints = this.takeFootprints();
     return group;
   }
 
@@ -542,7 +605,10 @@ export class BuildingBuilder {
           const cx = a.x + (b.x - a.x) * t;
           const cz = a.z + (b.z - a.z) * t;
           const side = rnd() < 0.5 ? -1 : 1;
-          const setback = half + 7 + rnd() * 9;
+          const w = 8 + rnd() * 14;
+          const d = 7 + rnd() * 12;
+          // v1.3.4: the near wall sits ≥ 3 m beyond the curb (1.3.3 could put it on the road)
+          const setback = half + 3 + d / 2 + rnd() * 6;
           const bx = cx + nx * side * setback;
           const bz = cz + nz * side * setback;
           if (
@@ -553,8 +619,6 @@ export class BuildingBuilder {
             nextAt += 18 + rnd() * 12;
             continue;
           }
-          const w = 8 + rnd() * 14;
-          const d = 7 + rnd() * 12;
           const main = hwy === 'primary' || hwy === 'secondary';
           const h = main ? 10 + rnd() * 22 : 6 + rnd() * 12;
           // footprint aligned with the road (along = (dx,dz), across = (nx,nz))
@@ -565,12 +629,20 @@ export class BuildingBuilder {
             z: bz + dz * sa * hw + nz * sb * hd,
           });
           const fp = [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)];
+          // Never on any road (crossing streets, other tiles' roads): corners, edge mids, centre
+          if (this.roadAt) {
+            const probes: Pt[] = [...fp, corner(0, -1), corner(0, 1), corner(-1, 0), corner(1, 0), { x: bx, z: bz }];
+            if (probes.some((p) => this.roadAt!(p.x, p.z))) {
+              nextAt += 18 + rnd() * 12;
+              continue;
+            }
+          }
           const fid = 7_000_000_000 + Math.floor(rnd() * 1e9);
           const tags = {
             building: main ? (rnd() < 0.6 ? 'commercial' : 'apartments') : rnd() < 0.55 ? 'house' : 'residential',
             height: h.toFixed(1),
           };
-          if (this.addBuilding(acc, fp, tags, fid, groundAt)) {
+          if (this.addBuilding(acc, fp, tags, fid, groundAt, true)) {
             placed.push({ x: bx, z: bz });
             added++;
           }
@@ -581,7 +653,14 @@ export class BuildingBuilder {
     const mesh = acc.build(this.handle.material);
     if (mesh) group.add(mesh);
     group.userData.count = added;
+    group.userData.footprints = this.takeFootprints();
     return group;
+  }
+
+  private takeFootprints(): Footprint[] {
+    const f = this.footprints;
+    this.footprints = [];
+    return f;
   }
 
   dispose(): void {
