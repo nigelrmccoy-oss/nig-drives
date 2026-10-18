@@ -167,6 +167,9 @@ export class TileManager {
   private shoreFetching = false;
   private shoreFetchRetryAt = 0;
   private shoreStale = false;
+  /** Shore mask classed (partly) from the z12 stand-in: rebuild once fine DEM lands. */
+  private shoreProvisional = false;
+  private shoreClassProv = false;
   private waterTime = 0;
   /** Count of heights served from a non-fine source since last reset. */
   private provisionalSamples = 0;
@@ -1213,7 +1216,10 @@ export class TileManager {
   private shoreClass = (x: number, z: number): ShoreClass => {
     const ll = this.origin.toLatLon(x, z);
     let v = this.elevation.sampleRelative(ll.lat, ll.lon);
-    if (v === null) v = this.midElevation.sampleRelative(ll.lat, ll.lon);
+    if (v === null) {
+      v = this.midElevation.sampleRelative(ll.lat, ll.lon);
+      this.shoreClassProv = true;
+    }
     if (v === null) return 3;
     const d = v - this.seaRel;
     return d < LAKE_FLAT_M ? 1 : d < LAKE_NOISE_M ? 2 : 0;
@@ -1247,7 +1253,9 @@ export class TileManager {
       );
       if (this.disposed) return;
       const lines = this.shoreLinesFor(cx, cz);
-      await this.shore.build(cx, cz, this.shoreClass, lines, () => this.disposed);
+      this.shoreClassProv = false;
+      const built = await this.shore.build(cx, cz, this.shoreClass, lines, () => this.disposed);
+      if (built) this.shoreProvisional = this.shoreClassProv;
       if (!lines && !this.forceOffline) void this.fetchShoreLines(cx, cz);
     } finally {
       this.shore.building = false;
@@ -1289,8 +1297,15 @@ export class TileManager {
   }
 
   /** Shore-mask stats for QA (`__nig.game.tiles.shoreInfo()`). */
-  shoreInfo(): { ready: boolean; osm: boolean; centerX: number; centerZ: number; version: number } {
-    return { ready: this.shore.ready, osm: this.shore.osm, centerX: this.shore.centerX, centerZ: this.shore.centerZ, version: this.shore.version };
+  shoreInfo(): { ready: boolean; osm: boolean; provisional: boolean; centerX: number; centerZ: number; version: number } {
+    return {
+      ready: this.shore.ready,
+      osm: this.shore.osm,
+      provisional: this.shoreProvisional,
+      centerX: this.shore.centerX,
+      centerZ: this.shore.centerZ,
+      version: this.shore.version,
+    };
   }
 
   /**
@@ -1507,6 +1522,14 @@ export class TileManager {
     this.reheightAcc = now;
     this.demDirty = false;
     if (this.waterMap.hasProvisional) this.waterMap.refreshLevels((r) => this.lakeLevel(r));
+    if (this.shoreProvisional) {
+      const a = this.origin.toLatLon(this.shore.centerX - SHORE_HALF_M, this.shore.centerZ - SHORE_HALF_M);
+      const b = this.origin.toLatLon(this.shore.centerX + SHORE_HALF_M, this.shore.centerZ + SHORE_HALF_M);
+      if (this.elevation.isAreaLoaded(Math.min(a.lat, b.lat), Math.min(a.lon, b.lon), Math.max(a.lat, b.lat), Math.max(a.lon, b.lon))) {
+        this.shoreProvisional = false;
+        this.shoreStale = true;
+      }
+    }
 
     this.rings.forEach((ring, i) => {
       if (ring.provisional && !ring.building && ring.builtOnce) {
