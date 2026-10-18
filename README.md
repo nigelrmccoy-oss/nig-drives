@@ -6,6 +6,16 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.4 (package 1.3.9) — Water stops the car, shoreline and QA fixes
+- **Street labels:** only major roads (motorway/trunk/primary/secondary/tertiary, as in 1.3.1e) get labels. Residential, living_street, service and unclassified names are never shown.
+- **Water:** lakes, the sea and rivers are a `Water` surface (grip 10 %, heavy drag, splash). After 2.2 s the car is put back on the last dry road point.
+- **HUD:** the top row leaves room for the minimap, so the Weather and Time buttons take mouse clicks whether the map is collapsed or expanded.
+- **Offline grid:** fallback roads are cut against water every ~6 m and fillers skip wet ground, so no grid is laid over Lake Ontario.
+- **Shoreline:** a 2.5 m Great-Lake shore mask near the camera. OSM shore lines (lake multipolygon members, piers, breakwaters) set the boundary when Overpass answers; otherwise the fine DEM is used.
+- **Shore z-fighting:** terrain is kept ≥ 15 cm off the water plane.
+- **Buildings:** each wall vertex has its own foundation (walls no longer sink or float). Fillers stay ≥ 3 m clear of every road, and the car is pushed out of building walls.
+- `<title>` now reads v1.3.4.
+
 ### v1.3.3 (package 1.3.8) — Textured buildings and real water
 
 - Buildings: shared facade texture-array material (brick, concrete, glass curtain wall), procedural whole-storey windows with faint night lights, styles from OSM tags (type, levels, colour, material), gable roofs on small houses.
@@ -126,7 +136,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.3**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.4**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 

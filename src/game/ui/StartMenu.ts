@@ -39,8 +39,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.3</span></h1>
-        <p class="tagline">v1.3.3: textured buildings with windows &amp; roofs · real lakes, rivers &amp; Lake Ontario · real hills · photoreal CC0 terrain.</p>
+        <h1>Nig Drives <span class="ver">v1.3.4</span></h1>
+        <p class="tagline">v1.3.4: water stops the car · OSM-accurate Lake Ontario shore · major-road labels only · textured buildings · real hills.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">
