@@ -176,19 +176,30 @@ export class Environment {
     this.onWeatherChange?.(this.weather);
   }
 
-  /** Jump time: morning → noon → dusk → night → morning… */
+  /**
+   * Jump time: dawn → day → dusk → night → dawn…
+   * v1.3.5: always forward to the next preset whose label differs, so the
+   * first click from the 0.38 "Day" start goes to Dusk (it used to land on
+   * 0.5 — still "Day", a barely visible change).
+   */
   cycleTimePreset(): void {
     const presets = [0.28, 0.5, 0.72, 0.92];
-    let best = 0;
-    let bestDist = 1;
-    for (let i = 0; i < presets.length; i++) {
-      const d = Math.abs(this.timeOfDay - presets[i]);
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
+    const label = this.getTimeLabel();
+    const now = this.timeOfDay;
+    let first = -1;
+    for (let k = 0; k < presets.length * 2; k++) {
+      // presets after `now`, wrapping round midnight
+      const i = k % presets.length;
+      const ahead = k < presets.length ? presets[i] > now + 0.005 : true;
+      if (!ahead) continue;
+      if (first < 0) first = i;
+      this.timeOfDay = presets[i];
+      if (this.getTimeLabel() !== label) {
+        this.applyVisuals();
+        return;
       }
     }
-    this.timeOfDay = presets[(best + 1) % presets.length];
+    this.timeOfDay = presets[first < 0 ? 0 : first];
     this.applyVisuals();
   }
 
