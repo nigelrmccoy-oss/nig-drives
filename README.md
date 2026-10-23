@@ -6,6 +6,14 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.5 (package 1.3.10) — Overpass resilience, bundled shoreline, load hitch
+- Overpass: 30 s attempts, `[timeout:25]`, identifying User-Agent (dev/preview proxy + Electron), mirror order de → mail.ru → kumi → coffee with backoff/cooldown on 429/5xx, 30 s spawn budget, and a 24 h IndexedDB last-good cache (stale cache used when every mirror fails).
+- Bundled western Lake Ontario shoreline (Hamilton → Toronto, plus Silver Lake / Laurel Creek / Columbia Lake), rasterised with an exact even-odd fill; piers stamped as land. Data © OpenStreetMap contributors, ODbL — see CREDITS.md. Humber shoreline offset 29.2 m → ~1.3 m median.
+- Terrain (ring, skirts and physics) is kept ≥ 17 cm off the water plane: 0 cells / 0 ring vertices within 15 cm.
+- No more sinking on mis-flagged shore cells: a DEM-only mask is ignored and physics follows the drawn mesh near the water.
+- Time button: the first click jumps to the next preset with a different label (Day → Dusk) and changes the sky.
+- Load freeze 1.4–1.7 s → ≤ ~0.3 s: cached road-texture noise, deferred road materials, and shaders precompiled behind the loading screen.
+
 ### v1.3.4 (package 1.3.9) — Water stops the car, shoreline and QA fixes
 - **Street labels:** only major roads (motorway/trunk/primary/secondary/tertiary, as in 1.3.1e) get labels. Residential, living_street, service and unclassified names are never shown.
 - **Water:** lakes, the sea and rivers are a `Water` surface (grip 10 %, heavy drag, splash). After 2.2 s the car is put back on the last dry road point.

@@ -39,7 +39,7 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.4</span></h1>
+        <h1>Nig Drives <span class="ver">v1.3.5</span></h1>
         <p class="tagline">v1.3.4: water stops the car · OSM-accurate Lake Ontario shore · major-road labels only · textured buildings · real hills.</p>
 
         <div class="section-label">Vehicle</div>
