@@ -54,6 +54,8 @@ export class TerrainRing {
   roadVersion = -1;
   lastBuildAt = 0;
   private generation = 0;
+  /** v1.3.5: water-plane height the skirt must stay ≥ 17 cm away from (NaN = none). */
+  avoidPlaneY = Number.NaN;
   /** v1.3.5: last published vertex heights (for sampleHeight). */
   private hData: Float32Array | null = null;
   private hN = 0;
@@ -226,7 +228,11 @@ export class TerrainRing {
         const src = border[b];
         const k = gridVerts + b;
         pos[k * 3] = pos[src * 3];
-        pos[k * 3 + 1] = pos[src * 3 + 1] - skirt;
+        let sy = pos[src * 3 + 1] - skirt;
+        // v1.3.5: skirt bottoms obey the ≥15 cm water-plane gap too
+        const pd = sy - this.avoidPlaneY;
+        if (pd > -0.17 && pd < 0.17) sy = this.avoidPlaneY - 0.17;
+        pos[k * 3 + 1] = sy;
         pos[k * 3 + 2] = pos[src * 3 + 2];
         nor[k * 3 + 1] = 1;
         col[k * 3] = col[src * 3] * 0.8;

@@ -1205,6 +1205,7 @@ export class TileManager {
       }
       return { y: offPlane(dem), verge: 0, water, park, forest, farm };
     };
+    ring.avoidPlaneY = this.water.mesh.visible && this.seaRel > -1e5 ? this.seaRel : Number.NaN;
     const ok = await ring.build(c.x, c.z, heightAt, () => this.disposed);
     if (!ok || this.disposed) return;
     ring.provisional = this.provisionalSamples > provBefore;
