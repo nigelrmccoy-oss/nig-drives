@@ -20,8 +20,8 @@ function overpassProxy(target: string, path: string) {
     changeOrigin: true,
     rewrite: () => path,
     headers: { 'User-Agent': OVERPASS_UA },
-    timeout: 35_000,
-    proxyTimeout: 35_000,
+    timeout: 60_000,
+    proxyTimeout: 60_000,
   };
 }
 
