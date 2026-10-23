@@ -54,6 +54,11 @@ export class TerrainRing {
   roadVersion = -1;
   lastBuildAt = 0;
   private generation = 0;
+  /** v1.3.5: last published vertex heights (for sampleHeight). */
+  private hData: Float32Array | null = null;
+  private hN = 0;
+  private hCell = 1;
+  private hHalf = 0;
 
   constructor(cfg: RingConfig, material: THREE.Material) {
     this.cfg = cfg;
@@ -78,6 +83,30 @@ export class TerrainRing {
     const dx = px - this.centerX;
     const dz = pz - this.centerZ;
     return dx * dx + dz * dz > this.cfg.recenter * this.cfg.recenter;
+  }
+
+  /**
+   * v1.3.5: height of the rendered surface at world (x, z) — same triangle
+   * split as the index buffer (a,c,b)/(b,c,d), so it matches what is drawn.
+   * NaN outside the ring / before the first build.
+   */
+  sampleHeight(x: number, z: number): number {
+    const h = this.hData;
+    if (!h) return Number.NaN;
+    const n = this.hN;
+    const fx = (x - this.centerX + this.hHalf) / this.hCell;
+    const fz = (z - this.centerZ + this.hHalf) / this.hCell;
+    if (!(fx >= 0 && fz >= 0 && fx < n - 1 && fz < n - 1)) return Number.NaN;
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    const u = fx - i;
+    const v = fz - j;
+    const a = h[j * n + i];
+    const b = h[j * n + i + 1];
+    const c = h[(j + 1) * n + i];
+    const d = h[(j + 1) * n + i + 1];
+    if (u + v <= 1) return a + u * (b - a) + v * (c - a);
+    return d + (1 - u) * (c - d) + (1 - v) * (b - d);
   }
 
   /**
@@ -257,6 +286,10 @@ export class TerrainRing {
       this.mesh.visible = true;
       this.centerX = cx;
       this.centerZ = cz;
+      this.hData = heights;
+      this.hN = n;
+      this.hCell = cell;
+      this.hHalf = half;
       this.builtOnce = true;
       this.lastBuildAt = performance.now();
       return true;

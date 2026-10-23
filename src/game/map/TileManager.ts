@@ -59,8 +59,12 @@ const MAX_PENDING_TILES = 12;
 const MAX_LOADED_TILES = 36;
 /** v1.3.4: OSM-dry shore cells the DEM had sunk are lifted to at least this far above the lake. */
 const SHORE_LAND_M = 0.3;
-/** Terrain vertices are kept at least this far off the lake / sea plane (z-fighting). */
-const WATER_PLANE_GAP_M = 0.15;
+/**
+ * Terrain (ring vertices and groundHeight) is kept at least 15 cm off the
+ * lake / sea plane (z-fighting); in-band heights are pushed to 17 cm so float
+ * error can't land back inside the 15 cm rule (v1.3.5).
+ */
+const WATER_PLANE_PUSH_M = 0.17;
 /** Re-centre the shore mask when the player is this far from its centre. */
 const SHORE_RECENTRE_M = 350;
 /** OSM shore lines are fetched for the mask window plus this margin. */
@@ -360,7 +364,23 @@ export class TileManager {
     }
     if (this.seaRel < -1e5) return null;
     if (!this.isWaterLocal(x, z)) return null;
-    return { y: this.seaRel - WATER_WADE_M, surface: this.seaRel };
+    // v1.3.5 P2-1: the 2.5 m mask / DEM can call a cell wet where the 6.25 m
+    // mesh is still visibly land (shore band) — the car then sat ~0.8 m into
+    // the drawn ground. Ride on what is drawn: visibly dry → not water.
+    const vis = this.visibleGround(x, z, groundY ?? this.groundHeight(x, z));
+    if (vis >= this.seaRel - 0.05) return null;
+    return { y: Math.max(this.seaRel - WATER_WADE_M, vis), surface: this.seaRel };
+  }
+
+  /**
+   * v1.3.5: on the lake / sea shore band the drawn near-ring surface can sit
+   * above groundHeight (triangle interpolation over sunk 2.5 m cells): use the
+   * higher of the two there so wheels don't sink into visible terrain.
+   */
+  private visibleGround(x: number, z: number, g: number): number {
+    if (this.seaRel < -1e5 || g > this.seaRel + 0.5) return g;
+    const m = this.rings[0]?.sampleHeight(x, z) ?? Number.NaN;
+    return Number.isFinite(m) && m > g ? m : g;
   }
 
   /** Relative height of the lake / sea plane (−1e6 when there is none). */
@@ -510,6 +530,20 @@ export class TileManager {
     return { y: dem + (bestY - dem) * bestW, verge };
   }
 
+  /**
+   * Push heights out of the ±WATER_PLANE_PUSH_M band around a visible lake /
+   * sea plane (v1.3.4 ring vertices; v1.3.5 also groundHeight). The push is a
+   * little more than the 15 cm rule so float error can't land inside it.
+   */
+  private offPlane(y: number): number {
+    if (!this.water.mesh.visible || this.seaRel < -1e5) return y;
+    const d = y - this.seaRel;
+    if (d > -WATER_PLANE_PUSH_M && d < WATER_PLANE_PUSH_M) {
+      return d >= 0 ? this.seaRel + WATER_PLANE_PUSH_M : this.seaRel - WATER_PLANE_PUSH_M;
+    }
+    return y;
+  }
+
   /** Final ground height (DEM + corridor carve), consistent with the near terrain ring. */
   groundHeight(x: number, z: number): number {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
@@ -517,7 +551,9 @@ export class TileManager {
     const dem = this.applyWater(x, z, this.demHeightLocal(x, z));
     this.provisionalSamples = before;
     const y = this.carveAt(x, z, dem, this.rings[0]?.cell ?? 6.25).y;
-    return Number.isFinite(y) ? y : 0;
+    // v1.3.5 P1-3: the same off-plane push as the ring vertices, so physics,
+    // spawn and QA sampling never see terrain within 15 cm of the water plane
+    return Number.isFinite(y) ? this.offPlane(y) : 0;
   }
 
   getCenterlines(): RoadCenterline[] {
@@ -775,7 +811,7 @@ export class TileManager {
    * roads stack (bridges over roads, tunnels under hills).
    */
   sampleSurface(x: number, z: number, preferY?: number): SurfaceSample {
-    const groundY = this.groundHeight(x, z);
+    const groundY = this.visibleGround(x, z, this.groundHeight(x, z));
     const offRoad: SurfaceSample = {
       roadFactor: 0.35,
       height: groundY,
@@ -1149,14 +1185,8 @@ export class TileManager {
       if (this.disposed) return;
     }
     const waterVersion = this.areaVersion();
-    const plane = this.water.mesh.visible && this.seaRel > -1e5 ? this.seaRel : Number.NaN;
     // v1.3.4: keep vertices off the lake / sea plane so the shore band can't z-fight
-    const offPlane = (y: number): number => {
-      if (Number.isNaN(plane)) return y;
-      const d = y - plane;
-      if (d > -WATER_PLANE_GAP_M && d < WATER_PLANE_GAP_M) return d >= 0 ? plane + WATER_PLANE_GAP_M : plane - WATER_PLANE_GAP_M;
-      return y;
-    };
+    const offPlane = (y: number): number => this.offPlane(y);
     const heightAt = (wx: number, wz: number): RingSample => {
       const dem = this.applyWater(wx, wz, this.ringDem(index, wx, wz));
       const a = this.areaTmp;
