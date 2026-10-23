@@ -418,8 +418,13 @@ export class TileManager {
       if (s.water > 0.5) {
         const g = groundY ?? this.groundHeight(x, z);
         let surf = Number.isFinite(s.level) ? s.level : g + 0.6;
-        // v1.3.6 P2-3: a river mouth sunk to the lake reads as the lake
-        if (this.planeShown() && g < this.seaRel) surf = Math.max(surf, this.seaRel);
+        // v1.3.6 P2-3: a river mouth sunk to the lake reads as the lake — and
+        // only where the drawn ground really is under the plane (the 4.7 m
+        // near-ring mesh rounds the sunk bank up: Humber +58 cm drawn land)
+        if (this.planeShown() && g < this.seaRel) {
+          if (!Number.isFinite(s.level) && this.drawnAt(x, z) >= this.seaRel - 0.05) return null;
+          surf = Math.max(surf, this.seaRel);
+        }
         return { y: Math.max(g, surf - WATER_WADE_M), surface: surf };
       }
     }
@@ -428,7 +433,7 @@ export class TileManager {
     // is under the drawn plane — physics and pixels can no longer disagree
     // (1.3.5 QA: ~800 cells/site looked wet but were dry, and the reverse).
     if (this.planeShown()) {
-      const drawn = this.rings[0]?.sampleHeight(x, z) ?? Number.NaN;
+      const drawn = this.drawnAt(x, z);
       if (Number.isFinite(drawn)) {
         if (drawn >= this.seaRel - 0.05) return null;
         const g = groundY ?? this.groundHeight(x, z);
@@ -442,6 +447,15 @@ export class TileManager {
     const vis = this.visibleGround(x, z, groundY ?? this.groundHeight(x, z));
     if (vis >= this.seaRel - 0.05) return null;
     return { y: Math.max(this.seaRel - WATER_WADE_M, vis), surface: this.seaRel };
+  }
+
+  /** v1.3.6: height of the finest terrain ring drawn at (x, z) (NaN if none). */
+  private drawnAt(x: number, z: number): number {
+    for (const r of this.rings) {
+      const m = r.sampleHeight(x, z);
+      if (Number.isFinite(m)) return m;
+    }
+    return Number.NaN;
   }
 
   /**
@@ -506,6 +520,7 @@ export class TileManager {
   }
 
   private addAreas(areas: OsmArea[]): void {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const a of areas) {
       if (this.waterMap.has(a.key)) continue;
       const cls = areaClass(a.tags);
@@ -526,7 +541,16 @@ export class TileManager {
         if (Math.abs(f.lat - l.lat) > 1e-7 || Math.abs(f.lon - l.lon) > 1e-7) continue;
       }
       this.waterMap.add({ key: a.key, cls, rings }, (r) => this.lakeLevel(r));
+      for (const r of rings) for (const q of r) {
+        if (q.x < x0) x0 = q.x;
+        if (q.x > x1) x1 = q.x;
+        if (q.z < z0) z0 = q.z;
+        if (q.z > z1) z1 = q.z;
+      }
     }
+    // v1.3.6 P2-6: a water polygon arriving after its neighbours' buildings
+    // sinks the ground under their walls (Humber mouth) → re-height them
+    if (x0 <= x1) this.driftBox(x0 - 10, x1 + 10, z0 - 10, z1 + 10, null);
   }
 
   /** ≥ 40 % of a 5×5 sample grid over the tile is sea / lake / OSM water. */
@@ -1652,16 +1676,19 @@ export class TileManager {
    * the ground is queued for a re-height (same path as late DEM tiles).
    */
   private checkGroundDrift(entry: TileEntry): void {
-    if (this.disposed) return;
     const tb = tileBounds(entry.tx, entry.ty);
     const a = this.origin.toLocal(tb.south, tb.west);
     const c = this.origin.toLocal(tb.north, tb.east);
     const M = 80; // roads leave their tile bbox a little
     const x0 = Math.min(a.x, c.x) - M, x1 = Math.max(a.x, c.x) + M;
     const z0 = Math.min(a.z, c.z) - M, z1 = Math.max(a.z, c.z) + M;
+    this.driftBox(x0, x1, z0, z1, entry);
+  }
+
+  private driftBox(x0: number, x1: number, z0: number, z1: number, skip: TileEntry | null): void {
+    if (this.disposed) return;
     for (const t of this.tiles.values()) {
-      if (t === entry || t.loading || t.rebuilding || t.cancelled || t.key === 'fallback') continue;
-      if (Math.max(Math.abs(t.tx - entry.tx), Math.abs(t.ty - entry.ty)) > 1) continue;
+      if (t === skip || t.loading || t.rebuilding || t.cancelled || t.key === 'fallback') continue;
       let drift = false;
       t.group.traverse((o) => {
         if (drift) return;
