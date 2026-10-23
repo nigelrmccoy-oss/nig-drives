@@ -422,7 +422,8 @@ export class TileManager {
         // only where the drawn ground really is under the plane (the 4.7 m
         // near-ring mesh rounds the sunk bank up: Humber +58 cm drawn land)
         if (this.planeShown() && g < this.seaRel) {
-          if (!Number.isFinite(s.level) && this.drawnAt(x, z) >= this.seaRel - 0.05) return null;
+          const d = this.drawnAt(x, z);
+          if (!Number.isFinite(s.level) && Number.isFinite(d) && d >= this.seaRel - 0.05) return null;
           surf = Math.max(surf, this.seaRel);
         }
         return { y: Math.max(g, surf - WATER_WADE_M), surface: surf };
@@ -434,11 +435,14 @@ export class TileManager {
     // (1.3.5 QA: ~800 cells/site looked wet but were dry, and the reverse).
     if (this.planeShown()) {
       const drawn = this.drawnAt(x, z);
+      const g = groundY ?? this.groundHeight(x, z);
       if (Number.isFinite(drawn)) {
         if (drawn >= this.seaRel - 0.05) return null;
-        const g = groundY ?? this.groundHeight(x, z);
         return { y: Math.max(this.seaRel - WATER_WADE_M, Math.max(drawn, Math.min(g, this.seaRel))), surface: this.seaRel };
       }
+      // beyond the near ring: what the near ring will draw there ≈ the ground
+      if (g >= this.seaRel - 0.05) return null;
+      return { y: Math.max(this.seaRel - WATER_WADE_M, g), surface: this.seaRel };
     }
     if (!this.isWaterLocal(x, z)) return null;
     // v1.3.5 P2-1: the 2.5 m mask / DEM can call a cell wet where the 6.25 m
@@ -449,13 +453,13 @@ export class TileManager {
     return { y: Math.max(this.seaRel - WATER_WADE_M, vis), surface: this.seaRel };
   }
 
-  /** v1.3.6: height of the finest terrain ring drawn at (x, z) (NaN if none). */
+  /**
+   * v1.3.6: near-ring (finest) drawn height at (x, z), NaN outside it. The
+   * coarser rings are not used: they only matter far from the car and get
+   * replaced by the near ring before the car can get there.
+   */
   private drawnAt(x: number, z: number): number {
-    for (const r of this.rings) {
-      const m = r.sampleHeight(x, z);
-      if (Number.isFinite(m)) return m;
-    }
-    return Number.NaN;
+    return this.rings[0]?.sampleHeight(x, z) ?? Number.NaN;
   }
 
   /**
