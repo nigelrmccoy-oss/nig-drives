@@ -258,7 +258,8 @@ export class TileManager {
     this.quality = quality;
     this.builder = new RoadBuilder(textures);
     this.buildings = new BuildingBuilder(textures);
-    this.buildings.skipAt = (x, z) => this.isWaterLocal(x, z);
+    // v1.3.6 P2-6: also skip ground that is (or is drawn) under the lake plane
+    this.buildings.skipAt = (x, z) => this.isWaterLocal(x, z) || this.underPlane(x, z);
     this.buildings.roadAt = (x, z) => {
       const hit = this.roadIndex.nearest(x, z, 16);
       return !!hit && Math.sqrt(hit.distSq) < (hit.line.width ?? 6) * 0.5 + 1.5;
@@ -358,6 +359,8 @@ export class TileManager {
 
   /** Is this point under the sea / Great-Lake plane or inside an OSM water polygon? */
   private isWaterLocal(x: number, z: number): boolean {
+    // v1.3.6 P2-4: roads and their bridges / ramps are dry, whatever the mask says
+    if (this.onGroundRoad(x, z)) return false;
     if (this.waterMap.size && this.waterMap.sample(x, z, this.areaTmp).water > 0.5) return true;
     if (this.seaRel < -1e5) return false;
     const before = this.provisionalSamples;
@@ -385,18 +388,53 @@ export class TileManager {
     return landY + (sunk - landY) * t * t * (3 - 2 * t);
   }
 
+  /** v1.3.6: on the asphalt of a ground road (half-width + 0.5 m)? */
+  private onGroundRoad(x: number, z: number): boolean {
+    const n = this.roadIndex.nearest(x, z, 14, (l) => l.structure === 'ground');
+    if (!n) return false;
+    const half = (n.line.width ?? 6) * 0.5 + 0.5;
+    return n.distSq <= half * half;
+  }
+
+  /** v1.3.6: ground (physics or drawn) under the visible lake plane here? */
+  private underPlane(x: number, z: number): boolean {
+    if (!this.planeShown()) return false;
+    if (this.groundHeight(x, z) < this.seaRel + 0.05) return true;
+    const drawn = this.rings[0]?.sampleHeight(x, z) ?? Number.NaN;
+    return Number.isFinite(drawn) && drawn < this.seaRel;
+  }
+
+  /** v1.3.6: is the lake / sea plane drawn here? */
+  private planeShown(): boolean {
+    return this.water.mesh.visible && this.seaRel > -1e5;
+  }
+
   /** Lake / sea / OSM water under (x, z) → wading height, else null. */
   waterInfo(x: number, z: number, groundY?: number): WaterInfo | null {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    if (this.onGroundRoad(x, z)) return null;
     if (this.waterMap.size) {
       const s = this.waterMap.sample(x, z, this.areaTmp);
       if (s.water > 0.5) {
         const g = groundY ?? this.groundHeight(x, z);
-        const surf = Number.isFinite(s.level) ? s.level : g + 0.6;
-        return { y: g, surface: surf };
+        let surf = Number.isFinite(s.level) ? s.level : g + 0.6;
+        // v1.3.6 P2-3: a river mouth sunk to the lake reads as the lake
+        if (this.planeShown() && g < this.seaRel) surf = Math.max(surf, this.seaRel);
+        return { y: Math.max(g, surf - WATER_WADE_M), surface: surf };
       }
     }
     if (this.seaRel < -1e5) return null;
+    // v1.3.6 P2-1: inside the near ring the lake is wherever the drawn ground
+    // is under the drawn plane — physics and pixels can no longer disagree
+    // (1.3.5 QA: ~800 cells/site looked wet but were dry, and the reverse).
+    if (this.planeShown()) {
+      const drawn = this.rings[0]?.sampleHeight(x, z) ?? Number.NaN;
+      if (Number.isFinite(drawn)) {
+        if (drawn >= this.seaRel - 0.05) return null;
+        const g = groundY ?? this.groundHeight(x, z);
+        return { y: Math.max(this.seaRel - WATER_WADE_M, Math.max(drawn, Math.min(g, this.seaRel))), surface: this.seaRel };
+      }
+    }
     if (!this.isWaterLocal(x, z)) return null;
     // v1.3.5 P2-1: the 2.5 m mask / DEM can call a cell wet where the 6.25 m
     // mesh is still visibly land (shore band) — the car then sat ~0.8 m into
@@ -431,7 +469,16 @@ export class TileManager {
     dem = this.shoreAdjust(x, z, dem);
     const s = this.waterMap.sample(x, z, this.areaTmp);
     if (s.water <= 0) return dem;
-    const yW = Number.isFinite(s.level) ? s.level : dem - 0.6;
+    let yW = Number.isFinite(s.level) ? s.level : dem - 0.6;
+    if (!Number.isFinite(s.level) && this.lakeMode && this.seaRel > -1e5) {
+      // v1.3.6 P2-3: river polygons at the lake (Humber mouth sat +1.3 m above
+      // the plane, drawn as raised land): within 3 m of lake level they sink
+      // under the plane, easing back to "DEM − 0.6" by 5 m.
+      const d = dem - this.seaRel;
+      const sunk = this.seaRel - 1.5;
+      if (d < 3) yW = sunk;
+      else if (d < 5) yW = sunk + (dem - 0.6 - sunk) * ((d - 3) / 2);
+    }
     const t = Math.min(1, s.water * 2);
     if (t >= 1) return yW;
     return dem + (Math.min(dem, yW) - dem) * t;
@@ -1139,6 +1186,7 @@ export class TileManager {
     }
     this.rebuildCenterlineIndex();
     if (!swap) this.scene.add(entry.group);
+    this.checkGroundDrift(entry);
     this.emitStatus(
       `${swap ? 'OSM swapped in · ' : ''}Tile ${key}: ${freshWays.length} roads, ${built.buildingCount} buildings${result.partial ? ' (partial)' : ''}`,
     );
@@ -1561,14 +1609,16 @@ export class TileManager {
       const n = Math.max(2, Math.ceil(len / 6));
       const nx = -(pb.z - pa.z) / len;
       const nz = (pb.x - pa.x) / len;
-      const dry: boolean[] = [];
+      const raw: boolean[] = [];
+      // v1.3.6 P2-6: "wet" includes ground drawn under the lake plane
+      const wetAt = (x: number, z: number) => this.isWaterLocal(x, z) || this.underPlane(x, z);
       for (let k = 0; k <= n; k++) {
         const x = pa.x + ((pb.x - pa.x) * k) / n;
         const z = pa.z + ((pb.z - pa.z) * k) / n;
-        dry.push(
-          !this.isWaterLocal(x, z) && !this.isWaterLocal(x + nx * 6, z + nz * 6) && !this.isWaterLocal(x - nx * 6, z - nz * 6),
-        );
+        raw.push(!wetAt(x, z) && !wetAt(x + nx * 6, z + nz * 6) && !wetAt(x - nx * 6, z - nz * 6));
       }
+      // erode by one sample so a cut end can't reach into the water
+      const dry = raw.map((d, k) => d && raw[k - 1] !== false && raw[k + 1] !== false);
       if (dry.every(Boolean)) {
         out.push(w);
         continue;
@@ -1593,6 +1643,43 @@ export class TileManager {
       }
     }
     return out;
+  }
+
+  /**
+   * v1.3.6 P2-6: roads that arrive after a neighbour's buildings were placed
+   * can carve the ground under a wall (1.3.5: 4 Toronto walls floated 6–10 m).
+   * Any loaded tile near `entry` whose wall bottoms now sit > 0.3 m above
+   * the ground is queued for a re-height (same path as late DEM tiles).
+   */
+  private checkGroundDrift(entry: TileEntry): void {
+    if (this.disposed) return;
+    const tb = tileBounds(entry.tx, entry.ty);
+    const a = this.origin.toLocal(tb.south, tb.west);
+    const c = this.origin.toLocal(tb.north, tb.east);
+    const M = 80; // roads leave their tile bbox a little
+    const x0 = Math.min(a.x, c.x) - M, x1 = Math.max(a.x, c.x) + M;
+    const z0 = Math.min(a.z, c.z) - M, z1 = Math.max(a.z, c.z) + M;
+    for (const t of this.tiles.values()) {
+      if (t === entry || t.loading || t.rebuilding || t.cancelled || t.key === 'fallback') continue;
+      if (Math.max(Math.abs(t.tx - entry.tx), Math.abs(t.ty - entry.ty)) > 1) continue;
+      let drift = false;
+      t.group.traverse((o) => {
+        if (drift) return;
+        const pr = o.userData.probes as Float32Array | undefined;
+        if (!pr) return;
+        for (let i = 0; i < pr.length; i += 3) {
+          if (pr[i] < x0 || pr[i] > x1 || pr[i + 1] < z0 || pr[i + 1] > z1) continue;
+          if (pr[i + 2] - this.groundHeight(pr[i], pr[i + 1]) > 0.3) {
+            drift = true;
+            return;
+          }
+        }
+      });
+      if (drift && t.reheights < MAX_REHEIGHTS) {
+        t.provisional = true;
+        this.demDirty = true;
+      }
+    }
   }
 
   private collectFootprints(entry: TileEntry): void {

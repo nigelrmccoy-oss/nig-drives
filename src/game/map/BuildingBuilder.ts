@@ -312,6 +312,8 @@ export class BuildingBuilder {
   roadAt: ((x: number, z: number) => boolean) | null = null;
   /** Footprints of the solid buildings added since the last takeFootprints(). */
   private footprints: Footprint[] = [];
+  /** v1.3.6: wall-bottom probes [x, z, bottomY, …] per building (ground-drift check). */
+  private probes: number[] = [];
 
   constructor(textures: TextureLibrary | null = null) {
     this.handle = createBuildingMaterial();
@@ -374,7 +376,18 @@ export class BuildingBuilder {
       // procedural fillers (strict) if ANY outline sample is wet.
       if (this.skipAt(cx, cz)) return false;
       let wet = 0;
-      for (const p of dense) if (this.skipAt(p.x, p.z)) wet++;
+      for (const p of dense) {
+        if (this.skipAt(p.x, p.z)) wet++;
+        else if (strict) {
+          // v1.3.6 P2-6: procedural fillers keep a 3 m dry margin (the shore
+          // mask / lake level can still settle after they are placed)
+          const dx = p.x - cx;
+          const dz = p.z - cz;
+          const d = Math.hypot(dx, dz) || 1;
+          if (this.skipAt(p.x + (dx / d) * 3, p.z + (dz / d) * 3)) wet++;
+        }
+        if (strict && wet) break;
+      }
       if (strict ? wet > 0 : wet * 3 >= dense.length) return false;
     }
 
@@ -417,6 +430,7 @@ export class BuildingBuilder {
       acc.wallQuad(p, q, ys[k] - PLINTH_M, ys[k2] - PLINTH_M, yt, u, u + len, minY, st.tint, wallB, winTop);
       u += len;
     }
+    for (let k = 0; k < dense.length; k += 2) this.probes.push(dense[k].x, dense[k].z, ys[k] - PLINTH_M);
     if (!NON_SOLID.has(tags.building ?? '') && !tags.layer?.startsWith('-')) {
       let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
       for (const p of ring) {
@@ -543,6 +557,7 @@ export class BuildingBuilder {
     if (mesh) group.add(mesh);
     group.userData.count = acc.count;
     group.userData.footprints = this.takeFootprints();
+    group.userData.probes = this.takeProbes();
     return group;
   }
 
@@ -654,7 +669,14 @@ export class BuildingBuilder {
     if (mesh) group.add(mesh);
     group.userData.count = added;
     group.userData.footprints = this.takeFootprints();
+    group.userData.probes = this.takeProbes();
     return group;
+  }
+
+  private takeProbes(): Float32Array {
+    const p = new Float32Array(this.probes);
+    this.probes = [];
+    return p;
   }
 
   private takeFootprints(): Footprint[] {
