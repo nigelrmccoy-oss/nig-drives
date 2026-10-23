@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build src/game/map/data/shore-west-ontario.json (v1.3.5 bundled shoreline).
+"""Build src/game/map/data/shore-west-ontario.json (v1.3.5 bundled shoreline; v1.3.6 piers in open water).
 
 Inputs are raw Overpass JSON dumps (ODbL, (c) OpenStreetMap contributors):
   ontario.json  rel["natural"="water"]["name"="Lake Ontario"]; way(r)(43.22,-80.00,43.72,-79.20); out geom;
@@ -100,11 +100,38 @@ def near_lake(pts, maxd=60):
                 for qx, qz in grid.get((ci + di, cj + dj), ()):
                     if math.hypot(qx - x, qz - z) < maxd: return True
     return False
+# v1.3.6: also keep piers / breakwaters standing out in the water (Hamilton
+# Harbour's CanVec breakwater is > 60 m from any shore vertex)
+wb = []
+for r in water:
+    la = [p[0] for p in r]; lo = [p[1] for p in r]
+    wb.append((min(la), max(la), min(lo), max(lo), r))
+def pip(pt, ring):
+    y, x = pt; ins = False
+    for i in range(len(ring)):
+        a = ring[i]; b = ring[i - 1]
+        if (a[0] > y) != (b[0] > y):
+            if x < a[1] + (y - a[0]) * (b[1] - a[1]) / (b[0] - a[0]): ins = not ins
+    return ins
+def in_water(pts):
+    dense = []
+    for i in range(len(pts)):
+        dense.append(pts[i])
+        if i:
+            a, b = pts[i - 1], pts[i]
+            n = int(math.hypot((b[0] - a[0]) * MLAT, (b[1] - a[1]) * MLON) / 20)
+            dense += [(a[0] + (b[0] - a[0]) * k / (n + 1), a[1] + (b[1] - a[1]) * k / (n + 1)) for k in range(1, n + 1)]
+    for q in dense:
+        c = 0
+        for s_, n_, w_, e_, r in wb:
+            if s_ <= q[0] <= n_ and w_ <= q[1] <= e_ and pip(q, r): c += 1
+        if c % 2: return True
+    return False
 pj = json.load(open(f'{src}/piers.json'))
 land_areas, land_lines = [], []
 for e in pj['elements']:
     g = geom(e)
-    if len(g) < 2 or not bbox_hit(g, COVER, 0) or not near_lake(g): continue
+    if len(g) < 2 or not bbox_hit(g, COVER, 0) or not (near_lake(g) or in_water(g)): continue
     closed = len(g) >= 4 and key(g[0]) == key(g[-1])
     (land_areas if closed and e.get('tags', {}).get('area') != 'no' else land_lines).append(dp(g, 0.5))
 
