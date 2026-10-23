@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, session } = require('electron');
 const path = require('path');
 
 const isDev = process.env.ELECTRON_DEV === '1';
@@ -46,7 +46,25 @@ function createWindow() {
   });
 }
 
+/**
+ * v1.3.5: identify ourselves to the public Overpass mirrors (they reject
+ * anonymous clients with 406 / 429). Only Overpass requests are touched.
+ */
+const OVERPASS_UA = `nig-drives/${app.getVersion()} (+https://github.com/nigelrmccoy-oss/nig-drives)`;
+function identifyToOverpass() {
+  const urls = [
+    'https://overpass-api.de/*',
+    'https://maps.mail.ru/osm/tools/overpass/*',
+    'https://overpass.kumi.systems/*',
+    'https://overpass.private.coffee/*',
+  ];
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls }, (details, callback) => {
+    callback({ requestHeaders: { ...details.requestHeaders, 'User-Agent': OVERPASS_UA } });
+  });
+}
+
 app.whenReady().then(() => {
+  identifyToOverpass();
   createWindow();
 
   app.on('activate', () => {
