@@ -30,6 +30,8 @@ interface ParsedTile {
 
 export interface OverpassResult extends ParsedTile {
   source: string;
+  /** v1.3.6: a server-side timeout returned only part of the tile (kept, upgraded later). */
+  partial?: boolean;
 }
 
 /** Relations spanning more than this (degrees) are skipped (Great Lakes use the DEM lake table). */
@@ -48,22 +50,27 @@ const HIGHWAY_FILTER =
   'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link';
 
 /**
- * v1.3.5 per-attempt fetch timeout (ms). Public mirrors answered in 13–35 s
- * in Oct 2026; 10 s turned every slow mirror into an offline grid.
+ * v1.3.6 per-attempt fetch timeout (ms). QA 1.3.5 measured maps.mail.ru at a
+ * 22 s median (15–34 s) and overpass-api.de at 27 s (19–42 s): the old 30 s
+ * attempt / 9 s hedge aborted good answers and re-queued them (retry storm).
  */
-export const OVERPASS_ATTEMPT_MS = 30_000;
+export const OVERPASS_ATTEMPT_MS = 55_000;
 /** Server-side [timeout:] for tile queries (s): must outlast a slow queue. */
-const SERVER_TIMEOUT_S = 25;
-/** Start a second mirror if the first hasn't answered within this (ms). */
-const HEDGE_MS = 9_000;
-/** Give up on the network for one request after this (ms) → cache → offline grid. */
-const REQUEST_BUDGET_MS = 75_000;
+const SERVER_TIMEOUT_S = 45;
+/** Hedge a second mirror only after this (ms), and only if few requests are out. */
+const HEDGE_MS = 35_000;
+/** Cap on attempts in flight across all requests before a hedge may start. */
+const HEDGE_MAX_GLOBAL = 3;
+/** Default network budget for one request (ms) → cache → offline grid. */
+const REQUEST_BUDGET_MS = 150_000;
 /** A cached response younger than this is used without asking a mirror. */
 const CACHE_FRESH_MS = 24 * 3600_000;
-/** Cap in-flight Overpass tile fetches across the client. */
-const MAX_CONCURRENT = 3;
+/** Cap in-flight Overpass requests across the client (v1.3.6: 3 → 2). */
+const MAX_CONCURRENT = 2;
 /** Soft cap on memory cache entries. */
-const MAX_CACHE = 48;
+const MAX_CACHE = 96;
+/** IndexedDB key prefix (v1.3.6 entries carry a `partial` flag). */
+const CACHE_PREFIX = 'v136:';
 
 /**
  * Identification. Mirrors reject anonymous clients (overpass-api.de → 406,
@@ -73,7 +80,7 @@ const MAX_CACHE = 48;
  * the Vite proxies and Electron set a real User-Agent (vite.config.ts,
  * electron/main.cjs).
  */
-export const OVERPASS_CLIENT_ID = 'nig-drives/1.3.10';
+export const OVERPASS_CLIENT_ID = 'nig-drives/1.3.11';
 
 function buildQuery(south: number, west: number, north: number, east: number): string {
   const pad = 0.0004;
@@ -104,31 +111,87 @@ function relationQuery(ids: number[]): string {
 }
 
 /**
- * v1.3.5 mirror order (Code Critic probe 2026-10-21 23:40 ET + nigian probes
- * 2026-10-22): overpass-api.de answered in 13–15 s, maps.mail.ru in ~19 s
- * (one timeout), kumi and private.coffee timed out. Same-origin Vite proxies
- * (dev / preview: no CORS, real User-Agent) are tried first when the page is
- * served over http(s); a 404 / HTML answer disables them for the session.
- * Mirrors that fail are pushed down the order for a minute.
+ * v1.3.6 mirror tiers (QA 1.3.5, 2026-10-23): overpass-api.de and
+ * maps.mail.ru answer (22–27 s medians); kumi had 0 successes and
+ * private.coffee 1, so they are last-resort only (tier 1) with a 10 min
+ * cooldown after a failure. Primary mirrors cool down per mirror,
+ * exponentially (15 s, 30 s, 60 s … 5 min). Same-origin Vite proxies
+ * (dev / preview: no CORS, real User-Agent) are used when the page is served
+ * over http(s); a 404 / HTML answer disables them for the session.
  */
 interface Mirror {
   name: string;
   direct: string;
   proxy: string;
-  /** performance.now() until which this mirror is de-prioritised. */
+  /** 0 = primary, 1 = last resort. */
+  tier: 0 | 1;
+  /** performance.now() until which this mirror is not asked. */
   coolUntil: number;
+  /** consecutive failures (drives the cooldown). */
+  fails: number;
+  /** attempts currently out on this mirror (all requests). */
+  busy: number;
+  /** smoothed answer time (ms), 0 = unknown. */
+  emaMs: number;
 }
 
+const mirror = (name: string, direct: string, proxy: string, tier: 0 | 1): Mirror => ({
+  name,
+  direct,
+  proxy,
+  tier,
+  coolUntil: 0,
+  fails: 0,
+  busy: 0,
+  emaMs: 0,
+});
+
 const MIRRORS: Mirror[] = [
-  { name: 'overpass-api.de', direct: 'https://overpass-api.de/api/interpreter', proxy: '/api/overpass-de', coolUntil: 0 },
-  { name: 'maps.mail.ru', direct: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', proxy: '/api/overpass-mailru', coolUntil: 0 },
-  { name: 'kumi', direct: 'https://overpass.kumi.systems/api/interpreter', proxy: '/api/overpass-kumi', coolUntil: 0 },
-  { name: 'private.coffee', direct: 'https://overpass.private.coffee/api/interpreter', proxy: '/api/overpass-coffee', coolUntil: 0 },
+  mirror('maps.mail.ru', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', '/api/overpass-mailru', 0),
+  mirror('overpass-api.de', 'https://overpass-api.de/api/interpreter', '/api/overpass-de', 0),
+  mirror('kumi', 'https://overpass.kumi.systems/api/interpreter', '/api/overpass-kumi', 1),
+  mirror('private.coffee', 'https://overpass.private.coffee/api/interpreter', '/api/overpass-coffee', 1),
 ];
+
+/** Attempts in flight across every request (hedges only start below HEDGE_MAX_GLOBAL). */
+let attemptsOut = 0;
+
+function coolMirror(m: Mirror): void {
+  m.fails++;
+  const ms = m.tier === 1 ? 600_000 : Math.min(300_000, 15_000 * 2 ** Math.min(5, m.fails - 1));
+  m.coolUntil = performance.now() + ms;
+}
+
+/**
+ * Best mirror to ask now (not cooling, not already used by this request):
+ * primaries by fewest attempts out, then fastest; last-resort mirrors only
+ * when every primary is cooling. When nothing is available, `waitMs` is the
+ * time until the first mirror leaves its cooldown.
+ */
+function pickMirror(exclude: Set<Mirror>): { mirror: Mirror | null; waitMs: number } {
+  const now = performance.now();
+  const free = MIRRORS.filter((m) => !exclude.has(m) && m.coolUntil <= now);
+  const prim = free.filter((m) => m.tier === 0);
+  const allPrimCooling = MIRRORS.every((m) => m.tier !== 0 || m.coolUntil > now);
+  const pool = prim.length ? prim : allPrimCooling ? free : [];
+  if (pool.length) {
+    pool.sort((a, b) => a.busy - b.busy || (a.emaMs || 25_000) - (b.emaMs || 25_000));
+    return { mirror: pool[0], waitMs: 0 };
+  }
+  let wait = Infinity;
+  for (const m of MIRRORS) if (!exclude.has(m) && m.tier === 0) wait = Math.min(wait, m.coolUntil - now);
+  return { mirror: null, waitMs: Number.isFinite(wait) ? Math.max(0, wait) : 15_000 };
+}
 
 let proxiesUsable = typeof location !== 'undefined' && /^https?:$/.test(location.protocol);
 
-/** HTTP statuses worth a retry (with backoff) on the next mirror. */
+/** IndexedDB envelope (v1.3.6). */
+interface CacheBox<T> {
+  d: T;
+  partial: boolean;
+}
+
+/** HTTP statuses counted as retryable (the mirror cools down, the next one is asked). */
 const RETRY_STATUS = new Set([429, 502, 503, 504]);
 
 class OverpassHttpError extends Error {
@@ -139,17 +202,6 @@ class OverpassHttpError extends Error {
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function orderedMirrors(): Mirror[] {
-  const now = performance.now();
-  return MIRRORS.map((m, i) => ({ m, i }))
-    .sort((a, b) => Number(a.m.coolUntil > now) - Number(b.m.coolUntil > now) || a.i - b.i)
-    .map((e) => e.m);
-}
-
 /** Request stats for QA (`__nig.game.tiles.overpassStats()`). */
 export const overpassStats = {
   ok: 0,
@@ -157,6 +209,12 @@ export const overpassStats = {
   cacheStale: 0,
   failed: 0,
   retries: 0,
+  /** v1.3.6: tiles answered from memory / IndexedDB (fresh or stale). */
+  cacheHits: 0,
+  memoryHits: 0,
+  partial: 0,
+  hedges: 0,
+  aborted: 0,
   lastSource: '',
   lastMs: 0,
   bySource: {} as Record<string, number>,
@@ -220,16 +278,18 @@ export class OverpassClient {
     }
   }
 
-  private async acquireSlot(): Promise<void> {
+  private async acquireSlot(priority = false): Promise<void> {
     if (this.inFlight < MAX_CONCURRENT) {
       this.inFlight++;
       return;
     }
     await new Promise<void>((resolve) => {
-      this.waiters.push(() => {
+      const w = () => {
         this.inFlight++;
         resolve();
-      });
+      };
+      if (priority) this.waiters.unshift(w);
+      else this.waiters.push(w);
     });
   }
 
@@ -240,10 +300,30 @@ export class OverpassClient {
   }
 
   /**
-   * Fetch highways + buildings for a tile bbox.
-   * Prefer Vite proxies → healthy directs; de is last-resort only.
-   * Short timeouts so callers can fall back offline on true outages.
-   * Pass expectGen to ignore results after cancelAll / dispose.
+   * v1.3.6: cached tile only (memory, then IndexedDB at any age), never the
+   * network — the spawn tile builds from this when it can, else starts on
+   * the offline grid and upgrades in the background.
+   */
+  async peekTile(key: string): Promise<OverpassResult | null> {
+    const mem = this.memoryCache.get(key);
+    if (mem) {
+      overpassStats.memoryHits++;
+      overpassStats.cacheHits++;
+      return { ...mem, source: 'memory' };
+    }
+    const c = await cacheGet<CacheBox<ParsedTile>>(`${CACHE_PREFIX}tile:${key}`);
+    if (!c || !c.data || !c.data.d) return null;
+    overpassStats.cacheHits++;
+    if (c.ageMs < CACHE_FRESH_MS) overpassStats.cacheFresh++;
+    else overpassStats.cacheStale++;
+    if (!c.data.partial) this.setCached(key, c.data.d);
+    return { ...c.data.d, source: c.ageMs < CACHE_FRESH_MS ? 'cache' : 'cache-stale', partial: c.data.partial };
+  }
+
+  /**
+   * Fetch highways + buildings + areas for a tile bbox: memory → IndexedDB
+   * (fresh) → mirrors (tiered, per-mirror cooldown) → stale / partial cache →
+   * throw. `priority` jumps the slot queue (the tile under the car).
    */
   async fetchTile(
     key: string,
@@ -253,15 +333,20 @@ export class OverpassClient {
     east: number,
     expectGen?: number,
     budgetMs = REQUEST_BUDGET_MS,
+    priority = false,
   ): Promise<OverpassResult> {
     const cached = this.memoryCache.get(key);
-    if (cached) return { ...cached, source: 'memory' };
+    if (cached) {
+      overpassStats.memoryHits++;
+      overpassStats.cacheHits++;
+      return { ...cached, source: 'memory' };
+    }
 
     if (expectGen !== undefined && expectGen !== this.generation) {
       throw new Error('Overpass request cancelled (stale generation)');
     }
 
-    await this.acquireSlot();
+    await this.acquireSlot(priority);
     try {
       if (expectGen !== undefined && expectGen !== this.generation) {
         throw new Error('Overpass request cancelled (stale generation)');
@@ -269,18 +354,21 @@ export class OverpassClient {
 
       const query = buildQuery(south, west, north, east);
       const res = await this.runWaves(query, (d) => parseTile(d), expectGen, `tile:${key}`, budgetMs);
-      this.memoryCache.set(key, res.parsed);
-      this.trimCache();
-      return { ...res.parsed, source: res.source };
+      if (!res.partial) {
+        this.memoryCache.set(key, res.parsed);
+        this.trimCache();
+      }
+      return { ...res.parsed, source: res.source, partial: res.partial };
     } finally {
       this.releaseSlot();
     }
   }
 
   /**
-   * v1.3.5: cache (fresh) → mirrors in health order, each attempt ≤ 30 s, a
-   * hedged second mirror after HEDGE_MS, backoff + next mirror on
-   * 429/502/503/504/timeouts → cache (any age) → throw (caller: offline grid).
+   * v1.3.6: cache (fresh, complete) → mirrors → cache (any age, complete) →
+   * partial (fresh from a server timeout, or cached) → throw. Every complete
+   * answer is written to IndexedDB; a partial one only when nothing better is
+   * cached.
    */
   private async runWaves<T>(
     query: string,
@@ -288,45 +376,67 @@ export class OverpassClient {
     expectGen?: number,
     cacheKey?: string,
     budgetMs = REQUEST_BUDGET_MS,
-  ): Promise<{ parsed: T; source: string }> {
+  ): Promise<{ parsed: T; source: string; partial?: boolean }> {
     const stale = () => expectGen !== undefined && expectGen !== this.generation;
-    const ck = cacheKey ? `v135:${cacheKey}` : null;
-    const cached = ck ? await cacheGet<T>(ck) : null;
+    const ck = cacheKey ? `${CACHE_PREFIX}${cacheKey}` : null;
+    const got = ck ? await cacheGet<CacheBox<T>>(ck) : null;
+    const cached = got && got.data && got.data.d !== undefined ? { ageMs: got.ageMs, d: got.data.d, partial: !!got.data.partial } : null;
     const count = (src: string) => {
       overpassStats.lastSource = src;
       overpassStats.bySource[src] = (overpassStats.bySource[src] ?? 0) + 1;
     };
-    if (cached && cached.ageMs < CACHE_FRESH_MS) {
+    if (cached && !cached.partial && cached.ageMs < CACHE_FRESH_MS) {
       overpassStats.cacheFresh++;
+      overpassStats.cacheHits++;
       count('cache');
-      return { parsed: cached.data, source: 'cache' };
+      return { parsed: cached.d, source: 'cache' };
     }
     const t0 = performance.now();
     let lastError: unknown = new Error('Overpass: no mirror tried');
+    let partial: { parsed: T; source: string } | null = null;
     try {
       const res = await this.raceMirrors(query, parse, stale, t0, budgetMs);
-      overpassStats.ok++;
-      overpassStats.lastMs = Math.round(performance.now() - t0);
-      count(res.source);
-      if (ck) void cachePut(ck, res.parsed);
-      return res;
+      if (!res.partial) {
+        overpassStats.ok++;
+        overpassStats.lastMs = Math.round(performance.now() - t0);
+        count(res.source);
+        if (ck) void cachePut(ck, { d: res.parsed, partial: false });
+        return { parsed: res.parsed, source: res.source };
+      }
+      partial = { parsed: res.parsed, source: res.source };
     } catch (err) {
       lastError = err;
     }
     if (stale()) throw new Error('Overpass request cancelled (stale generation)');
-    if (cached) {
+    if (cached && !cached.partial) {
       overpassStats.cacheStale++;
+      overpassStats.cacheHits++;
       count('cache-stale');
-      return { parsed: cached.data, source: 'cache-stale' };
+      return { parsed: cached.d, source: 'cache-stale' };
+    }
+    if (partial) {
+      overpassStats.partial++;
+      count(`${partial.source} partial`);
+      if (ck) void cachePut(ck, { d: partial.parsed, partial: true });
+      return { parsed: partial.parsed, source: `${partial.source} partial`, partial: true };
+    }
+    if (cached) {
+      overpassStats.partial++;
+      overpassStats.cacheHits++;
+      count('cache-partial');
+      return { parsed: cached.d, source: 'cache-partial', partial: true };
     }
     overpassStats.failed++;
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
   /**
-   * Walk the mirrors; at most two attempts in flight (the second starts after
-   * HEDGE_MS, or once the first fails). Retryable failures back off
-   * (1.5 s, 3 s, 6 s… ± jitter) before the next attempt.
+   * v1.3.6: one attempt at a time on the best mirror (attempt ≤ 55 s); a
+   * hedge on a second primary only after HEDGE_MS and while fewer than
+   * HEDGE_MAX_GLOBAL attempts are out client-wide. A failed mirror cools down
+   * (per mirror, exponential); when every mirror is cooling the request waits
+   * for the first one instead of hammering. A server-side timeout that still
+   * returned elements is kept as a partial fallback while other mirrors try.
    */
   private raceMirrors<T>(
     query: string,
@@ -334,72 +444,112 @@ export class OverpassClient {
     stale: () => boolean,
     t0: number,
     budgetMs: number,
-  ): Promise<{ parsed: T; source: string }> {
+  ): Promise<{ parsed: T; source: string; partial?: boolean }> {
     return new Promise((resolve, reject) => {
-      // healthy-first order, then a second pass if the budget allows
-      const queue = [...orderedMirrors(), ...orderedMirrors()];
-      let inFlight = 0;
+      const out = new Map<Mirror, AbortController>();
       let done = false;
-      let failures = 0;
       let lastErr: unknown = new Error('Overpass: all mirrors failed');
+      let best: { parsed: T; source: string } | null = null;
       let hedgeTimer: ReturnType<typeof setTimeout> | null = null;
+      let waitTimer: ReturnType<typeof setTimeout> | null = null;
       const finish = (fn: () => void) => {
         if (done) return;
         done = true;
         if (hedgeTimer) clearTimeout(hedgeTimer);
+        if (waitTimer) clearTimeout(waitTimer);
+        // the losing attempt is no longer needed: free the mirror
+        for (const c of out.values()) {
+          overpassStats.aborted++;
+          try {
+            c.abort();
+          } catch {
+            /* ignore */
+          }
+        }
+        out.clear();
         fn();
       };
-      const launch = (): void => {
+      const giveUp = () => finish(() => (best ? resolve({ ...best, partial: true }) : reject(lastErr)));
+      const launch = (hedge = false): void => {
         if (done) return;
         if (stale()) {
           finish(() => reject(new Error('Overpass request cancelled (stale generation)')));
           return;
         }
-        const elapsed = performance.now() - t0;
-        const m = elapsed < budgetMs - 5_000 ? queue.shift() : undefined;
-        if (!m) {
-          if (inFlight === 0) finish(() => reject(lastErr));
+        const left = budgetMs - (performance.now() - t0);
+        if (left < 8_000) {
+          if (out.size === 0) giveUp();
           return;
         }
-        inFlight++;
-        const timeout = Math.min(OVERPASS_ATTEMPT_MS, budgetMs - elapsed);
+        const pick = pickMirror(new Set(out.keys()));
+        const m = pick.mirror;
+        if (!m) {
+          if (out.size === 0) {
+            if (pick.waitMs > left - 8_000) {
+              giveUp();
+              return;
+            }
+            if (waitTimer) clearTimeout(waitTimer);
+            waitTimer = setTimeout(() => {
+              waitTimer = null;
+              launch();
+            }, pick.waitMs + 50);
+          }
+          return;
+        }
+        if (hedge) overpassStats.hedges++;
+        const timeout = Math.min(OVERPASS_ATTEMPT_MS, left);
         const viaProxy = proxiesUsable;
         const ep = viaProxy ? m.proxy : `${m.direct}?client=${encodeURIComponent(OVERPASS_CLIENT_ID)}`;
-        this.postQuery(ep, query, parse, timeout).then(
-          (parsed) => {
-            inFlight--;
-            m.coolUntil = 0;
-            finish(() => resolve({ parsed, source: viaProxy ? `${m.name} (proxy)` : m.name }));
+        const ctrl = new AbortController();
+        out.set(m, ctrl);
+        m.busy++;
+        attemptsOut++;
+        const tA = performance.now();
+        const settle = () => {
+          m.busy = Math.max(0, m.busy - 1);
+          attemptsOut = Math.max(0, attemptsOut - 1);
+          out.delete(m);
+        };
+        this.postQuery(ep, query, parse, timeout, ctrl).then(
+          (r) => {
+            settle();
+            const src = viaProxy ? `${m.name} (proxy)` : m.name;
+            if (done) return;
+            if (!r.partial) {
+              m.fails = 0;
+              m.coolUntil = 0;
+              const ms = performance.now() - tA;
+              m.emaMs = m.emaMs ? m.emaMs * 0.6 + ms * 0.4 : ms;
+              finish(() => resolve({ parsed: r.parsed, source: src }));
+              return;
+            }
+            // server timed out mid-query: keep what came back, try elsewhere
+            best = { parsed: r.parsed, source: src };
+            coolMirror(m);
+            if (out.size === 0) launch();
           },
-          async (err: unknown) => {
-            inFlight--;
+          (err: unknown) => {
+            settle();
             if (done) return;
             lastErr = err;
-            failures++;
             const status = err instanceof OverpassHttpError ? err.status : 0;
             if (viaProxy && (status === 404 || status === 405 || err instanceof SyntaxError)) {
               // No same-origin proxy (static hosting): go direct from now on
               proxiesUsable = false;
-              queue.unshift(m);
-              launch();
+              if (out.size === 0) launch();
               return;
             }
-            m.coolUntil = performance.now() + 60_000;
-            if (status === 0 || RETRY_STATUS.has(status)) {
-              overpassStats.retries++;
-              const back = Math.min(8_000, 1_500 * 2 ** Math.min(3, failures - 1)) * (0.75 + Math.random() * 0.5);
-              await sleep(back);
-            }
-            if (done) return;
-            if (inFlight < 2) launch();
-            if (inFlight === 0) finish(() => reject(lastErr));
+            coolMirror(m);
+            if (status === 0 || RETRY_STATUS.has(status)) overpassStats.retries++;
+            if (out.size === 0) launch();
           },
         );
-        if (inFlight === 1) {
+        if (out.size === 1) {
           if (hedgeTimer) clearTimeout(hedgeTimer);
           hedgeTimer = setTimeout(() => {
             hedgeTimer = null;
-            if (!done && inFlight < 2) launch();
+            if (!done && out.size === 1 && attemptsOut < HEDGE_MAX_GLOBAL) launch(true);
           }, HEDGE_MS);
         }
       };
@@ -472,8 +622,8 @@ out geom;`;
     query: string,
     parse: (data: OverpassJson) => T,
     timeoutMs = OVERPASS_ATTEMPT_MS,
-  ): Promise<T> {
-    const ctrl = new AbortController();
+    ctrl = new AbortController(),
+  ): Promise<{ parsed: T; partial: boolean }> {
     this.activeAborts.add(ctrl);
     const abortTimer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -489,9 +639,10 @@ out geom;`;
       const json = (await res.json()) as OverpassJson & { remark?: string };
       // A server-side timeout is a 200 with a remark and no / partial elements
       if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) {
-        throw new OverpassHttpError(504, endpoint);
+        if (!json.elements || json.elements.length === 0) throw new OverpassHttpError(504, endpoint);
+        return { parsed: parse(json), partial: true };
       }
-      return parse(json);
+      return { parsed: parse(json), partial: false };
     } finally {
       clearTimeout(abortTimer);
       this.activeAborts.delete(ctrl);
