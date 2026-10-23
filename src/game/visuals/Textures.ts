@@ -62,6 +62,27 @@ export interface SurfaceMaps {
 }
 
 /** Grayscale-ish albedo so MeshStandardMaterial.color still tints by surface kind. */
+/**
+ * v1.3.5: the fbm height fields behind the road maps depend only on the noise
+ * scale (3 distinct values across 8 surface kinds), so compute them once per
+ * scale — same values as before, ~6× less work (it was a 1.6 s freeze at start).
+ * h5[y*size+x] = fbm(x·s, y·s, 5); h4[(y+1)*(size+2)+(x+1)] = fbm(x·s, y·s, 4), x,y ∈ [−1, size].
+ */
+const roadFields = new Map<number, { h5: Float64Array; h4: Float64Array }>();
+function roadField(size: number, scale: number): { h5: Float64Array; h4: Float64Array } {
+  const key = size * 1000 + scale;
+  let f = roadFields.get(key);
+  if (f) return f;
+  const h5 = new Float64Array(size * size);
+  const w = size + 2;
+  const h4 = new Float64Array(w * w);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) h5[y * size + x] = fbm(x * scale, y * scale, 5);
+  for (let y = -1; y <= size; y++) for (let x = -1; x <= size; x++) h4[(y + 1) * w + x + 1] = fbm(x * scale, y * scale, 4);
+  f = { h5, h4 };
+  roadFields.set(key, f);
+  return f;
+}
+
 export function makeRoadMaps(kind: string): SurfaceMaps {
   const size = 256;
   const { c: albedoC, ctx: a } = canvas(size, size);
@@ -72,13 +93,13 @@ export function makeRoadMaps(kind: string): SurfaceMaps {
   const imgN = n.createImageData(size, size);
 
   const scale = kind === 'cobblestone' || kind === 'paving_stones' ? 0.09 : kind === 'gravel' || kind === 'dirt' ? 0.07 : 0.045;
+  const { h5, h4 } = roadField(size, scale);
+  const w4 = size + 2;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const nx = x * scale;
-      const ny = y * scale;
-      let h = fbm(nx, ny, 5);
+      let h = h5[y * size + x];
       if (kind === 'asphalt' || kind === 'unknown') {
         // Fine grit + faint cracks
         const grit = noise2(x * 0.4, y * 0.4) * 0.12;
@@ -116,8 +137,8 @@ export function makeRoadMaps(kind: string): SurfaceMaps {
       imgR.data[i + 3] = 255;
 
       // Cheap normal from height neighbors
-      const hx = fbm((x + 1) * scale, y * scale, 4) - fbm((x - 1) * scale, y * scale, 4);
-      const hy = fbm(x * scale, (y + 1) * scale, 4) - fbm(x * scale, (y - 1) * scale, 4);
+      const hx = h4[(y + 1) * w4 + x + 2] - h4[(y + 1) * w4 + x];
+      const hy = h4[(y + 2) * w4 + x + 1] - h4[y * w4 + x + 1];
       imgN.data[i] = Math.round((0.5 - hx * 1.8) * 255);
       imgN.data[i + 1] = Math.round((0.5 - hy * 1.8) * 255);
       imgN.data[i + 2] = 255;

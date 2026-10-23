@@ -362,19 +362,17 @@ export class RoadBuilder {
       polygonOffsetFactor: -3,
       polygonOffsetUnits: -3,
     });
-    // Pre-create common materials
-    for (const kind of [
-      'asphalt',
-      'concrete',
-      'gravel',
-      'dirt',
-      'grass',
-      'cobblestone',
-      'paving_stones',
-      'compacted',
-    ] as SurfaceKind[]) {
+    // Pre-create common materials. v1.3.5: only asphalt up front; the rest are
+    // generated one per task (or on first use) so start-up doesn't freeze.
+    this.ensureMat('asphalt');
+    const later: SurfaceKind[] = ['concrete', 'gravel', 'dirt', 'grass', 'cobblestone', 'paving_stones', 'compacted'];
+    const step = () => {
+      const kind = later.shift();
+      if (!kind || this.disposed) return;
       this.ensureMat(kind);
-    }
+      setTimeout(step, 30);
+    };
+    setTimeout(step, 30);
     if (textures) this.unsubTextures = textures.onReady(() => this.applyPhotoTextures());
   }
 

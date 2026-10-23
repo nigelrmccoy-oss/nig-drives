@@ -230,6 +230,21 @@ export class Game {
     this.hud.setCameraMode('chase');
     this.hud.setWeather(this.env.weather);
     this.hud.setTime(this.env.getTimeLabel(), this.env.timePaused, this.env.getDayLengthMinutes());
+    // v1.3.5 P2-3: compile the world's shaders behind the loading screen
+    // (parallel where KHR_parallel_shader_compile exists) instead of in the
+    // first frames — that was a ~0.4 s hitch right after spawn.
+    try {
+      // compile for the composer's off-screen target (no in-shader tone
+      // mapping) — the variant the game actually renders with
+      const prevRT = this.renderer.getRenderTarget();
+      this.renderer.setRenderTarget(this.post.composer.renderTarget1);
+      const compiling = this.renderer.compileAsync(this.scene, this.camera);
+      this.renderer.setRenderTarget(prevRT);
+      await Promise.race([compiling, new Promise<void>((r) => setTimeout(r, 3_000))]);
+    } catch {
+      /* first frame will compile instead */
+    }
+
     this.hud.show();
     this.minimap.setVisible(true);
     this.loadingEl.classList.remove('visible');
