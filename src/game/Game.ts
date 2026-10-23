@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { ChaseCamera } from './camera/ChaseCamera';
-import { CITIES, getCityById } from './cities';
+import { getCityById, nearestPlace } from './cities';
 import { Input } from './input/Input';
-import { TileManager } from './map/TileManager';
+import { TileManager, type TileSwapInfo } from './map/TileManager';
 import { HUD } from './ui/HUD';
 import { Minimap } from './ui/Minimap';
 import { createVehicle } from './vehicles/VehicleFactory';
@@ -164,11 +164,10 @@ export class Game {
       city.lat = spawn.lat;
       city.lon = spawn.lon;
       if (spawn.heading !== undefined) city.headingDeg = spawn.heading;
-      // v1.3.3: HUD names the nearest known city to the override, not the menu pick
-      const km = (c: { lat: number; lon: number }) =>
-        Math.hypot(c.lat - spawn.lat, (c.lon - spawn.lon) * Math.cos((spawn.lat * Math.PI) / 180)) * 111.32;
-      const near = [...CITIES].sort((a, b) => km(a) - km(b))[0];
-      if (near && km(near) < 60) {
+      // v1.3.6: HUD names the nearest place (gazetteer of municipalities,
+      // several anchors per big one) — 1.3.5 said "Toronto" at Hamilton
+      const near = nearestPlace(spawn.lat, spawn.lon);
+      if (near) {
         city.name = near.name;
         city.region = near.region;
       } else {
@@ -195,6 +194,7 @@ export class Game {
     });
     this.chase.setGroundSampler((x, z) => this.tiles!.getHeight(x, z));
     this.chase.reset();
+    this.tiles.setTileSwapListener((info) => this.onTileSwap(info));
 
     this.vehicle = createVehicle(opts.vehicle, trans);
     this.scene.add(this.vehicle.mesh);
@@ -287,6 +287,45 @@ export class Game {
         this.lastDry = { x: p.x, z: p.z, y: p.y, heading: v.heading };
       }
     }
+  }
+
+  /**
+   * v1.3.6 P1: a tile's offline roads were just replaced by OSM. The car must
+   * not end up under the new surface, in water or inside a new building: lift
+   * it onto the surface, or (stopped / wet / boxed in) put it on the nearest
+   * road. The last dry point may have been on a removed grid road.
+   */
+  private onTileSwap(info: TileSwapInfo): void {
+    const v = this.vehicle;
+    const tiles = this.tiles;
+    if (!v || !tiles) return;
+    const m = 40;
+    const { x, z } = v.position;
+    if (x < info.minX - m || x > info.maxX + m || z < info.minZ - m || z > info.maxZ + m) return;
+    this.lastDry = null;
+    const s = tiles.sampleSurface(x, z, v.position.y);
+    const boxed = tiles.pushOutOfBuildings(x, z, CAR_COLLIDE_R, s.roadFactor > 0.5);
+    const p = tiles.findNearestRoadPoint(x, z);
+    const slow = Math.abs(v.speed) < 4;
+    if (p && (s.kind === 'water' || boxed || (slow && s.roadFactor <= 0.5))) {
+      v.setPose(p.x, p.z, v.heading);
+      v.position.y = p.y;
+      v.vy = 0;
+      v.mesh.position.y = p.y;
+      this.lastGroundY = p.y;
+      this.lastDry = { x: p.x, z: p.z, y: p.y, heading: v.heading };
+      this.waterTime = 0;
+      this.chase.reset();
+      this.hud.setStatus('OSM roads streamed in — car placed on the nearest road');
+      return;
+    }
+    if (!(v.position.y >= s.height - 0.02)) {
+      v.position.y = s.height;
+      v.vy = 0;
+      v.mesh.position.y = s.height;
+    }
+    this.lastGroundY = s.height;
+    this.hud.setStatus('OSM roads streamed in');
   }
 
   private resetToDry(): void {

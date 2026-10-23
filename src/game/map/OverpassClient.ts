@@ -334,6 +334,7 @@ export class OverpassClient {
     expectGen?: number,
     budgetMs = REQUEST_BUDGET_MS,
     priority = false,
+    alive?: () => boolean,
   ): Promise<OverpassResult> {
     const cached = this.memoryCache.get(key);
     if (cached) {
@@ -348,8 +349,8 @@ export class OverpassClient {
 
     await this.acquireSlot(priority);
     try {
-      if (expectGen !== undefined && expectGen !== this.generation) {
-        throw new Error('Overpass request cancelled (stale generation)');
+      if ((expectGen !== undefined && expectGen !== this.generation) || (alive && !alive())) {
+        throw new Error('Overpass request cancelled (tile gone / stale generation)');
       }
 
       const query = buildQuery(south, west, north, east);

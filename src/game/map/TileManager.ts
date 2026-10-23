@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OverpassClient, overpassStats } from './OverpassClient';
+import { OverpassClient, overpassStats, type OverpassResult } from './OverpassClient';
 import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder, type Footprint } from './BuildingBuilder';
 import { ShoreMask, SHORE_HALF_M, type ShoreClass, type ShoreLines } from './ShoreMask';
@@ -47,8 +47,11 @@ const NEAR_RING: RingConfig = { name: 'near', size: 1200, res: 192, recenter: 16
 const MID_RING: RingConfig = { name: 'mid', size: 4800, res: 160, recenter: 700, skirt: 40, carve: false };
 const FAR_RING: RingConfig = { name: 'far', size: 16000, res: 128, recenter: 2600, skirt: 120, carve: false };
 const SPAWN_DEADLINE_MS = 14_000;
-/** v1.3.5: Overpass budget for the spawn tile (background tiles: 75 s). */
-const SPAWN_OVERPASS_BUDGET_MS = 30_000;
+/**
+ * v1.3.6: a tile shows offline roads if Overpass hasn't answered within this
+ * (the spawn tile: at once, unless cached); the real tile is swapped in later.
+ */
+const TILE_FILLER_AFTER_MS = 20_000;
 /** How long a tile build waits for its DEM before building with provisional heights. */
 const DEM_WAIT_MS = 15_000;
 /** How often (s) to look for provisional tiles whose DEM has since arrived. */
@@ -113,6 +116,27 @@ interface TileEntry {
   reheights: number;
   /** Solid building footprints in this tile (push-out collision). */
   footprints?: Footprint[];
+  /** v1.3.6: showing offline / partial content while OSM streams in. */
+  awaitingOsm?: boolean;
+}
+
+/** v1.3.6: a tile's offline content was replaced by OSM (local metres). */
+export interface TileSwapInfo {
+  key: string;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+/** Resolve with the promise's value, or null after `ms` (or on rejection). */
+function raceDeadline<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  const safe = p.then(
+    (v) => v,
+    () => null,
+  );
+  if (ms <= 0) return Promise.resolve(null);
+  return Promise.race([safe, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
 }
 
 export interface WaterInfo {
@@ -201,6 +225,14 @@ export class TileManager {
   private ground: THREE.Mesh;
   private groundMat: THREE.MeshStandardMaterial;
   private onStatus?: TileStatusListener;
+  private onTileSwap?: (info: TileSwapInfo) => void;
+  /** v1.3.6 streaming stats (ms since construction; −1 = not yet). */
+  private readonly createdAt = performance.now();
+  private readyAtMs = -1;
+  private spawnOsmAtMs = -1;
+  private spawnKey = '';
+  private spawnCacheSource = '';
+  private upgradedTiles = 0;
   private seenWayIds = new Set<number>();
   private seenBuildingIds = new Set<number>();
   private fallbackBuilt = false;
@@ -661,7 +693,8 @@ export class TileManager {
         ? `Forced offline roads (?fallback=1) · tile ${tileKey(tx, ty)}…`
         : `Loading spawn tile ${tileKey(tx, ty)}…`,
     );
-    await this.loadTile(tx, ty);
+    this.spawnKey = tileKey(tx, ty);
+    await this.loadTile(tx, ty, true);
     if (this.disposed) return;
 
     if (!this.hasAnyRoads()) {
@@ -716,6 +749,7 @@ export class TileManager {
       );
     }
 
+    this.readyAtMs = Math.round(performance.now() - this.createdAt);
     for (let dy = -LOAD_RADIUS; dy <= LOAD_RADIUS; dy++) {
       for (let dx = -LOAD_RADIUS; dx <= LOAD_RADIUS; dx++) {
         if (dx === 0 && dy === 0) continue;
@@ -925,7 +959,7 @@ export class TileManager {
     }
   }
 
-  private async loadTile(tx: number, ty: number): Promise<void> {
+  private async loadTile(tx: number, ty: number, spawn = false): Promise<void> {
     if (this.disposed) return;
     const key = tileKey(tx, ty);
     if (this.tiles.has(key)) return;
@@ -979,91 +1013,33 @@ export class TileManager {
         await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Forced offline roads · tile ${key}`);
       } else {
-      // v1.3.5: the spawn tile gets a shorter Overpass budget so a dead API
-      // falls back to cached / offline roads in ~30 s, not 75 s
-      const result = await this.client.fetchTile(
-        key,
-        b.south,
-        b.west,
-        b.north,
-        b.east,
-        gen,
-        this.tiles.size <= 1 && !this.hasAnyRoads() ? SPAWN_OVERPASS_BUDGET_MS : undefined,
-      );
-      if (this.disposed || entry.cancelled || gen !== this.fetchGen) {
-        this.finishLoading(key);
-        return;
-      }
-
-      const freshWays = result.ways.filter((w) => {
-        if (this.seenWayIds.has(w.id)) return false;
-        this.seenWayIds.add(w.id);
-        entry.wayIds.push(w.id);
-        return true;
-      });
-      const freshBuildings = result.buildings.filter((w) => {
-        if (this.seenBuildingIds.has(w.id)) return false;
-        this.seenBuildingIds.add(w.id);
-        entry.buildingIds.push(w.id);
-        return true;
-      });
-
-      // v1.3.3 water + landuse polygons (cheap: rasterised once, shared by all rings)
-      this.addAreas(result.areas ?? []);
-      if (result.relationIds?.length) {
-        void this.client
-          .fetchRelations(result.relationIds, gen)
-          .then((rels) => {
-            if (!this.disposed && gen === this.fetchGen) this.addAreas(rels);
-          })
-          .catch(() => {
-            /* water relations are optional */
-          });
-      }
-
-      if (freshWays.length === 0 && this.tileMostlyWater(b)) {
-        // v1.3.3: OSM answered and the tile is open water (SF Bay, Lake
-        // Ontario): no offline grid roads floating on the water.
-      } else if (freshWays.length === 0) {
-        await this.applyTileFallback(entry, heightAt);
-        this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
-      } else {
-        entry.ways = freshWays;
-        entry.buildings = freshBuildings;
-        // Ways extend past the tile bbox: make sure their DEM is in too
-        const db = dataBounds([...freshWays, ...freshBuildings], b);
-        await this.elevation.preloadArea(db.south, db.west, db.north, db.east, 6_000);
-        if (this.disposed || entry.cancelled) {
-          this.finishLoading(key);
-          return;
+        // v1.3.6 P1: never block on Overpass. The spawn tile builds from the
+        // cache when it has one, else from the offline grid at once; other
+        // tiles wait up to TILE_FILLER_AFTER_MS. The request keeps running in
+        // the background (long budget) and the real tile is swapped in place.
+        const alive = () => !this.disposed && !entry.cancelled && gen === this.fetchGen && this.tiles.get(key) === entry;
+        let result: OverpassResult | null = null;
+        let fetchP: Promise<OverpassResult> | null = null;
+        if (spawn) {
+          result = await this.client.peekTile(key);
+          if (!alive()) return;
+          if (result) this.spawnCacheSource = result.source;
         }
-        // Density polish: fill sparse lots without waiting on Overpass multipolygons
-        const TARGET_PER_TILE = 380;
-        entry.fillCount = 0;
-        if (freshBuildings.length < 220) {
-          entry.fillCount = Math.min(180, TARGET_PER_TILE - freshBuildings.length);
+        if (!result) {
+          fetchP = this.client.fetchTile(key, b.south, b.west, b.north, b.east, gen, undefined, spawn, alive);
+          result = await raceDeadline(fetchP, spawn ? 0 : TILE_FILLER_AFTER_MS);
         }
-        const built = await this.buildTileContent(entry);
-        if (!built || this.disposed || entry.cancelled) {
-          if (built) {
-            this.roadIndex.remove(built.centerlines);
-            disposeGroup(built.group);
-          }
-          this.finishLoading(key);
-          return;
+        if (!alive()) return;
+        if (result) {
+          const ok = await this.applyOsmResult(entry, result, gen, false);
+          if (ok && spawn) this.spawnOsmAtMs = 0;
+          if (result.partial) this.scheduleUpgrade(entry, gen, 1, 30_000);
+        } else {
+          await this.applyTileFallback(entry, heightAt);
+          entry.awaitingOsm = true;
+          this.emitStatus(`Offline roads for tile ${key} — OSM streaming in the background`);
+          if (fetchP) void this.upgradeTile(entry, fetchP, gen, 0);
         }
-        entry.group.add(built.group);
-        entry.centerlines = built.centerlines;
-        entry.provisional = built.provisional;
-        this.collectFootprints(entry);
-        this.rebuildCenterlineIndex();
-        const bldgCount = built.buildingCount;
-
-        this.scene.add(entry.group);
-        this.emitStatus(
-          `Tile ${key}: ${freshWays.length} roads, ${bldgCount} buildings`,
-        );
-      }
       }
     } catch (err) {
       if (this.disposed || entry.cancelled) {
@@ -1072,10 +1048,186 @@ export class TileManager {
       }
       console.warn('Tile load failed — offline fallback', key, err);
       await this.applyTileFallback(entry, heightAt);
+      entry.awaitingOsm = true;
+      this.scheduleUpgrade(entry, gen, 1, 30_000);
       this.emitStatus(`Using offline roads (Overpass slow) · tile ${key}`);
     } finally {
       this.finishLoading(key);
     }
+  }
+
+  /**
+   * v1.3.6: build an Overpass answer into a tile. `swap` = the tile already
+   * shows offline / partial content: the new group is built off-screen and
+   * replaces the old one in one step (no frame without roads), then the swap
+   * listener lets Game put the car back on solid ground.
+   */
+  private async applyOsmResult(entry: TileEntry, result: OverpassResult, gen: number, swap: boolean): Promise<boolean> {
+    const key = entry.key;
+    const b = tileBounds(entry.tx, entry.ty);
+    const own = new Set(swap ? entry.wayIds : []);
+    const ownB = new Set(swap ? entry.buildingIds : []);
+    const freshWays = result.ways.filter((w) => !this.seenWayIds.has(w.id) || own.has(w.id));
+    const freshBuildings = result.buildings.filter((w) => !this.seenBuildingIds.has(w.id) || ownB.has(w.id));
+
+    // v1.3.3 water + landuse polygons (cheap: rasterised once, shared by all rings)
+    this.addAreas(result.areas ?? []);
+    if (result.relationIds?.length) {
+      void this.client
+        .fetchRelations(result.relationIds, gen)
+        .then((rels) => {
+          if (!this.disposed && gen === this.fetchGen) this.addAreas(rels);
+        })
+        .catch(() => {
+          /* water relations are optional */
+        });
+    }
+
+    if (freshWays.length === 0) {
+      if (swap) return false; // keep what is there
+      if (this.tileMostlyWater(b)) return true; // open water: no grid roads floating on it
+      await this.applyTileFallback(entry, this.heightAtFn());
+      this.emitStatus(`Using offline roads (no OSM roads) · tile ${key}`);
+      return false;
+    }
+    // claim the ids (and release the ones this tile no longer shows)
+    const newW = new Set(freshWays.map((w) => w.id));
+    const newB = new Set(freshBuildings.map((w) => w.id));
+    for (const id of entry.wayIds) if (!newW.has(id)) this.seenWayIds.delete(id);
+    for (const id of entry.buildingIds) if (!newB.has(id)) this.seenBuildingIds.delete(id);
+    for (const id of newW) this.seenWayIds.add(id);
+    for (const id of newB) this.seenBuildingIds.add(id);
+    entry.wayIds = [...newW];
+    entry.buildingIds = [...newB];
+    entry.ways = freshWays;
+    entry.buildings = freshBuildings;
+    // Ways extend past the tile bbox: make sure their DEM is in too
+    const db = dataBounds([...freshWays, ...freshBuildings], b);
+    await this.elevation.preloadArea(db.south, db.west, db.north, db.east, 6_000);
+    if (this.disposed || entry.cancelled) return false;
+    // Density polish: fill sparse lots without waiting on Overpass multipolygons
+    const TARGET_PER_TILE = 380;
+    entry.fillCount = 0;
+    entry.fillSeed = entry.tx * 997 + entry.ty * 131;
+    if (freshBuildings.length < 220) {
+      entry.fillCount = Math.min(180, TARGET_PER_TILE - freshBuildings.length);
+    }
+    const built = await this.buildTileContent(entry);
+    if (!built || this.disposed || entry.cancelled) {
+      if (built) {
+        this.roadIndex.remove(built.centerlines);
+        disposeGroup(built.group);
+      }
+      return false;
+    }
+    if (swap) {
+      for (const child of [...entry.group.children]) {
+        entry.group.remove(child);
+        disposeGroup(child);
+      }
+    }
+    entry.group.add(built.group);
+    entry.centerlines = built.centerlines;
+    entry.provisional = built.provisional;
+    entry.usedFallback = false;
+    entry.awaitingOsm = !!result.partial;
+    this.collectFootprints(entry);
+    if (swap && this.tiles.get('fallback') && entry.key === this.spawnKey) {
+      // the 3×3 spawn grid (spawn tile had no dry grid roads) is no longer needed
+      const fb = this.tiles.get('fallback')!;
+      this.unloadTile('fallback', fb);
+    }
+    this.rebuildCenterlineIndex();
+    if (!swap) this.scene.add(entry.group);
+    this.emitStatus(
+      `${swap ? 'OSM swapped in · ' : ''}Tile ${key}: ${freshWays.length} roads, ${built.buildingCount} buildings${result.partial ? ' (partial)' : ''}`,
+    );
+    if (swap) {
+      this.upgradedTiles++;
+      if (key === this.spawnKey && this.spawnOsmAtMs < 0) this.spawnOsmAtMs = Math.round(performance.now() - this.createdAt);
+      const a = this.origin.toLocal(b.south, b.west);
+      const c = this.origin.toLocal(b.north, b.east);
+      this.onTileSwap?.({
+        key,
+        minX: Math.min(a.x, c.x),
+        maxX: Math.max(a.x, c.x),
+        minZ: Math.min(a.z, c.z),
+        maxZ: Math.max(a.z, c.z),
+      });
+    }
+    return true;
+  }
+
+  /** v1.3.6: wait for a background Overpass answer, then swap it into the tile. */
+  private async upgradeTile(entry: TileEntry, p: Promise<OverpassResult>, gen: number, attempt: number): Promise<void> {
+    let r: OverpassResult | null = null;
+    try {
+      r = await p;
+    } catch {
+      r = null;
+    }
+    const alive = () => !this.disposed && !entry.cancelled && gen === this.fetchGen && this.tiles.get(entry.key) === entry;
+    if (!alive()) return;
+    if (r) {
+      while (entry.rebuilding || entry.loading) {
+        await new Promise((res) => setTimeout(res, 250));
+        if (!alive()) return;
+      }
+      entry.rebuilding = true;
+      let ok = false;
+      try {
+        ok = await this.applyOsmResult(entry, r, gen, true);
+      } catch (err) {
+        console.warn('OSM swap failed', entry.key, err);
+      } finally {
+        entry.rebuilding = false;
+      }
+      if (ok && !r.partial) return;
+    }
+    this.scheduleUpgrade(entry, gen, attempt + 1, 20_000 * (attempt + 1));
+  }
+
+  private scheduleUpgrade(entry: TileEntry, gen: number, attempt: number, delayMs: number): void {
+    if (attempt > 5) return;
+    setTimeout(() => {
+      const alive = () => !this.disposed && !entry.cancelled && gen === this.fetchGen && this.tiles.get(entry.key) === entry;
+      if (!alive() || this.forceOffline) return;
+      const b = tileBounds(entry.tx, entry.ty);
+      const p = this.client.fetchTile(entry.key, b.south, b.west, b.north, b.east, gen, undefined, entry.key === this.spawnKey, alive);
+      void this.upgradeTile(entry, p, gen, attempt);
+    }, delayMs);
+  }
+
+  /** v1.3.6 QA: streaming state (ms since the TileManager was created). */
+  streamInfo(): {
+    readyMs: number;
+    spawnKey: string;
+    spawnCacheSource: string;
+    spawnOsmMs: number;
+    upgradedTiles: number;
+    fillerTiles: number;
+    osmTiles: number;
+  } {
+    let filler = 0;
+    let osm = 0;
+    for (const t of this.tiles.values()) {
+      if (t.key === 'fallback') continue;
+      if (t.usedFallback) filler++;
+      else if (!t.loading) osm++;
+    }
+    return {
+      readyMs: this.readyAtMs,
+      spawnKey: this.spawnKey,
+      spawnCacheSource: this.spawnCacheSource,
+      spawnOsmMs: this.spawnOsmAtMs,
+      upgradedTiles: this.upgradedTiles,
+      fillerTiles: filler,
+      osmTiles: osm,
+    };
+  }
+
+  setTileSwapListener(cb: ((info: TileSwapInfo) => void) | null): void {
+    this.onTileSwap = cb ?? undefined;
   }
 
   private finishLoading(key: string): void {
