@@ -3,6 +3,7 @@ import { OverpassClient } from './OverpassClient';
 import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder, type Footprint } from './BuildingBuilder';
 import { ShoreMask, SHORE_HALF_M, type ShoreClass, type ShoreLines } from './ShoreMask';
+import { loadBundledShore, bundledCovers, bundledShoreLines, bundledInlandNear, type BundledShore } from './BundledShore';
 import type { OsmNode } from './OverpassClient';
 import { WaterMap, assembleRings, type AreaClass, type AreaSample } from './WaterMap';
 import { isWaterTags, type OsmArea } from './OverpassClient';
@@ -165,6 +166,11 @@ export class TileManager {
   private shore = new ShoreMask();
   private shoreLines: { minX: number; minZ: number; maxX: number; maxZ: number; lines: ShoreLines } | null = null;
   private shoreFetching = false;
+  /** v1.3.5: bundled western Lake Ontario outline (null outside / not loaded). */
+  private bundled: BundledShore | null = null;
+  private bundledLines: ShoreLines | null = null;
+  /** Where the published shore mask came from. */
+  private shoreSource: 'none' | 'bundled' | 'overpass' | 'dem' = 'none';
   private shoreFetchRetryAt = 0;
   private shoreStale = false;
   /** Shore mask classed (partly) from the z12 stand-in: rebuild once fine DEM lands. */
@@ -328,7 +334,9 @@ export class TileManager {
    * the plane, dry cells the DEM had sunk are lifted just above it.
    */
   private shoreAdjust(x: number, z: number, dem: number): number {
-    if (!this.lakeMode || !this.shore.ready) return dem;
+    // v1.3.5: a DEM-only mask (no OSM / bundled outline) is no better than
+    // the raw DEM and was 2–3× further off in QA — keep the 1.3.3 shore then.
+    if (!this.lakeMode || !this.shore.ready || !this.shore.osm) return dem;
     const w = this.shore.sample(x, z);
     if (Number.isNaN(w)) return dem;
     const sunk = this.seaRel - 1.5;
@@ -593,6 +601,14 @@ export class TileManager {
       this.origin.lat + 0.08,
       this.origin.lon + 0.11,
     );
+
+    // v1.3.5: bundled OSM shoreline / inland lakes (offline-safe, separate chunk)
+    this.bundled = await loadBundledShore();
+    if (this.disposed) return;
+    if (this.bundled) {
+      const near = bundledInlandNear(this.bundled, this.origin.lat, this.origin.lon, 15);
+      if (near.length) this.addAreas(near);
+    }
 
     if (this.lakeMode) {
       // v1.3.4: DEM shore mask before anything is placed (OSM lines follow in the background)
@@ -1225,6 +1241,19 @@ export class TileManager {
     return d < LAKE_FLAT_M ? 1 : d < LAKE_NOISE_M ? 2 : 0;
   };
 
+  /** v1.3.5: bundled OSM outline when the whole shore window is inside its coverage. */
+  private bundledLinesFor(cx: number, cz: number): ShoreLines | null {
+    const b = this.bundled;
+    if (!b) return null;
+    const a = this.origin.toLatLon(cx - SHORE_HALF_M, cz - SHORE_HALF_M);
+    const c = this.origin.toLatLon(cx + SHORE_HALF_M, cz + SHORE_HALF_M);
+    if (!bundledCovers(b, Math.min(a.lat, c.lat), Math.min(a.lon, c.lon), Math.max(a.lat, c.lat), Math.max(a.lon, c.lon))) {
+      return null;
+    }
+    if (!this.bundledLines) this.bundledLines = bundledShoreLines(b, (lat, lon) => this.origin.toLocal(lat, lon));
+    return this.bundledLines;
+  }
+
   private shoreLinesFor(cx: number, cz: number): ShoreLines | null {
     const c = this.shoreLines;
     if (!c) return null;
@@ -1252,10 +1281,14 @@ export class TileManager {
         6_000,
       );
       if (this.disposed) return;
-      const lines = this.shoreLinesFor(cx, cz);
+      const bundled = this.bundledLinesFor(cx, cz);
+      const lines = bundled ?? this.shoreLinesFor(cx, cz);
       this.shoreClassProv = false;
       const built = await this.shore.build(cx, cz, this.shoreClass, lines, () => this.disposed);
-      if (built) this.shoreProvisional = this.shoreClassProv;
+      if (built) {
+        this.shoreProvisional = bundled ? false : this.shoreClassProv;
+        this.shoreSource = bundled ? 'bundled' : this.shore.osm ? 'overpass' : 'dem';
+      }
       if (!lines && !this.forceOffline) void this.fetchShoreLines(cx, cz);
     } finally {
       this.shore.building = false;
@@ -1297,10 +1330,19 @@ export class TileManager {
   }
 
   /** Shore-mask stats for QA (`__nig.game.tiles.shoreInfo()`). */
-  shoreInfo(): { ready: boolean; osm: boolean; provisional: boolean; centerX: number; centerZ: number; version: number } {
+  shoreInfo(): {
+    ready: boolean;
+    osm: boolean;
+    source: 'none' | 'bundled' | 'overpass' | 'dem';
+    provisional: boolean;
+    centerX: number;
+    centerZ: number;
+    version: number;
+  } {
     return {
       ready: this.shore.ready,
       osm: this.shore.osm,
+      source: this.shoreSource,
       provisional: this.shoreProvisional,
       centerX: this.shore.centerX,
       centerZ: this.shore.centerZ,

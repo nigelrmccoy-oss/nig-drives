@@ -12,6 +12,8 @@
  *     follows OSM exactly while the DEM only decides which side is water;
  *  3. piers / breakwaters are stamped back in as land.
  * Without OSM (Overpass down) the mask is the DEM classification alone.
+ * v1.3.5: with bundled water polygons the mask is their exact fill, and a
+ * DEM-only mask is flagged osm=false so TileManager ignores it (1.3.3 shore).
  */
 
 export interface ShoreLines {
@@ -21,6 +23,11 @@ export interface ShoreLines {
   landAreas: Array<Array<{ x: number; z: number }>>;
   /** Pier / breakwater / groyne centrelines (land, stroked). */
   landLines: Array<Array<{ x: number; z: number }>>;
+  /**
+   * v1.3.5: closed water polygons (bundled OSM lake outline incl. islands).
+   * When present the mask is their exact even-odd fill — no DEM vote.
+   */
+  waterPolys?: Array<Array<{ x: number; z: number }>>;
 }
 
 /** 0 = dry, 1 = wet, 2 = near lake level (wet if mostly surrounded by lake). */
@@ -90,6 +97,19 @@ export class ShoreMask {
     const x0 = cx - SHORE_HALF_M;
     const z0 = cz - SHORE_HALF_M;
     const cc = SHORE_CELL_M * CLASS_STRIDE;
+    if (lines?.waterPolys?.length) {
+      const out = await fillPolys(n, x0, z0, lines.waterPolys, cancelled);
+      if (!out) return false;
+      for (const ring of lines.landAreas) fillRing(out, n, x0, z0, ring);
+      for (const line of lines.landLines) strokeLine(out, n, x0, z0, line, PIER_HALF_M);
+      if (cancelled()) return false;
+      this.mask = out;
+      this.centerX = cx;
+      this.centerZ = cz;
+      this.osm = true;
+      this.version++;
+      return true;
+    }
     // 1. DEM classes at 5 m
     const cls = new Uint8Array(cn * cn);
     let missing = 0;
@@ -247,6 +267,51 @@ export class ShoreMask {
     this.version++;
     return true;
   }
+}
+
+/** Even-odd scanline fill of closed rings (cell centres), sliced across frames. */
+async function fillPolys(
+  n: number,
+  x0: number,
+  z0: number,
+  rings: Array<Array<{ x: number; z: number }>>,
+  cancelled: () => boolean,
+): Promise<Uint8Array | null> {
+  const zMin = z0;
+  const zMax = z0 + n * SHORE_CELL_M;
+  // edges that cross the window's z range (any x: they still flip parity)
+  const ex0: number[] = [], ez0: number[] = [], ex1: number[] = [], ez1: number[] = [];
+  for (const r of rings) {
+    for (let i = 0; i < r.length; i++) {
+      const a = r[i];
+      const b = r[(i + 1) % r.length];
+      if ((a.z < zMin && b.z < zMin) || (a.z > zMax && b.z > zMax) || a.z === b.z) continue;
+      ex0.push(a.x); ez0.push(a.z); ex1.push(b.x); ez1.push(b.z);
+    }
+  }
+  const out = new Uint8Array(n * n);
+  const xs: number[] = [];
+  let t0 = performance.now();
+  for (let j = 0; j < n; j++) {
+    if (performance.now() - t0 > 6) {
+      await yieldSlice();
+      if (cancelled()) return null;
+      t0 = performance.now();
+    }
+    const zc = z0 + (j + 0.5) * SHORE_CELL_M;
+    xs.length = 0;
+    for (let k = 0; k < ex0.length; k++) {
+      const az = ez0[k], bz = ez1[k];
+      if ((az <= zc && bz > zc) || (bz <= zc && az > zc)) xs.push(ex0[k] + ((zc - az) / (bz - az)) * (ex1[k] - ex0[k]));
+    }
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const i0 = Math.max(0, Math.ceil((xs[k] - x0) / SHORE_CELL_M - 0.5));
+      const i1 = Math.min(n - 1, Math.floor((xs[k + 1] - x0) / SHORE_CELL_M - 0.5));
+      for (let i = i0; i <= i1; i++) out[j * n + i] = 255;
+    }
+  }
+  return out;
 }
 
 function fillRing(out: Uint8Array, n: number, x0: number, z0: number, ring: Array<{ x: number; z: number }>): void {
