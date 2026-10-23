@@ -252,6 +252,7 @@ export class OverpassClient {
     north: number,
     east: number,
     expectGen?: number,
+    budgetMs = REQUEST_BUDGET_MS,
   ): Promise<OverpassResult> {
     const cached = this.memoryCache.get(key);
     if (cached) return { ...cached, source: 'memory' };
@@ -267,7 +268,7 @@ export class OverpassClient {
       }
 
       const query = buildQuery(south, west, north, east);
-      const res = await this.runWaves(query, (d) => parseTile(d), expectGen, `tile:${key}`);
+      const res = await this.runWaves(query, (d) => parseTile(d), expectGen, `tile:${key}`, budgetMs);
       this.memoryCache.set(key, res.parsed);
       this.trimCache();
       return { ...res.parsed, source: res.source };
@@ -286,6 +287,7 @@ export class OverpassClient {
     parse: (data: OverpassJson) => T,
     expectGen?: number,
     cacheKey?: string,
+    budgetMs = REQUEST_BUDGET_MS,
   ): Promise<{ parsed: T; source: string }> {
     const stale = () => expectGen !== undefined && expectGen !== this.generation;
     const ck = cacheKey ? `v135:${cacheKey}` : null;
@@ -302,7 +304,7 @@ export class OverpassClient {
     const t0 = performance.now();
     let lastError: unknown = new Error('Overpass: no mirror tried');
     try {
-      const res = await this.raceMirrors(query, parse, stale, t0);
+      const res = await this.raceMirrors(query, parse, stale, t0, budgetMs);
       overpassStats.ok++;
       overpassStats.lastMs = Math.round(performance.now() - t0);
       count(res.source);
@@ -331,6 +333,7 @@ export class OverpassClient {
     parse: (data: OverpassJson) => T,
     stale: () => boolean,
     t0: number,
+    budgetMs: number,
   ): Promise<{ parsed: T; source: string }> {
     return new Promise((resolve, reject) => {
       // healthy-first order, then a second pass if the budget allows
@@ -353,13 +356,13 @@ export class OverpassClient {
           return;
         }
         const elapsed = performance.now() - t0;
-        const m = elapsed < REQUEST_BUDGET_MS - 5_000 ? queue.shift() : undefined;
+        const m = elapsed < budgetMs - 5_000 ? queue.shift() : undefined;
         if (!m) {
           if (inFlight === 0) finish(() => reject(lastErr));
           return;
         }
         inFlight++;
-        const timeout = Math.min(OVERPASS_ATTEMPT_MS, REQUEST_BUDGET_MS - elapsed);
+        const timeout = Math.min(OVERPASS_ATTEMPT_MS, budgetMs - elapsed);
         const viaProxy = proxiesUsable;
         const ep = viaProxy ? m.proxy : `${m.direct}?client=${encodeURIComponent(OVERPASS_CLIENT_ID)}`;
         this.postQuery(ep, query, parse, timeout).then(

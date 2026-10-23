@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OverpassClient } from './OverpassClient';
+import { OverpassClient, overpassStats } from './OverpassClient';
 import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder, type Footprint } from './BuildingBuilder';
 import { ShoreMask, SHORE_HALF_M, type ShoreClass, type ShoreLines } from './ShoreMask';
@@ -47,6 +47,8 @@ const NEAR_RING: RingConfig = { name: 'near', size: 1200, res: 192, recenter: 16
 const MID_RING: RingConfig = { name: 'mid', size: 4800, res: 160, recenter: 700, skirt: 40, carve: false };
 const FAR_RING: RingConfig = { name: 'far', size: 16000, res: 128, recenter: 2600, skirt: 120, carve: false };
 const SPAWN_DEADLINE_MS = 14_000;
+/** v1.3.5: Overpass budget for the spawn tile (background tiles: 75 s). */
+const SPAWN_OVERPASS_BUDGET_MS = 30_000;
 /** How long a tile build waits for its DEM before building with provisional heights. */
 const DEM_WAIT_MS = 15_000;
 /** How often (s) to look for provisional tiles whose DEM has since arrived. */
@@ -977,6 +979,8 @@ export class TileManager {
         await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Forced offline roads · tile ${key}`);
       } else {
+      // v1.3.5: the spawn tile gets a shorter Overpass budget so a dead API
+      // falls back to cached / offline roads in ~30 s, not 75 s
       const result = await this.client.fetchTile(
         key,
         b.south,
@@ -984,6 +988,7 @@ export class TileManager {
         b.north,
         b.east,
         gen,
+        this.tiles.size <= 1 && !this.hasAnyRoads() ? SPAWN_OVERPASS_BUDGET_MS : undefined,
       );
       if (this.disposed || entry.cancelled || gen !== this.fetchGen) {
         this.finishLoading(key);
@@ -1357,6 +1362,11 @@ export class TileManager {
     } finally {
       this.shoreFetching = false;
     }
+  }
+
+  /** Overpass request stats for QA (`__nig.game.tiles.overpassStats()`). */
+  overpassStats(): typeof overpassStats {
+    return { ...overpassStats, bySource: { ...overpassStats.bySource } };
   }
 
   /** Shore-mask stats for QA (`__nig.game.tiles.shoreInfo()`). */
