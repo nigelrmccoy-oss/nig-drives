@@ -6,6 +6,30 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API k
 
 ## Changelog
 
+### v1.3.6 (package 1.3.11) — Stream OSM after ready, water agreement, dry roads
+
+- **Ready first, OSM after.** The start tile no longer waits on Overpass: it
+  uses the cached tile if there is one, otherwise the bundled/offline map, and
+  the game is ready immediately. Real OSM streams in afterwards and is swapped
+  in place (built off-screen, children swapped in one frame); the car is lifted
+  or snapped to the nearest road if the swap would leave it in water or inside
+  a building.
+- **Overpass client:** ~55 s per attempt (server timeout 45 s), at most 2
+  requests in flight, one hedge after 35 s, losing requests aborted, kumi and
+  coffee mirrors only when the primaries are cooling, per-mirror exponential
+  cooldowns. Every complete *and* partial result is cached (IndexedDB), so the
+  second load comes straight from the cache.
+- **Water:** physics water now follows the drawn lake plane (no more wet land
+  or dry water at the shoreline); river polygons that meet the lake are sunk to
+  lake level; roads and bridges are never water; filler grids and filler
+  buildings keep a margin from water.
+- **Piers:** the bundled shoreline keeps piers and breakwaters that stand in
+  open water (e.g. the Hamilton canal breakwater).
+- **Buildings:** walls left hanging after a later road carved the ground under
+  them are re-heighted.
+- **HUD:** the place name comes from a gazetteer with several anchors per city
+  (no more "Toronto" at Hamilton).
+
 ### v1.3.5 (package 1.3.10) — Overpass resilience, bundled shoreline, load hitch
 - Overpass: 30 s attempts, `[timeout:25]`, identifying User-Agent (dev/preview proxy + Electron), mirror order de → mail.ru → kumi → coffee with backoff/cooldown on 429/5xx, 30 s spawn budget, and a 24 h IndexedDB last-good cache (stale cache used when every mirror fails).
 - Bundled western Lake Ontario shoreline (Hamilton → Toronto, plus Silver Lake / Laurel Creek / Columbia Lake), rasterised with an exact even-odd fill; piers stamped as land. Data © OpenStreetMap contributors, ODbL — see CREDITS.md. Humber shoreline offset 29.2 m → ~1.3 m median.

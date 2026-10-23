@@ -12,7 +12,7 @@ import { defineConfig } from 'vite';
  * base: './' so Electron loadFile() resolves assets under dist/ (file://).
  * Also works for static hosting and `npm run preview`.
  */
-const OVERPASS_UA = 'nig-drives/1.3.10 (+https://github.com/nigelrmccoy-oss/nig-drives)';
+const OVERPASS_UA = 'nig-drives/1.3.11 (+https://github.com/nigelrmccoy-oss/nig-drives)';
 
 function overpassProxy(target: string, path: string) {
   return {
