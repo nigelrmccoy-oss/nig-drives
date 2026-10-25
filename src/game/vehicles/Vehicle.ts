@@ -585,7 +585,7 @@ export class Vehicle {
     }
 
     // --- ABS / TCS / stability (work on the brake torques in place, return the engine throttle) ---
-    const aids = this.assists.update(dt, this.sim, this.steerAngle, throttle, this.brakeTorque, this.drivenIdx);
+    const aids = this.assists.update(dt, this.sim, this.steerAngle, throttle, this.brakeTorque, this.drivenIdx, surfaceGrip);
     this.absActive = aids.abs;
     this.tcsActive = aids.tcs;
     this.escActive = aids.esc;

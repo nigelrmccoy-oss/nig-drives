@@ -186,6 +186,85 @@ if (process.argv[2] === 'lane') {
   process.exit(0);
 }
 
+/**
+ * v1.4.1: steady-circle ESC check. Hold a 50 m radius at a set lateral acceleration (path-curvature
+ * steering loop, analog inputs) and report how often stability control is active, plus the throttle
+ * needed with assists on vs off. A healthy ESC stays out of the way in steady corners.
+ */
+function escCircle(id: VehicleId, on: boolean, radius: number, gTarget: number): { escPct: number; thr: number; kmh: number } {
+  const { v, inp } = makeCar(id);
+  const internals = v as unknown as { sim: { u: number }; assists: { enabled: { abs: boolean; tcs: boolean; stability: boolean } } };
+  internals.assists.enabled.abs = internals.assists.enabled.tcs = internals.assists.enabled.stability = on;
+  inp.analog = true;
+  const vT = Math.sqrt(gTarget * G * radius);
+  let t = 0;
+  while (internals.sim.u < vT && t < 60) { inp.setThrottle(1); tick(v, inp); t += FRAME; }
+  const hist: [number, number][] = [];
+  let ie = 0, n = 0, esc = 0, thr = 0, kmh = 0;
+  for (let i = 0; i < 60 * 30; i++) {
+    hist.push([v.position.x, v.position.z]);
+    if (hist.length > 16) hist.shift();
+    let k = 0;
+    if (hist.length >= 3) {
+      const a = hist[0], m = hist[Math.floor(hist.length / 2)], b = hist[hist.length - 1];
+      const c1 = Math.atan2(m[0] - a[0], m[1] - a[1]), c2 = Math.atan2(b[0] - m[0], b[1] - m[1]);
+      let dc = c2 - c1; if (dc > Math.PI) dc -= 2 * Math.PI; if (dc < -Math.PI) dc += 2 * Math.PI;
+      const L = (Math.hypot(m[0] - a[0], m[1] - a[1]) + Math.hypot(b[0] - m[0], b[1] - m[1])) / 2;
+      k = L > 0.05 ? dc / L : 0;
+    }
+    const ce = 1 / radius - k;
+    ie = THREE.MathUtils.clamp(ie + ce * FRAME * 6, -1, 1);
+    inp.setSteer(THREE.MathUtils.clamp(ce * 8 + ie, -1, 1));
+    const th = THREE.MathUtils.clamp((vT - internals.sim.u) * 0.8 + 0.3, 0, 1);
+    inp.setThrottle(th);
+    tick(v, inp);
+    if (i > 60 * 15) { n++; thr += th; kmh += v.getSpeedKmh(); if (v.getAssistFlags().esc) esc++; }
+  }
+  return { escPct: (100 * esc) / n, thr: thr / n, kmh: kmh / n };
+}
+
+/** v1.4.1: full lock at low speed, throttle loop toward a target speed (the 1.4.0 "held to walking pace" case). */
+function lowLock(id: VehicleId, on: boolean, kmhTarget: number): { kmh: number; thr: number } {
+  const { v, inp } = makeCar(id);
+  const internals = v as unknown as { sim: { u: number }; assists: { enabled: { abs: boolean; tcs: boolean; stability: boolean } } };
+  internals.assists.enabled.abs = internals.assists.enabled.tcs = internals.assists.enabled.stability = on;
+  inp.analog = true;
+  let kmh = 0, thr = 0, n = 0;
+  for (let i = 0; i < 60 * 25; i++) {
+    const th = THREE.MathUtils.clamp((kmhTarget / 3.6 - internals.sim.u) * 0.8 + 0.25, 0, 1);
+    inp.setThrottle(th);
+    inp.setSteer(i > 180 ? 1 : 0);
+    tick(v, inp);
+    if (i > 60 * 15) { n++; kmh += v.getSpeedKmh(); thr += th; }
+  }
+  return { kmh: kmh / n, thr: thr / n };
+}
+
+if (process.argv[2] === 'esc') {
+  const ids = (process.argv.slice(3).length ? process.argv.slice(3) : Object.keys(VEHICLE_SPECS)) as VehicleId[];
+  console.log('50 m circle: ESC active % with assists on (throttle on / off)');
+  for (const id of ids) {
+    const gs = id.startsWith('bus') ? [0.2, 0.35, 0.5] : [0.3, 0.5, 0.7, 0.8];
+    const cells = gs.map((g) => {
+      const a = escCircle(id, true, 50, g);
+      const b = escCircle(id, false, 50, g);
+      return `${g.toFixed(2)} g: ${a.escPct.toFixed(0).padStart(3)} % (${f2(a.thr)}/${f2(b.thr)})`;
+    });
+    console.log(`${id.padEnd(13)} ${cells.join('  ')}`);
+  }
+  console.log('full lock, target 30 / 40 km/h: km/h reached and mean throttle, assists on | off');
+  for (const id of ids) {
+    if (id.startsWith('bus')) continue;
+    const cells = [30, 40].map((k) => {
+      const a = lowLock(id, true, k);
+      const b = lowLock(id, false, k);
+      return `${k}: ${f1(a.kmh)} (${f2(a.thr)}) | ${f1(b.kmh)} (${f2(b.thr)})`;
+    });
+    console.log(`${id.padEnd(13)} ${cells.join('    ')}`);
+  }
+  process.exit(0);
+}
+
 if (process.argv[2] === 'trace') {
   // 0–100 trace for tuning: speed, gear, rpm, boost, clutch, front slip
   const id = (process.argv[3] ?? 'golf_19tdi') as VehicleId;
