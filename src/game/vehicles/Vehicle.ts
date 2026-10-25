@@ -5,6 +5,7 @@ import { Transmission, type TransmissionMode } from './Transmission';
 import { MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
+import { Assists } from '../physics/Assists';
 import { Powertrain } from '../physics/Powertrain';
 import { VehicleSim } from '../physics/VehicleSim';
 
@@ -276,6 +277,7 @@ export class Vehicle {
   private readonly drivenIdx: number[];
   private readonly driveTorque = [0, 0, 0, 0];
   private readonly brakeTorque = [0, 0, 0, 0];
+  private readonly assists: Assists;
   private readonly extraInertia = [0, 0, 0, 0];
   speed = 0;
   sliding = false;
@@ -324,6 +326,7 @@ export class Vehicle {
     this.phys = physicsSpecFor(spec);
     this.sim = new VehicleSim(this.phys);
     this.powertrain = new Powertrain(this.phys);
+    this.assists = new Assists(this.phys);
     this.drivenIdx = this.phys.drive === 'fwd' ? [0, 1] : this.phys.drive === 'rwd' ? [2, 3] : [0, 1, 2, 3];
     this.engineRpmActual = this.phys.engine.idleRpm;
     this.mesh = mesh;
@@ -409,6 +412,7 @@ export class Vehicle {
     this.heading = headingRad;
     this.sim.reset();
     this.powertrain.reset();
+    this.assists.reset();
     this.steerAngle = 0;
     this.speed = 0;
     this.throttleLoad = 0;
@@ -529,16 +533,26 @@ export class Vehicle {
     this.brakeInput = brake;
     this.throttleLoad = throttle;
 
-    // --- engine → wheels ---
-    this.computeDrive(dt, throttle, drive.engaged ? drive.ratio : 0, drive.reverse);
-
     // --- brakes (Park / spawn hold lock the wheels like a parking pawl + handbrake) ---
     const regenMul = p.regen?.brakeMul ?? 1;
     for (let i = 0; i < 4; i++) {
       const base = i < 2 ? p.brakes.frontNm : p.brakes.rearNm;
       this.brakeTorque[i] = brake * base * regenMul;
-      if (parked || this.spawnHold) this.brakeTorque[i] = Math.max(this.brakeTorque[i], base * 3);
     }
+
+    // --- ABS / TCS / stability (work on the brake torques in place, return the engine throttle) ---
+    const aids = this.assists.update(dt, this.sim, this.steerAngle, throttle, this.brakeTorque, this.drivenIdx);
+    this.absActive = aids.abs;
+    this.tcsActive = aids.tcs || aids.esc;
+    if (parked || this.spawnHold) {
+      for (let i = 0; i < 4; i++) {
+        const base = i < 2 ? p.brakes.frontNm : p.brakes.rearNm;
+        this.brakeTorque[i] = Math.max(this.brakeTorque[i], base * 3);
+      }
+    }
+
+    // --- engine → wheels ---
+    this.computeDrive(dt, aids.throttle, drive.engaged ? drive.ratio : 0, drive.reverse);
 
     // --- chassis + tyres ---
     const gradeSin = this.gradeGravity ? this.gradeSin : 0;

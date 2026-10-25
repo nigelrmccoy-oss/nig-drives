@@ -86,7 +86,7 @@ export function derivePhysicsSpec(spec: VehicleSpec): PhysicsSpec {
       trackRear: spec.track,
       yawInertia: (spec.mass * (spec.length * spec.length + spec.width * spec.width)) / 12 * 0.9,
       cdA,
-      rollStiffnessFront: bus ? 0.5 : 0.6,
+      rollStiffnessFront: bus ? 0.55 : 0.68,
       rollGradient: bus ? 0.05 : 0.07,
       pitchGradient: bus ? 0.02 : 0.035,
       bodyFreqHz: bus ? 1.1 : 1.45,

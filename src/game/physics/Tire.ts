@@ -19,6 +19,9 @@ export interface TireOut {
   limit: number;
 }
 
+/** Share of peak grip a fully sliding tyre keeps. */
+const SLIDE_FLOOR = 0.8;
+
 /** B such that sin(C·atan(B·s)) peaks exactly at s = 1. */
 export function shapeB(C: number): number {
   return Math.tan(Math.PI / (2 * C));
@@ -56,7 +59,9 @@ export function tireForces(
   const C = Math.max(1.15, t.C - (1 - Math.min(1, surfaceGrip)) * 0.6);
   const B = shapeB(C);
   const sx = kappa / t.peakSlip;
-  const sy = tanAlpha / Math.tan(t.peakAngle);
+  // the peak slip angle grows with load (a loaded tyre needs more angle), so a nose-heavy car's
+  // front axle saturates first: natural, load-driven understeer instead of a neutral knife edge
+  const sy = tanAlpha / (Math.tan(t.peakAngle) * Math.sqrt(Math.min(2, Math.max(0.3, loadRatio))));
   const s = Math.hypot(sx, sy);
   const limit = mu * fz;
   out.limit = limit;
@@ -67,7 +72,8 @@ export function tireForces(
     out.kLong = (limit * C * B) / t.peakSlip;
     return out;
   }
-  const f = limit * magic(s, C, B);
+  // past the peak a sliding tyre keeps most of its grip (~80 %), it doesn't fall off a cliff
+  const f = limit * (s > 1 ? Math.max(magic(s, C, B), SLIDE_FLOOR) : magic(s, C, B));
   const perS = f / s;
   out.fx = perS * sx;
   out.fy = -perS * sy;

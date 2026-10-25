@@ -22,7 +22,7 @@ export const GOLF_19TDI: PhysicsSpec = {
     trackRear: 1.494,
     yawInertia: 1900,
     cdA: 0.63, // Cd 0.315 × 2.0 m²
-    rollStiffnessFront: 0.62,
+    rollStiffnessFront: 0.7, // front anti-roll bar, soft rear twist beam: stable FWD hatch
     rollGradient: 0.07, // ≈ 4° per g
     pitchGradient: 0.035,
     bodyFreqHz: 1.5,

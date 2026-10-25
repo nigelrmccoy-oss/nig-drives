@@ -147,6 +147,43 @@ function skidpad(id: VehicleId, radius = 30.5): { g: number; kmh: number } {
 const f1 = (x: number): string => (Number.isFinite(x) ? x.toFixed(1) : '--');
 const f2 = (x: number): string => (Number.isFinite(x) ? x.toFixed(2) : '--');
 
+/**
+ * Lift-off double lane change at 100 km/h with a sharp analog sine of steering. Returns peak
+ * sideslip (deg) and whether the car spun (|beta| > 30 deg), with stability control on or off.
+ */
+function laneChange(id: VehicleId, stability: boolean, amp = 0.45): { beta: number; spun: boolean; exitKmh: number } {
+  const { v, inp } = makeCar(id);
+  const internals = v as unknown as { sim: { u: number; v: number }; assists: { enabled: { stability: boolean } } };
+  internals.assists.enabled.stability = stability;
+  inp.setThrottle(1);
+  let t = 0;
+  while (v.getSpeedKmh() < 100 && t < 60) { tick(v, inp); t += FRAME; }
+  inp.setThrottle(0);
+  inp.analog = true;
+  let peak = 0;
+  for (let i = 0; i < 60 * 5; i++) {
+    const ts = i * FRAME;
+    const s = ts < 2.4 ? amp * Math.sin((ts / 2.4) * 2 * Math.PI) : 0;
+    inp.setSteer(s);
+    tick(v, inp);
+    const b = Math.abs(Math.atan2(internals.sim.v, Math.max(0.1, Math.abs(internals.sim.u))));
+    peak = Math.max(peak, b);
+  }
+  return { beta: (peak * 180) / Math.PI, spun: peak > 0.52, exitKmh: v.getSpeedKmh() };
+}
+
+if (process.argv[2] === 'lane') {
+  const ids = (process.argv.slice(3).length ? process.argv.slice(3) : Object.keys(VEHICLE_SPECS)) as VehicleId[];
+  for (const id of ids) {
+    for (const amp of (process.env.AMPS ?? '0.15,0.3,0.45').split(',').map(Number)) {
+      const on = laneChange(id, true, amp);
+      const off = laneChange(id, false, amp);
+      console.log(`${id.padEnd(13)} steer ${amp}: ESC on beta ${on.beta.toFixed(1)} deg${on.spun ? ' SPUN' : ''} exit ${on.exitKmh.toFixed(0)} | off beta ${off.beta.toFixed(1)} deg${off.spun ? ' SPUN' : ''} exit ${off.exitKmh.toFixed(0)}`);
+    }
+  }
+  process.exit(0);
+}
+
 if (process.argv[2] === 'trace') {
   // 0–100 trace for tuning: speed, gear, rpm, boost, clutch, front slip
   const id = (process.argv[3] ?? 'golf_19tdi') as VehicleId;
