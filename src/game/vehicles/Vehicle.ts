@@ -7,6 +7,8 @@ import {
   type TransmissionMode,
 } from './Transmission';
 import { MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
+import type { PhysicsSpec } from '../physics/PhysicsSpec';
+import { physicsSpecFor } from '../physics/deriveSpec';
 
 /** Selectable drivetrains / transit variants (v1.2). */
 export type VehicleId =
@@ -237,6 +239,8 @@ export interface DriveControls {
  */
 export class Vehicle {
   readonly spec: VehicleSpec;
+  /** v1.4.0: physical parameters (hand-written for the TDI, derived for the rest). */
+  readonly phys: PhysicsSpec;
   readonly mesh: THREE.Group;
   position = new THREE.Vector3();
   /**
@@ -293,6 +297,7 @@ export class Vehicle {
 
   constructor(spec: VehicleSpec, mesh: THREE.Group, transmissionMode: TransmissionMode = 'auto') {
     this.spec = spec;
+    this.phys = physicsSpecFor(spec);
     this.mesh = mesh;
     this.transmission = new Transmission({
       mode: transmissionMode,
