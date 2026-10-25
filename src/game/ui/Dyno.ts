@@ -160,8 +160,14 @@ class RollerInput implements DriverInput {
   }
 }
 
-/** Full-throttle pull of the real car model; samples every 0.1 s. */
-function rollerPull(id: VehicleId): { curve: CurveData; t100: number } {
+/**
+ * Full-throttle pull of the real car model; samples every 0.1 s.
+ * v1.4.1: each sample is the mean over its 0.1 s (not one frame), the quoted peak skips gear
+ * changes (+0.5 s settle) and uses a 0.5 s moving average, so driveline shocks at a shift no longer
+ * read as peak power; the run goes on until the speed plateaus (< 0.3 km/h gained in 10 s) instead
+ * of stopping after 3 s without a 0.2 km/h gain, so slow cars reach their real top speed.
+ */
+export function rollerPull(id: VehicleId): { curve: CurveData; t100: number; peakKw: number; topKmh: number } {
   const v = new Vehicle(VEHICLE_SPECS[id], new Group(), 'auto');
   v.setPose(0, 0, 0);
   const frame = 1 / 60;
@@ -173,30 +179,63 @@ function rollerPull(id: VehicleId): { curve: CurveData; t100: number } {
   const kw: number[] = [];
   const kn: number[] = [];
   const rpm: number[] = [];
+  const steady: boolean[] = [];
+  const speedHist: number[] = []; // speed at each whole second
   let t = 0;
   let t100 = NaN;
   let best = 0;
-  let lastGain = 0;
-  while (t < 60) {
+  let accP = 0;
+  let accF = 0;
+  let n = 0;
+  let gear = v.getGearLabel();
+  let settle = 0;
+  let sampleSteady = true;
+  const MAX_T = 300;
+  for (let i = 1; t < MAX_T; i++) {
     v.update(frame, inp, weather, road);
-    t += frame;
+    t = i * frame;
     const kmh = v.getSpeedKmh();
     if (Number.isNaN(t100) && kmh >= 100) t100 = t;
-    if (kmh > best + 0.2) {
-      best = kmh;
-      lastGain = t;
+    best = Math.max(best, kmh);
+    const g = v.getGearLabel();
+    if (g !== gear) {
+      gear = g;
+      settle = 0.5;
     }
-    if (t - lastGain > 3) break;
-    if (Math.round(t * 60) % 6 === 0 && kmh > 1) {
-      const fx = v.sim.wheels.reduce((a, w) => a + w.fx, 0);
-      xs.push(kmh);
-      kw.push(Math.max(0, fx * v.sim.u * KW));
-      kn.push(Math.max(0, fx / 1000));
-      rpm.push(v.getEngineRpmDisplay() / 1000);
+    settle = Math.max(0, settle - frame);
+    if (settle > 0) sampleSteady = false;
+    const fx = v.sim.wheels.reduce((a, w) => a + w.fx, 0);
+    accP += fx * v.sim.u;
+    accF += fx;
+    n++;
+    if (i % 6 === 0) {
+      if (kmh > 1) {
+        xs.push(kmh);
+        kw.push(Math.max(0, (accP / n) * KW));
+        kn.push(Math.max(0, accF / n / 1000));
+        rpm.push(v.getEngineRpmDisplay() / 1000);
+        steady.push(sampleSteady);
+      }
+      accP = 0;
+      accF = 0;
+      n = 0;
+      sampleSteady = true;
     }
+    if (i % 60 === 0) {
+      speedHist.push(kmh);
+      const k = speedHist.length;
+      if (k > 10 && kmh - speedHist[k - 11] < 0.3) break;
+    }
+  }
+  let peakKw = 0;
+  for (let i = 2; i < kw.length - 2; i++) {
+    if (!steady.slice(i - 2, i + 3).every(Boolean)) continue;
+    peakKw = Math.max(peakKw, (kw[i - 2] + kw[i - 1] + kw[i] + kw[i + 1] + kw[i + 2]) / 5);
   }
   return {
     t100,
+    peakKw,
+    topKmh: best,
     curve: {
       xs,
       xLabel: 'road speed (km/h)',
@@ -208,7 +247,7 @@ function rollerPull(id: VehicleId): { curve: CurveData; t100: number } {
         { ys: rpm, color: '#e0e0e0', label: 'rpm ÷ 1000', axis: 'right', dashed: true },
       ],
       notes: [
-        `peak ${Math.round(Math.max(...kw))} kW at the wheels`,
+        `peak ${Math.round(peakKw)} kW at the wheels (steady, shifts excluded)`,
         `0–100 km/h ${Number.isNaN(t100) ? '—' : t100.toFixed(1) + ' s'} on this roller`,
         `top ${Math.round(best)} km/h`,
       ],
