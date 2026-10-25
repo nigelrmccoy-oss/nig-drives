@@ -18,7 +18,7 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
   spins the car. The countersteer helper no longer kicks the wheel the other way when you let go
   of a key. Buses get twin rear tyres and the Tesla has a more realistic yaw inertia.
 - **Low frame rates.** Physics catches up to real time down to 5 fps (it used to slow down
-  below about 20 fps). A NaN in the physics now resets the car in place instead of breaking it.
+  at 15 fps and below). A NaN in the physics now resets the car in place instead of breaking it.
 - **Automatics creep** in D like a real torque converter, and hold on a gentle slope.
 - **Gamepad and keyboard.** A drifting stick no longer blocks the keys, and a held key no longer
   locks out the stick.
