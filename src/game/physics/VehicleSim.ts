@@ -150,7 +150,14 @@ export class VehicleSim {
       const relax = Math.min(1, ((Math.abs(vLong) + 1.5) * dt) / t.relaxLength);
       w.tanAlpha += (tanSS - w.tanAlpha) * relax;
       w.kappa = (w.omega * rad - vLong) / vDen;
-      const f = tireForces(t, w.fz, this.fzNominal, w.kappa, w.tanAlpha, inp.mu, inp.mu, this.tmp);
+      const dual = i >= 2 && c.rearDualTyres === true;
+      const f = tireForces(t, dual ? w.fz / 2 : w.fz, this.fzNominal, w.kappa, w.tanAlpha, inp.mu, inp.mu, this.tmp);
+      if (dual) {
+        f.fx *= 2;
+        f.fy *= 2;
+        f.kLong *= 2;
+        f.limit *= 2;
+      }
       w.fx = f.fx;
       w.fy = f.fy;
       w.slip = f.slip;

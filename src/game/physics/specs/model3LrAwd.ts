@@ -19,7 +19,7 @@ export const MODEL3_LR_AWD: PhysicsSpec = {
     cgHeight: 0.46, // battery in the floor: low centre of gravity
     trackFront: 1.584,
     trackRear: 1.584,
-    yawInertia: 3100,
+    yawInertia: 3600, // v1.4.1: m·(l²+w²)/12 × 0.9 for 4.72 × 1.85 m, like the derived cars (was 3100)
     cdA: 0.49, // Cd 0.219 × 2.22 m²
     rollStiffnessFront: 0.72, // stiff front bar: safe, mild understeer like the real car
     rollGradient: 0.05,

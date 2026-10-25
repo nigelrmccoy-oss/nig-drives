@@ -117,6 +117,11 @@ export interface ChassisSpec {
   /** Sprung-mass natural frequency (Hz) and damping ratio for roll / pitch. */
   bodyFreqHz: number;
   bodyDamping: number;
+  /**
+   * v1.4.1: twin tyres on each rear hub (city buses). Each tyre carries half the corner load,
+   * so the rear axle has more grip (load sensitivity) and corners stiffer: a bus understeers.
+   */
+  rearDualTyres?: boolean;
 }
 
 export interface SteeringSpec {

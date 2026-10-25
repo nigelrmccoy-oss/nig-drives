@@ -93,6 +93,7 @@ export function derivePhysicsSpec(spec: VehicleSpec): PhysicsSpec {
       pitchGradient: bus ? 0.02 : 0.035,
       bodyFreqHz: bus ? 1.1 : 1.45,
       bodyDamping: bus ? 0.5 : 0.45,
+      rearDualTyres: bus,
     },
     tire: {
       radius,

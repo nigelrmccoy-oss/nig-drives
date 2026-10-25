@@ -657,14 +657,27 @@ export class Vehicle {
     const u = Math.abs(this.sim.u);
     const g = 9.81;
     const ayLimit = p.tire.mu * Math.max(0.3, surfaceGrip) * g;
-    const gripLock = (p.chassis.wheelbase * ayLimit) / Math.max(1, u * u) + p.tire.peakAngle * (this.analogInput ? 1.0 : 0.6);
+    // v1.4.1 P2-10: a key is all-or-nothing, so its slip-angle allowance on top of the geometric
+    // lock shrinks with speed (0.6 x peak when parking, ~0.35 x at 100 km/h): a full-key flick at
+    // speed asks for about what the fronts can give instead of a yaw spike past the rear's grip.
+    const speedK = 1 / (1 + u / p.steering.halfLockSpeed);
+    const slipRoom = this.analogInput ? 1.0 : 0.2 + 0.4 * speedK;
+    const gripLock = (p.chassis.wheelbase * ayLimit) / Math.max(1, u * u) + p.tire.peakAngle * slipRoom;
     const maxNow = Math.min(p.steering.maxAngle, gripLock);
     let target = this.steerIn * maxNow;
-    const rearSliding = Math.max(this.sim.wheels[2].slip, this.sim.wheels[3].slip) > 0.9;
-    if (!this.analogInput && u > 4 && rearSliding) {
+    // v1.4.1 P2-9: the countersteer helper (keyboard only) acts on a real slide: rears at their peak
+    // and more saturated than the fronts (oversteer, not understeer), with the tail out (sideslip
+    // against the yaw). A plain key release in a fast corner no longer kicks the wheel the other way.
+    if (!this.analogInput && u > 4) {
+      const w = this.sim.wheels;
+      const rearSlip = Math.max(w[2].slip, w[3].slip);
+      const frontSlip = Math.max(w[0].slip, w[1].slip);
       const beta = Math.atan2(this.sim.v, u);
-      const excess = Math.abs(beta) - 0.04;
-      if (excess > 0) target += Math.sign(beta) * excess * 1.6 * (1 - 0.5 * Math.abs(this.steerIn));
+      const tailOut = beta * this.sim.r < 0 ? Math.abs(beta) : 0;
+      const excess = tailOut - 0.04;
+      if (rearSlip > 0.9 && rearSlip > frontSlip && excess > 0) {
+        target += Math.sign(beta) * excess * 1.6 * (1 - 0.5 * Math.abs(this.steerIn));
+      }
     }
     return THREE.MathUtils.clamp(target, -p.steering.maxAngle, p.steering.maxAngle);
   }
@@ -691,7 +704,12 @@ export class Vehicle {
     const regen = this.phys.regen;
     if (regen && throttle < 0.05 && this.vz > 2) {
       const fade = Math.min(1, (this.vz - 2) / 4);
-      const t = (regen.coastDecel * this.phys.chassis.mass * this.phys.tire.radius * fade) / n;
+      // v1.4.1: like the EV, the hybrid's drive controller backs regen off as the driven tyres near
+      // their limit (a lift in a fast corner no longer drags the rear axle into a slide)
+      let slipMax = 0;
+      for (const i of this.drivenIdx) slipMax = Math.max(slipMax, this.sim.wheels[i].slip);
+      const slipScale = THREE.MathUtils.clamp(1 - (slipMax - 0.5) / 0.4, 0, 1);
+      const t = (regen.coastDecel * this.phys.chassis.mass * this.phys.tire.radius * fade * slipScale) / n;
       for (const i of this.drivenIdx) this.driveTorque[i] -= t;
     }
     const rpm = this.powertrain.rpm;
