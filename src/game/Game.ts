@@ -5,6 +5,8 @@ import { Input } from './input/Input';
 import { TileManager, type TileSwapInfo } from './map/TileManager';
 import { HUD } from './ui/HUD';
 import { Minimap } from './ui/Minimap';
+import { TelemetryPlus } from './ui/TelemetryPlus';
+import { loadAssistPrefs, saveAssistPrefs, type AssistPrefs } from './ui/assistPrefs';
 import { createVehicle } from './vehicles/VehicleFactory';
 import { EngineSound } from './vehicles/EngineSound';
 import { Vehicle } from './vehicles/Vehicle';
@@ -28,6 +30,8 @@ export interface GameStartOptions {
   cityId: string;
   transmission?: TransmissionMode;
   quality?: QualityLevel;
+  /** v1.4.0: ABS / TCS / stability switches (defaults: last saved, else all on). */
+  assists?: AssistPrefs;
 }
 
 export class Game {
@@ -38,6 +42,7 @@ export class Game {
   private input = new Input();
   private hud: HUD;
   private minimap: Minimap;
+  private telemetryPlus: TelemetryPlus;
   private env: Environment;
   private loadingEl: HTMLElement;
   private vehicle: Vehicle | null = null;
@@ -104,6 +109,8 @@ export class Game {
       () => this.cycleWeather(),
       () => this.cycleTime(),
     );
+    this.hud.setAssistHandler((a) => this.applyAssists(a));
+    this.telemetryPlus = new TelemetryPlus(parent);
 
     this.loadingEl = document.createElement('div');
     this.loadingEl.id = 'loading-overlay';
@@ -129,6 +136,13 @@ export class Game {
       undefined,
       (err) => console.warn('Sky HDRI unavailable — keeping RoomEnvironment', err),
     );
+  }
+
+  /** v1.4.0 M9: assist switches from the start menu or the HUD panel (F1); remembered. */
+  private applyAssists(a: AssistPrefs): void {
+    saveAssistPrefs(a);
+    this.vehicle?.setAssistsEnabled(a);
+    this.hud.setAssistSwitches(a);
   }
 
   getQuality(): QualitySettings {
@@ -199,6 +213,7 @@ export class Game {
     this.vehicle = createVehicle(opts.vehicle, trans);
     this.scene.add(this.vehicle.mesh);
     this.engineSound.setVehicle(opts.vehicle);
+    this.applyAssists(opts.assists ?? loadAssistPrefs());
 
     try {
       await this.tiles.warmStart();
@@ -413,6 +428,8 @@ export class Game {
       this.env.toggleTimePause();
       this.hud.setTime(this.env.getTimeLabel(), this.env.timePaused, this.env.getDayLengthMinutes());
     }
+    if (this.input.consumeAssistPanel()) this.hud.toggleAssistPanel();
+    if (this.input.consumeTelemetryPlus()) this.telemetryPlus.toggle();
 
     const v = this.vehicle;
     const surface = this.tiles.sampleSurface(v.position.x, v.position.z, v.position.y);
@@ -500,7 +517,9 @@ export class Game {
       boost: this.vehicle.boost,
       coolant: this.vehicle.coolant,
       showBoost,
+      ev: this.vehicle.getEvTelemetry(),
     });
+    this.telemetryPlus.update(dt, this.vehicle);
 
     this.minimap.draw(lines, this.vehicle.position.x, this.vehicle.position.z, this.vehicle.getCompassHeading());
 

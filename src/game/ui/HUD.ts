@@ -1,4 +1,5 @@
 import { WEATHER_LABELS, type WeatherPreset } from '../weather/Environment';
+import { ASSIST_LABELS, type AssistPrefs } from './assistPrefs';
 
 export interface TelemetryData {
   rpm: number;
@@ -10,7 +11,11 @@ export interface TelemetryData {
   boost: number;
   coolant: number;
   showBoost: boolean;
+  /** v1.4.0: battery-electric readout (null for engine cars). */
+  ev?: { powerKw: number; regenKw: number; soc: number } | null;
 }
+
+const ASSIST_KEYS = Object.keys(ASSIST_LABELS) as (keyof AssistPrefs)[];
 
 export class HUD {
   private root: HTMLElement;
@@ -35,6 +40,14 @@ export class HUD {
   private pauseBanner: HTMLElement;
   private onWeatherClick?: () => void;
   private onTimeClick?: () => void;
+  private onAssistsChange?: (a: AssistPrefs) => void;
+  private assistSwitches: AssistPrefs = { abs: true, tcs: true, stability: true };
+  private assistPanel: HTMLElement;
+  private assistBtn: HTMLElement;
+  private lights: Record<keyof AssistPrefs, HTMLElement>;
+  private telemPower: HTMLElement;
+  private telemRegen: HTMLElement;
+  private telemBattery: HTMLElement;
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -44,7 +57,10 @@ export class HUD {
         <div class="hud-panel">
           <div class="label">Vehicle</div>
           <div class="sub" id="hud-vehicle">—</div>
-          <div class="sub" id="hud-assist"></div>
+          <div class="assist-lights">
+            ${ASSIST_KEYS.map((k) => `<span class="alight" data-light="${k}" title="${ASSIST_LABELS[k].hint}">${ASSIST_LABELS[k].short}</span>`).join('')}
+            <span class="sub" id="hud-assist"></span>
+          </div>
           <div class="sub" id="hud-surface">Surface: —</div>
         </div>
         <div class="hud-panel">
@@ -56,6 +72,10 @@ export class HUD {
           <div class="label">Environment</div>
           <button type="button" class="hud-btn" id="hud-weather">Weather: Clear / dry (R)</button>
           <button type="button" class="hud-btn" id="hud-time">Time: Day (T)</button>
+          <button type="button" class="hud-btn" id="hud-assists">Assists (F1)</button>
+          <div class="assist-panel" id="hud-assist-panel" hidden>
+            ${ASSIST_KEYS.map((k) => `<button type="button" class="hud-btn assist-toggle" data-assist-toggle="${k}">${ASSIST_LABELS[k].name}: On</button>`).join('')}
+          </div>
         </div>
       </div>
       <div class="speedo-cluster">
@@ -66,7 +86,10 @@ export class HUD {
           <div class="telem-row"><span class="telem-k">Engine</span><span id="telem-engine">—</span></div>
           <div class="telem-row"><span class="telem-k">T / B</span><span id="telem-pedals">0% / 0%</span></div>
           <div class="telem-row telem-boost"><span class="telem-k">Boost</span><span id="telem-boost">—</span></div>
-          <div class="telem-row"><span class="telem-k">Coolant</span><span id="telem-coolant">—</span></div>
+          <div class="telem-row telem-ice"><span class="telem-k">Coolant</span><span id="telem-coolant">—</span></div>
+          <div class="telem-row telem-ev"><span class="telem-k">Power</span><span id="telem-power">—</span></div>
+          <div class="telem-row telem-ev"><span class="telem-k">Regen</span><span id="telem-regen">—</span></div>
+          <div class="telem-row telem-ev"><span class="telem-k">Battery</span><span id="telem-battery">—</span></div>
         </div>
         <div class="speedo">
           <div class="speedo-gear" id="hud-gear">D</div>
@@ -78,14 +101,14 @@ export class HUD {
         <div class="controls-hint">
           W/↑ accel · S/↓ brake/reverse · A/D steer · Space brake · C camera<br/>
           G auto P-R-N-D · Q/E shift · 1–6/N/B H-pattern · Shift clutch<br/>
-          R weather · T time · P pause clock<br/>
+          R weather · T time · P pause clock · F1 assists · F2 Telemetry+<br/>
           Gamepad: stick steer · RT/LT throttle/brake · LB/RB shift · B reverse · X clutch · Y camera
         </div>
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
       <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
       <div class="fps-counter" id="hud-fps">— FPS</div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.3.6</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.4.0</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;
@@ -108,8 +131,51 @@ export class HUD {
     this.pauseBanner = this.root.querySelector('#hud-paused')!;
     this.fpsEl = this.root.querySelector('#hud-fps')!;
 
+    this.telemPower = this.root.querySelector('#telem-power')!;
+    this.telemRegen = this.root.querySelector('#telem-regen')!;
+    this.telemBattery = this.root.querySelector('#telem-battery')!;
+    this.assistPanel = this.root.querySelector('#hud-assist-panel')!;
+    this.assistBtn = this.root.querySelector('#hud-assists')!;
+    this.lights = {
+      abs: this.root.querySelector('[data-light="abs"]')!,
+      tcs: this.root.querySelector('[data-light="tcs"]')!,
+      stability: this.root.querySelector('[data-light="stability"]')!,
+    };
+
     this.weatherEl.addEventListener('click', () => this.onWeatherClick?.());
     this.timeEl.addEventListener('click', () => this.onTimeClick?.());
+    this.assistBtn.addEventListener('click', () => this.toggleAssistPanel());
+    this.root.querySelectorAll<HTMLElement>('[data-assist-toggle]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const k = btn.dataset.assistToggle as keyof AssistPrefs;
+        this.setAssistSwitches({ ...this.assistSwitches, [k]: !this.assistSwitches[k] });
+        this.onAssistsChange?.({ ...this.assistSwitches });
+      });
+    });
+  }
+
+  /** v1.4.0: called when the driver flips an assist in the HUD panel. */
+  setAssistHandler(cb: (a: AssistPrefs) => void): void {
+    this.onAssistsChange = cb;
+  }
+
+  toggleAssistPanel(): void {
+    this.assistPanel.hidden = !this.assistPanel.hidden;
+    this.assistBtn.classList.toggle('active', !this.assistPanel.hidden);
+  }
+
+  /** Show which assists are switched on (panel buttons + dimmed / struck-out lights). */
+  setAssistSwitches(a: AssistPrefs): void {
+    this.assistSwitches = { ...a };
+    for (const k of ASSIST_KEYS) {
+      this.lights[k].classList.toggle('off', !a[k]);
+      this.lights[k].title = `${ASSIST_LABELS[k].hint}: ${a[k] ? 'on' : 'OFF'}`;
+      const btn = this.assistPanel.querySelector<HTMLElement>(`[data-assist-toggle="${k}"]`)!;
+      btn.textContent = `${ASSIST_LABELS[k].name}: ${a[k] ? 'On' : 'Off'}`;
+      btn.classList.toggle('active', a[k]);
+    }
+    const off = ASSIST_KEYS.filter((k) => !a[k]).map((k) => ASSIST_LABELS[k].short);
+    this.assistBtn.textContent = off.length ? `Assists (F1): ${off.join(' · ')} off` : 'Assists (F1): all on';
   }
 
   setEnvHandlers(onWeather: () => void, onTime: () => void): void {
@@ -169,12 +235,12 @@ export class HUD {
     this.pauseBanner.classList.toggle('visible', paused);
   }
 
-  setAssists(flags: { abs: boolean; tcs: boolean; slide: boolean }): void {
-    const parts: string[] = [];
-    if (flags.slide) parts.push('SLIDE');
-    if (flags.abs) parts.push('ABS');
-    if (flags.tcs) parts.push('TCS');
-    this.assistEl.textContent = parts.join(' · ');
+  /** Lights flash while an assist is working; stability control has its own (STM) light. */
+  setAssists(flags: { abs: boolean; tcs: boolean; esc: boolean; slide: boolean }): void {
+    this.lights.abs.classList.toggle('on', flags.abs);
+    this.lights.tcs.classList.toggle('on', flags.tcs);
+    this.lights.stability.classList.toggle('on', flags.esc);
+    this.assistEl.textContent = flags.slide ? 'SLIDE' : '';
   }
 
   setTelemetry(t: TelemetryData): void {
@@ -193,5 +259,12 @@ export class HUD {
       (this.telemBoost.parentElement as HTMLElement).style.display = 'none';
     }
     this.telemCoolant.textContent = `${Math.round(t.coolant * 100)}%`;
+    const ev = t.ev ?? null;
+    this.root.classList.toggle('is-ev', ev !== null);
+    if (ev) {
+      this.telemPower.textContent = `${Math.round(ev.powerKw)} kW`;
+      this.telemRegen.textContent = ev.regenKw > 0.5 ? `${Math.round(ev.regenKw)} kW` : '—';
+      this.telemBattery.textContent = `${(ev.soc * 100).toFixed(1)}%`;
+    }
   }
 }

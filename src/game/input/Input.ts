@@ -46,6 +46,8 @@ export class Input implements DriverInput {
   private gearDownQueued = false;
   private autoSelectorQueued = false;
   private hGearQueued: number | null = null; // 0=N, -1=R, 1..6
+  private assistPanelQueued = false;
+  private telemetryPlusQueued = false;
 
   constructor() {
     window.addEventListener('keydown', this.onKeyDown);
@@ -64,7 +66,9 @@ export class Input implements DriverInput {
       k === 'ArrowDown' ||
       k === 'ArrowLeft' ||
       k === 'ArrowRight' ||
-      k === 'Space'
+      k === 'Space' ||
+      k === 'F1' ||
+      k === 'F2'
     ) {
       e.preventDefault();
     }
@@ -77,6 +81,8 @@ export class Input implements DriverInput {
       if (k === 'KeyE' || k === 'Equal' || k === 'NumpadAdd') this.gearUpQueued = true;
       if (k === 'KeyQ' || k === 'Minus' || k === 'NumpadSubtract') this.gearDownQueued = true;
       if (k === 'KeyG') this.autoSelectorQueued = true;
+      if (k === 'F1') this.assistPanelQueued = true;
+      if (k === 'F2') this.telemetryPlusQueued = true;
       // H-pattern: digits 1–6, KeyN = N, KeyB = reverse (R conflicts with weather)
       if (k === 'Digit1' || k === 'Numpad1') this.hGearQueued = 1;
       if (k === 'Digit2' || k === 'Numpad2') this.hGearQueued = 2;
@@ -164,6 +170,20 @@ export class Input implements DriverInput {
     this.left = this.steer > 0.25;
     this.right = this.steer < -0.25;
     this.clutch = held(2);
+  }
+
+  /** v1.4.0: F1 opens / closes the assists panel. */
+  consumeAssistPanel(): boolean {
+    const v = this.assistPanelQueued;
+    this.assistPanelQueued = false;
+    return v;
+  }
+
+  /** v1.4.0: F2 shows / hides Telemetry+. */
+  consumeTelemetryPlus(): boolean {
+    const v = this.telemetryPlusQueued;
+    this.telemetryPlusQueued = false;
+    return v;
   }
 
   consumeCameraToggle(): boolean {

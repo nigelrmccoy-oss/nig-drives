@@ -1,6 +1,7 @@
 import { CITIES } from '../cities';
 import {
   BUS_VARIANT_IDS,
+  EV_VARIANT_IDS,
   GOLF_ENGINE_IDS,
   VEHICLE_SPECS,
   type VehicleId,
@@ -8,13 +9,23 @@ import {
 } from '../vehicles/Vehicle';
 import type { TransmissionMode } from '../vehicles/Transmission';
 import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel } from '../visuals/Quality';
+import { ASSIST_LABELS, loadAssistPrefs, saveAssistPrefs, type AssistPrefs } from './assistPrefs';
+import { openDyno } from './Dyno';
 
 export interface StartSelection {
   vehicle: VehicleId;
   cityId: string;
   transmission: TransmissionMode;
   quality: QualityLevel;
+  /** v1.4.0: ABS / TCS / stability switches. */
+  assists: AssistPrefs;
 }
+
+const CLASS_VARIANTS: Record<VehicleClass, { ids: VehicleId[]; label: string; first: VehicleId }> = {
+  golf: { ids: GOLF_ENGINE_IDS, label: 'Engine', first: 'golf_20aba' },
+  ev: { ids: EV_VARIANT_IDS, label: 'Motor', first: 'model3_lr_awd' },
+  bus: { ids: BUS_VARIANT_IDS, label: 'Powertrain', first: 'bus_diesel' },
+};
 
 export class StartMenu {
   private root: HTMLElement;
@@ -23,6 +34,7 @@ export class StartMenu {
   private cityId = CITIES[0].id;
   private transmission: TransmissionMode = 'auto';
   private quality: QualityLevel = loadQualityLevel();
+  private assists: AssistPrefs = loadAssistPrefs();
   private onStart: (sel: StartSelection) => void;
 
   constructor(parent: HTMLElement, onStart: (sel: StartSelection) => void) {
@@ -34,19 +46,24 @@ export class StartMenu {
   }
 
   private render(): void {
-    const variantIds = this.vehicleClass === 'golf' ? GOLF_ENGINE_IDS : BUS_VARIANT_IDS;
-    const variantLabel = this.vehicleClass === 'golf' ? 'Engine' : 'Powertrain';
+    const variantIds = CLASS_VARIANTS[this.vehicleClass].ids;
+    const variantLabel = CLASS_VARIANTS[this.vehicleClass].label;
+    const ev = this.vehicleClass === 'ev';
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.3.6</span></h1>
-        <p class="tagline">v1.3.4: water stops the car · OSM-accurate Lake Ontario shore · major-road labels only · textured buildings · real hills.</p>
+        <h1>Nig Drives <span class="ver">v1.4.0</span></h1>
+        <p class="tagline">v1.4.0: real tyre &amp; drivetrain physics · Tesla Model 3 · assists you can switch off · Telemetry+ (F2) · Dyno.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">
           <button type="button" class="choice ${this.vehicleClass === 'golf' ? 'selected' : ''}" data-class="golf">
             <strong>VW Golf</strong>
             <span>Hatchback · pick an engine below</span>
+          </button>
+          <button type="button" class="choice ${ev ? 'selected' : ''}" data-class="ev">
+            <strong>Tesla Model 3</strong>
+            <span>Electric · dual motor · 0–100 in 4.4 s</span>
           </button>
           <button type="button" class="choice ${this.vehicleClass === 'bus' ? 'selected' : ''}" data-class="bus">
             <strong>City Bus</strong>
@@ -70,7 +87,15 @@ export class StartMenu {
         </div>
 
         <div class="section-label">Transmission</div>
-        <div class="choice-row" id="trans-choices">
+        ${
+          ev
+            ? `<div class="choice-row" id="trans-choices">
+          <button type="button" class="choice selected" disabled>
+            <strong>Single-speed</strong>
+            <span>9.03:1 reduction · no gears · G cycles P/R/N/D</span>
+          </button>
+        </div>`
+            : `<div class="choice-row" id="trans-choices">
           <button type="button" class="choice ${this.transmission === 'auto' ? 'selected' : ''}" data-trans="auto">
             <strong>Auto</strong>
             <span>P/R/N/D · G cycles · shift points</span>
@@ -83,6 +108,20 @@ export class StartMenu {
             <strong>Stick · H-pattern</strong>
             <span>1–6 / N / B=R · Q/E also</span>
           </button>
+        </div>`
+        }
+
+        <div class="section-label">Assists</div>
+        <div class="choice-row" id="assist-choices">
+          ${(Object.keys(ASSIST_LABELS) as (keyof AssistPrefs)[])
+            .map(
+              (k) => `
+            <button type="button" class="choice toggle ${this.assists[k] ? 'selected' : ''}" data-assist="${k}" aria-pressed="${this.assists[k]}">
+              <strong>${ASSIST_LABELS[k].name}: ${this.assists[k] ? 'On' : 'Off'}</strong>
+              <span>${ASSIST_LABELS[k].hint}</span>
+            </button>`,
+            )
+            .join('')}
         </div>
 
         <div class="section-label">Graphics</div>
@@ -109,12 +148,15 @@ export class StartMenu {
           ).join('')}
         </div>
 
-        <button type="button" id="start-btn">Start driving</button>
+        <div class="menu-actions">
+          <button type="button" id="start-btn">Start driving</button>
+          <button type="button" id="dyno-btn" class="secondary-btn">Dyno: ${VEHICLE_SPECS[this.vehicle].variantLabel}</button>
+        </div>
 
         <p class="attribution">
           Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (Overpass).
           Elevation: AWS Open Data Terrarium DEM. Not affiliated with Google — no Google Maps/Earth road data.
-          Vehicles are stylized; not affiliated with Volkswagen, New Flyer, or Grand River Transit.
+          Vehicles are stylized; not affiliated with Volkswagen, Tesla, New Flyer, or Grand River Transit.
         </p>
       </div>
     `;
@@ -122,8 +164,7 @@ export class StartMenu {
     this.root.querySelectorAll('[data-class]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.vehicleClass = (btn as HTMLElement).dataset.class as VehicleClass;
-        this.vehicle =
-          this.vehicleClass === 'golf' ? 'golf_20aba' : 'bus_diesel';
+        this.vehicle = CLASS_VARIANTS[this.vehicleClass].first;
         this.render();
       });
     });
@@ -133,7 +174,23 @@ export class StartMenu {
         this.vehicle = (btn as HTMLElement).dataset.vehicle as VehicleId;
         this.root.querySelectorAll('[data-vehicle]').forEach((b) => b.classList.remove('selected'));
         btn.classList.add('selected');
+        this.root.querySelector('#dyno-btn')!.textContent = `Dyno: ${VEHICLE_SPECS[this.vehicle].variantLabel}`;
       });
+    });
+
+    this.root.querySelectorAll('[data-assist]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const k = (btn as HTMLElement).dataset.assist as keyof AssistPrefs;
+        this.assists = { ...this.assists, [k]: !this.assists[k] };
+        saveAssistPrefs(this.assists);
+        btn.classList.toggle('selected', this.assists[k]);
+        btn.setAttribute('aria-pressed', String(this.assists[k]));
+        btn.querySelector('strong')!.textContent = `${ASSIST_LABELS[k].name}: ${this.assists[k] ? 'On' : 'Off'}`;
+      });
+    });
+
+    this.root.querySelector('#dyno-btn')!.addEventListener('click', () => {
+      openDyno(this.root, this.vehicle);
     });
 
     this.root.querySelectorAll('[data-trans]').forEach((btn) => {
@@ -165,8 +222,9 @@ export class StartMenu {
       this.onStart({
         vehicle: this.vehicle,
         cityId: this.cityId,
-        transmission: this.transmission,
+        transmission: this.vehicleClass === 'ev' ? 'auto' : this.transmission,
         quality: this.quality,
+        assists: { ...this.assists },
       });
     });
   }
@@ -194,6 +252,8 @@ function variantHint(id: VehicleId): string {
       return 'Heavy · low growl · stack';
     case 'bus_hybrid':
       return 'Lighter · regen brake · roof pack';
+    case 'model3_lr_awd':
+      return '366 kW · front + rear motors · one-pedal regen';
     default:
       return '';
   }

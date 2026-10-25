@@ -724,6 +724,11 @@ export class Vehicle {
     return { powerKw: this.ev.batteryPowerW / 1000, regenKw: this.ev.regenPowerW / 1000, soc: this.ev.soc };
   }
 
+  /** Road-wheel angle as a share of full lock (+ = left), for Telemetry+. */
+  getSteerNorm(): number {
+    return this.steerAngle / this.phys.steering.maxAngle;
+  }
+
   /** v1.4.0 M9: the driver's assist switches (start menu / F1). */
   setAssistsEnabled(a: { abs: boolean; tcs: boolean; stability: boolean }): void {
     this.assists.enabled.abs = a.abs;
