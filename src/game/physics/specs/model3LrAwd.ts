@@ -105,8 +105,10 @@ export const MODEL3_LR_AWD: PhysicsSpec = {
         inertia: 0.045,
       },
     ],
-    systemPowerW: 350000, // 366 kW nameplate; ~350 kW at the wheels-side inverter limit
-    topSpeedKmh: 201,
+    // v1.4.1: Tesla publishes no system power (third-party figures 324-340 kW, "366" is hp in
+    // some listings). 350 kW reproduces the official 4.4 s 0-100; the start-menu card shows this value.
+    systemPowerW: 350000,
+    topSpeedKmh: 201, // 2024+ Highland LR AWD (the 233 km/h figure was the 2021-23 car)
     responseS: 0.03,
     regenDecel: 1.96, // ≈ 0.2 g lift-off
     regenMaxPowerW: 110000,

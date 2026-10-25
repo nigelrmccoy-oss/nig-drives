@@ -11,6 +11,7 @@ import type { TransmissionMode } from '../vehicles/Transmission';
 import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel } from '../visuals/Quality';
 import { ASSIST_LABELS, loadAssistPrefs, saveAssistPrefs, type AssistPrefs } from './assistPrefs';
 import { openDyno } from './Dyno';
+import { MODEL3_LR_AWD } from '../physics/specs/model3LrAwd';
 
 export interface StartSelection {
   vehicle: VehicleId;
@@ -253,7 +254,7 @@ function variantHint(id: VehicleId): string {
     case 'bus_hybrid':
       return 'Lighter · regen brake · roof pack';
     case 'model3_lr_awd':
-      return '366 kW · front + rear motors · one-pedal regen';
+      return `${Math.round(MODEL3_LR_AWD.ev!.systemPowerW / 1000)} kW · front + rear motors · one-pedal regen`; // v1.4.1: from the sim spec
     default:
       return '';
   }

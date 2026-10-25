@@ -19,7 +19,7 @@ export function physicsSpecFor(spec: VehicleSpec): PhysicsSpec {
 /**
  * Build a physical spec from a legacy arcade VehicleSpec so the generated Golfs and buses
  * keep their character (relative power, grip, size, brakes) on the new model.
- * Power ≈ 7 W per (kg · legacy accel); gearing is chosen so top gear meets peak power
+ * Power = the real rated power when given, else ≈ 7 W per (kg · legacy accel); gearing is chosen so top gear meets peak power
  * at the drag-limited top speed (buses: at their legacy governed speed).
  */
 export function derivePhysicsSpec(spec: VehicleSpec): PhysicsSpec {
@@ -32,7 +32,7 @@ export function derivePhysicsSpec(spec: VehicleSpec): PhysicsSpec {
   const crr = bus ? 0.009 : 0.012;
   const efficiency = bus ? 0.88 : 0.91;
 
-  const powerW = 7 * spec.mass * spec.accel;
+  const powerW = spec.ratedPowerKw ? spec.ratedPowerKw * 1000 : 7 * spec.mass * spec.accel;
 
   // Torque curve: a shape per fuel type over rpm / redline, scaled to the target peak power.
   const shape: [number, number][] = diesel
@@ -49,7 +49,7 @@ export function derivePhysicsSpec(spec: VehicleSpec): PhysicsSpec {
       ? [3.49, 1.86, 1.41, 1.0, 0.75, 0.65]
       : [3.49, 1.86, 1.41, 1.0, 0.75]
     : spec.id.includes('vr6')
-      ? [3.78, 2.12, 1.36, 1.03, 0.84, 0.68]
+      ? [3.78, 2.12, 1.43, 1.03, 0.84] // v1.4.1: real 02A 5-speed (6-speed overdrive made 1st 25 % too short)
       : [3.78, 2.12, 1.36, 0.97, 0.76];
 
   // Drag-limited top speed for this power (bisection), then gear top to peak power there.

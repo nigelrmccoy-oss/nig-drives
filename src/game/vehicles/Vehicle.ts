@@ -35,6 +35,11 @@ export interface VehicleSpec {
   mass: number;
   /** Peak engine accel force / mass (m/s²) at full throttle on dry. */
   accel: number;
+  /**
+   * v1.4.1: rated engine power (kW, DIN) of the real car. When set, the physics uses it instead of
+   * the legacy 7 W × mass × accel estimate (which under-rated the VR6 and the 1.8).
+   */
+  ratedPowerKw?: number;
   maxSpeed: number;
   brakeForce: number;
   wheelbase: number;
@@ -106,8 +111,9 @@ export const VEHICLE_SPECS: Record<VehicleId, VehicleSpec> = {
     id: 'golf_18carb',
     name: 'VW Golf 1.8 carb',
     variantLabel: '1.8 carb',
-    mass: 1160,
+    mass: 1040, // v1.4.1: ~965 kg kerb + driver (was 1160)
     accel: 6.2,
+    ratedPowerKw: 66, // 90 PS 1.8 8V (Golf II GU / RP class); legacy estimate was 50 kW
     maxSpeed: 41,
     brakeForce: 16,
     torquePeak: 0.35,
@@ -149,8 +155,9 @@ export const VEHICLE_SPECS: Record<VehicleId, VehicleSpec> = {
     id: 'golf_28vr6',
     name: 'VW Golf 2.8 VR6',
     variantLabel: '2.8 VR6',
-    mass: 1420,
+    mass: 1335, // v1.4.1: 1233 kg kerb (Golf III VR6 automatic) + driver and fuel (was 1420)
     accel: 12.2,
+    ratedPowerKw: 128, // 174 PS 2.8 VR6 (AAA); legacy estimate was 121 kW. Real auto: 0-100 9.0 s, 221 km/h
     maxSpeed: 56,
     brakeForce: 19,
     frontBias: 0.6,
