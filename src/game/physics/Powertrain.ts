@@ -94,7 +94,8 @@ export class Powertrain {
     if (e.turbo) {
       const tb = e.turbo;
       const x = Math.min(1, Math.max(0, (rpm - tb.spoolStartRpm) / Math.max(1, tb.fullBoostRpm - tb.spoolStartRpm)));
-      const target = throttle * x * x * (3 - 2 * x);
+      // v1.4.0 M11: the driver's foot stays down through a quick shift, so the VNT keeps spinning
+      const target = inp.throttle * x * x * (3 - 2 * x);
       const lag = target > this.boost ? tb.lagS : tb.lagS * 1.2; // VNT holds most of the boost through a quick shift
       this.boost += (target - this.boost) * Math.min(1, dt / lag);
     }
@@ -116,12 +117,12 @@ export class Powertrain {
     if (inGear && !inp.clutchPedal && !inp.shifting) {
       if (shaftRpm > closeRpm && Math.abs(rpm - shaftRpm) < 350) target = 1;
       else if (throttle > 0.02) {
-        const x = Math.min(1, Math.max(0, (rpm - (launch - 400)) / 700));
+        const x = Math.min(1, Math.max(0, (rpm - (launch - 300)) / 600));
         target = Math.min(1, throttle * 1.5) * x * x * (3 - 2 * x);
       }
     }
     // engage smoothly (≈0.15 s), release instantly
-    this.engage = target < this.engage ? target : Math.min(target, this.engage + dt / 0.15);
+    this.engage = target < this.engage ? target : Math.min(target, this.engage + dt / 0.1);
     const cap = this.engage * this.spec.clutch.maxTorqueNm;
 
     if (this.locked) {

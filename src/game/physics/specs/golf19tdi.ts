@@ -63,15 +63,15 @@ export const GOLF_19TDI: PhysicsSpec = {
     inertia: 0.18, // mod engine inertia
     frictionNm: 14,
     frictionPerKrpm: 5,
-    turbo: { maxBoostBar: 0.91, spoolStartRpm: 1250, fullBoostRpm: 1900, lagS: 0.45, boostShare: 0.35 },
+    turbo: { maxBoostBar: 0.91, spoolStartRpm: 1250, fullBoostRpm: 1900, lagS: 0.35, boostShare: 0.35 },
   },
   gearbox: {
     ratios: [3.78, 2.12, 1.36, 0.97, 0.76],
     reverse: 3.6,
     finalDrive: 3.39,
-    efficiency: 0.92,
-    shiftTimeS: 0.25,
-    upshiftRpm: 4600,
+    efficiency: 0.94, // 5-speed FWD transaxle
+    shiftTimeS: 0.2,
+    upshiftRpm: 4300,
     downshiftRpm: 1350,
   },
   clutch: { maxTorqueNm: 330 },
