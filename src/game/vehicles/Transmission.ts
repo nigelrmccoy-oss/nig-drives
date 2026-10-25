@@ -11,6 +11,13 @@ export interface TransmissionConfig {
   mode: TransmissionMode;
   /** Forward gears (5 for most Golfs, 6 for VR6 / buses use 5). */
   forwardGears: number;
+  /** v1.4.0: the car's own ratios (1st first), reverse, final drive and shift points. */
+  ratios?: number[];
+  reverseRatio?: number;
+  finalDrive?: number;
+  upshiftRpm?: number;
+  downshiftRpm?: number;
+  shiftTimeS?: number;
 }
 
 /** Ratio relative to 4th ≈ 1.0; higher = more torque / lower top in gear. */
@@ -29,12 +36,28 @@ export class Transmission {
   /** Current engaged forward gear 1..n while in D (auto) or stick. */
   currentGear = 1;
   clutchIn = false;
+  /** v1.4.0: > 0 while a gear change is in progress (clutch open, throttle cut). */
+  shiftTimer = 0;
   private shiftCooldown = 0;
   private autoHold = 0;
+  private readonly specRatios: number[] | null;
+  private readonly reverseRatio: number;
+  private readonly finalDrive: number;
+  private readonly upshiftRpm: number;
+  private readonly downshiftRpm: number;
+  private readonly shiftTimeS: number;
 
   constructor(cfg: TransmissionConfig) {
     this.mode = cfg.mode;
-    this.forwardGears = Math.max(4, Math.min(6, cfg.forwardGears));
+    this.specRatios = cfg.ratios && cfg.ratios.length >= 3 ? [0, ...cfg.ratios] : null;
+    this.forwardGears = this.specRatios
+      ? this.specRatios.length - 1
+      : Math.max(4, Math.min(6, cfg.forwardGears));
+    this.reverseRatio = cfg.reverseRatio ?? REVERSE_RATIO;
+    this.finalDrive = cfg.finalDrive ?? FINAL_DRIVE;
+    this.upshiftRpm = cfg.upshiftRpm ?? 5500;
+    this.downshiftRpm = cfg.downshiftRpm ?? 1800;
+    this.shiftTimeS = cfg.shiftTimeS ?? 0.3;
     if (this.mode === 'auto') {
       this.autoSelector = 2;
       this.currentGear = 1;
@@ -46,6 +69,7 @@ export class Transmission {
   }
 
   get ratios(): number[] {
+    if (this.specRatios) return this.specRatios;
     return this.forwardGears >= 6 ? RATIOS_6 : RATIOS_5;
   }
 
@@ -53,16 +77,16 @@ export class Transmission {
   getDriveRatio(): { ratio: number; reverse: boolean; engaged: boolean } {
     if (this.mode === 'auto') {
       if (this.autoSelector === -1) return { ratio: 0, reverse: false, engaged: false }; // P
-      if (this.autoSelector === 0) return { ratio: REVERSE_RATIO * FINAL_DRIVE, reverse: true, engaged: true };
+      if (this.autoSelector === 0) return { ratio: this.reverseRatio * this.finalDrive, reverse: true, engaged: true };
       if (this.autoSelector === 1) return { ratio: 0, reverse: false, engaged: false }; // N
       const g = Math.max(1, Math.min(this.forwardGears, this.currentGear));
-      return { ratio: this.ratios[g] * FINAL_DRIVE, reverse: false, engaged: true };
+      return { ratio: this.ratios[g] * this.finalDrive, reverse: false, engaged: true };
     }
     // stick
     if (this.gearIndex === 0) return { ratio: 0, reverse: false, engaged: false }; // N
-    if (this.gearIndex < 0) return { ratio: REVERSE_RATIO * FINAL_DRIVE, reverse: true, engaged: true };
+    if (this.gearIndex < 0) return { ratio: this.reverseRatio * this.finalDrive, reverse: true, engaged: true };
     const g = Math.max(1, Math.min(this.forwardGears, this.gearIndex));
-    return { ratio: this.ratios[g] * FINAL_DRIVE, reverse: false, engaged: true };
+    return { ratio: this.ratios[g] * this.finalDrive, reverse: false, engaged: true };
   }
 
   getLabel(): GearLabel {
@@ -119,8 +143,11 @@ export class Transmission {
       clutch?: boolean;
       autoCycle?: boolean; // cycle P-R-N-D
     },
+    /** v1.4.0: mean spin of the driven wheels (rad/s) so the auto box shifts on real rpm. */
+    wheelOmega?: number,
   ): void {
     this.shiftCooldown = Math.max(0, this.shiftCooldown - dt);
+    this.shiftTimer = Math.max(0, this.shiftTimer - dt);
     this.clutchIn = !!opts.clutch;
     this.autoHold = Math.max(0, this.autoHold - dt);
 
@@ -134,7 +161,8 @@ export class Transmission {
         if (this.autoSelector === 2) this.currentGear = 1;
       }
       if (this.autoSelector === 2) {
-        this.autoShift(speedMs, throttle, dt);
+        if (wheelOmega !== undefined && this.specRatios) this.autoShiftRpm(Math.abs(wheelOmega), throttle);
+        else this.autoShift(speedMs, throttle, dt);
       }
       return;
     }
@@ -179,9 +207,39 @@ export class Transmission {
   private applyStickGear(g: number): void {
     // Optional-lite clutch: without clutch, small delay / allow anyway
     const delay = this.clutchIn ? 0.08 : 0.18;
+    if (g !== this.gearIndex) this.shiftTimer = this.clutchIn ? 0.05 : this.shiftTimeS;
     this.gearIndex = g;
     this.currentGear = g > 0 ? g : 0;
     this.shiftCooldown = delay;
+  }
+
+  /** Engine rpm the driven wheels would give in gear g. */
+  rpmInGear(wheelOmega: number, g: number): number {
+    const gi = Math.max(1, Math.min(this.forwardGears, g));
+    return (wheelOmega * this.ratios[gi] * this.finalDrive * 30) / Math.PI;
+  }
+
+  /**
+   * v1.4.0 auto box on real rpm: full throttle holds gears to upshiftRpm, light throttle
+   * short-shifts; kickdown when the driver floors it and the lower gear has room.
+   */
+  private autoShiftRpm(wheelOmega: number, throttle: number): void {
+    if (this.autoHold > 0 || this.shiftTimer > 0) return;
+    const g = this.currentGear;
+    const rpm = this.rpmInGear(wheelOmega, g);
+    const up = this.downshiftRpm * 1.9 + (this.upshiftRpm - this.downshiftRpm * 1.9) * Math.min(1, throttle * 1.15);
+    if (g < this.forwardGears && rpm > up && this.rpmInGear(wheelOmega, g + 1) > this.downshiftRpm * 1.1) {
+      this.currentGear = g + 1;
+      this.autoHold = 0.8;
+      this.shiftTimer = this.shiftTimeS;
+      return;
+    }
+    const kickdown = throttle > 0.9 && g > 1 && this.rpmInGear(wheelOmega, g - 1) < this.upshiftRpm * 0.82;
+    if (g > 1 && (rpm < this.downshiftRpm || kickdown)) {
+      this.currentGear = g - 1;
+      this.autoHold = 0.8;
+      this.shiftTimer = this.shiftTimeS * 0.8;
+    }
   }
 
   private autoShift(speedMs: number, throttle: number, _dt: number): void {

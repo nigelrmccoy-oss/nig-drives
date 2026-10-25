@@ -147,6 +147,23 @@ function skidpad(id: VehicleId, radius = 30.5): { g: number; kmh: number } {
 const f1 = (x: number): string => (Number.isFinite(x) ? x.toFixed(1) : '--');
 const f2 = (x: number): string => (Number.isFinite(x) ? x.toFixed(2) : '--');
 
+if (process.argv[2] === 'trace') {
+  // 0–100 trace for tuning: speed, gear, rpm, boost, clutch, front slip
+  const id = (process.argv[3] ?? 'golf_19tdi') as VehicleId;
+  const { v, inp } = makeCar(id);
+  inp.setThrottle(1);
+  for (let i = 0; i <= 60 * 20; i++) {
+    tick(v, inp);
+    if (i % 30 === 0) {
+      const w = v.sim.wheels;
+      console.log(
+        `t=${(i * FRAME).toFixed(1)} kmh=${v.getSpeedKmh().toFixed(1)} gear=${v.getGearLabel()} rpm=${v.getEngineRpmDisplay()} ` +
+          `boost=${v.boost.toFixed(2)} lock=${v.powertrain.clutchLocked ? 1 : 0} kF=${w[0].kappa.toFixed(3)} fzF=${w[0].fz.toFixed(0)} fxF=${w[0].fx.toFixed(0)}`,
+      );
+    }
+  }
+  process.exit(0);
+}
 const ids = (process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(VEHICLE_SPECS)) as VehicleId[];
 console.log('vehicle        0-50   0-100  0-160  400m   top km/h (at s)  gear@100  100-0 m (s)   skidpad g (km/h)');
 for (const id of ids) {

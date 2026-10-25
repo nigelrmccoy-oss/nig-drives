@@ -14,7 +14,7 @@ export const GOLF_19TDI: PhysicsSpec = {
   source: 'VW ALH / 02J public data + BeamNG MIRROR Golf MK4 1.9TDI mod (reference values)',
   drive: 'fwd',
   chassis: {
-    mass: 1345, // 1270 kg kerb + driver
+    mass: 1275, // 1200 kg kerb (VW data, 90 PS) + driver; VW quotes 0-100 12.0-12.4 s, 180 km/h
     wheelbase: 2.51,
     frontWeight: 0.61,
     cgHeight: 0.52,
@@ -38,7 +38,7 @@ export const GOLF_19TDI: PhysicsSpec = {
     loadSensitivity: 0.08,
     rollingRes: 0.012,
     relaxLength: 0.35,
-    inertia: 1.1,
+    inertia: 0.95,
   },
   engine: {
     fuel: 'diesel',
@@ -51,8 +51,8 @@ export const GOLF_19TDI: PhysicsSpec = {
       { rpm: 1600, nm: 185 },
       { rpm: 1900, nm: 210 },
       { rpm: 2500, nm: 205 },
-      { rpm: 3000, nm: 192 },
-      { rpm: 3500, nm: 176 },
+      { rpm: 3000, nm: 202 },
+      { rpm: 3500, nm: 182 },
       { rpm: 4000, nm: 158 },
       { rpm: 4500, nm: 128 },
       { rpm: 5000, nm: 70 },
@@ -60,18 +60,18 @@ export const GOLF_19TDI: PhysicsSpec = {
     idleRpm: 850,
     redlineRpm: 4500,
     limiterRpm: 5000,
-    inertia: 0.22,
+    inertia: 0.18, // mod engine inertia
     frictionNm: 14,
     frictionPerKrpm: 5,
-    turbo: { maxBoostBar: 0.91, spoolStartRpm: 1250, fullBoostRpm: 1900, lagS: 0.55, boostShare: 0.45 },
+    turbo: { maxBoostBar: 0.91, spoolStartRpm: 1250, fullBoostRpm: 1900, lagS: 0.45, boostShare: 0.35 },
   },
   gearbox: {
     ratios: [3.78, 2.12, 1.36, 0.97, 0.76],
     reverse: 3.6,
     finalDrive: 3.39,
     efficiency: 0.92,
-    shiftTimeS: 0.32,
-    upshiftRpm: 4300,
+    shiftTimeS: 0.25,
+    upshiftRpm: 4600,
     downshiftRpm: 1350,
   },
   clutch: { maxTorqueNm: 330 },

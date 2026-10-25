@@ -1,15 +1,11 @@
 import * as THREE from 'three';
 import type { DriverInput } from '../input/Input';
 import type { WeatherPreset } from '../weather/Environment';
-import {
-  Transmission,
-  defaultForwardGears,
-  type TransmissionMode,
-} from './Transmission';
+import { Transmission, type TransmissionMode } from './Transmission';
 import { MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
-import { torqueAt } from '../physics/PhysicsSpec';
+import { Powertrain } from '../physics/Powertrain';
 import { VehicleSim } from '../physics/VehicleSim';
 
 /** Selectable drivetrains / transit variants (v1.2). */
@@ -253,6 +249,8 @@ export class Vehicle {
   heading = 0;
   /** v1.4.0: the chassis / tyre simulation (owns the body velocities). */
   readonly sim: VehicleSim;
+  /** v1.4.0 M4: engine, turbo and clutch. */
+  readonly powertrain: Powertrain;
   private get vx(): number {
     return this.sim.v;
   }
@@ -325,12 +323,20 @@ export class Vehicle {
     this.spec = spec;
     this.phys = physicsSpecFor(spec);
     this.sim = new VehicleSim(this.phys);
+    this.powertrain = new Powertrain(this.phys);
     this.drivenIdx = this.phys.drive === 'fwd' ? [0, 1] : this.phys.drive === 'rwd' ? [2, 3] : [0, 1, 2, 3];
     this.engineRpmActual = this.phys.engine.idleRpm;
     this.mesh = mesh;
+    const gb = this.phys.gearbox;
     this.transmission = new Transmission({
       mode: transmissionMode,
-      forwardGears: defaultForwardGears(spec.id),
+      forwardGears: gb.ratios.length,
+      ratios: gb.ratios,
+      reverseRatio: gb.reverse,
+      finalDrive: gb.finalDrive,
+      upshiftRpm: gb.upshiftRpm,
+      downshiftRpm: gb.downshiftRpm,
+      shiftTimeS: gb.shiftTimeS,
     });
     this.collectVisuals();
   }
@@ -402,6 +408,7 @@ export class Vehicle {
     this.position.set(x, 0, z);
     this.heading = headingRad;
     this.sim.reset();
+    this.powertrain.reset();
     this.steerAngle = 0;
     this.speed = 0;
     this.throttleLoad = 0;
@@ -497,7 +504,7 @@ export class Vehicle {
       setGear: ctl.setGear,
       clutch: ctl.clutch,
       autoCycle: ctl.autoCycle,
-    });
+    }, this.sim.meanOmega(this.drivenIdx));
     const drive = this.transmission.getDriveRatio();
 
     let throttle = this.throttleIn;
@@ -523,7 +530,7 @@ export class Vehicle {
     this.throttleLoad = throttle;
 
     // --- engine → wheels ---
-    this.computeDrive(dt, throttle, drive.engaged && !this.transmission.clutchIn, drive.reverse);
+    this.computeDrive(dt, throttle, drive.engaged ? drive.ratio : 0, drive.reverse);
 
     // --- brakes (Park / spawn hold lock the wheels like a parking pawl + handbrake) ---
     const regenMul = p.regen?.brakeMul ?? 1;
@@ -574,41 +581,35 @@ export class Vehicle {
     this.speed = Math.hypot(this.vx, this.vz);
   }
 
-  /** Gear ratio × final drive from the car's own gearbox spec. */
-  private overallRatio(reverse: boolean): number {
-    const gb = this.phys.gearbox;
-    if (reverse) return gb.reverse * gb.finalDrive;
-    const gi = Math.max(1, Math.min(gb.ratios.length, this.transmission.currentGear));
-    return gb.ratios[gi - 1] * gb.finalDrive;
-  }
-
-  /**
-   * M3 drivetrain: engine torque curve coupled straight to the driven wheels through the
-   * current gear (engine sits at idle and slips below it). Replaced by Powertrain in M4.
-   */
-  private computeDrive(dt: number, throttle: number, coupled: boolean, reverse: boolean): void {
+  /** Engine → clutch → gearbox → open differential (equal torque to each driven wheel). */
+  private computeDrive(dt: number, throttle: number, ratio: number, reverse: boolean): void {
     const e = this.phys.engine;
-    const gb = this.phys.gearbox;
+    const n = this.drivenIdx.length;
+    const out = this.powertrain.update(dt, {
+      throttle,
+      ratio,
+      direction: reverse ? -1 : 1,
+      wheelOmega: this.sim.meanOmega(this.drivenIdx),
+      clutchPedal: this.transmission.clutchIn,
+      shifting: this.transmission.shiftTimer > 0,
+    });
     this.driveTorque.fill(0);
     this.extraInertia.fill(0);
-    const ratio = coupled ? this.overallRatio(reverse) : 0;
-    let rpm: number;
-    if (ratio > 0) {
-      rpm = Math.max(e.idleRpm, ((Math.abs(this.sim.meanOmega(this.drivenIdx)) * ratio * 30) / Math.PI));
-      let te = throttle * torqueAt(e.torqueCurve, rpm) - (1 - throttle) * (e.frictionNm + (e.frictionPerKrpm * rpm) / 1000);
-      if (rpm >= e.limiterRpm) te = -(e.frictionNm + (e.frictionPerKrpm * rpm) / 1000);
-      const tw = te * ratio * gb.efficiency * (reverse ? -1 : 1);
-      const n = this.drivenIdx.length;
-      for (const i of this.drivenIdx) {
-        this.driveTorque[i] = tw / n;
-        this.extraInertia[i] = (e.inertia * ratio * ratio) / n;
-      }
-    } else {
-      const target = e.idleRpm + throttle * (e.redlineRpm - e.idleRpm);
-      rpm = approach(this.engineRpmActual, target, dt * 6000);
+    for (const i of this.drivenIdx) {
+      this.driveTorque[i] = out.wheelTorque / n;
+      this.extraInertia[i] = out.wheelInertia / n;
     }
+    // hybrid / regen: coast regen on the driven wheels with the throttle closed
+    const regen = this.phys.regen;
+    if (regen && throttle < 0.05 && this.vz > 2) {
+      const fade = Math.min(1, (this.vz - 2) / 4);
+      const t = (regen.coastDecel * this.phys.chassis.mass * this.phys.tire.radius * fade) / n;
+      for (const i of this.drivenIdx) this.driveTorque[i] -= t;
+    }
+    const rpm = this.powertrain.rpm;
     this.engineRpmActual = rpm;
     this.engineRpm = THREE.MathUtils.clamp((rpm - e.idleRpm * 0.9) / (e.redlineRpm - e.idleRpm * 0.9), 0, 1);
+    this.boost = this.powertrain.boost;
   }
   /** v1.3.4: water — heavy drag on every axis (no traction comes from the 0.1 grip). */
   applyWaterDrag(dt: number, k = 3.2): void {
