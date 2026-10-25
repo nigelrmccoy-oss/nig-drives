@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Input } from '../input/Input';
+import type { DriverInput } from '../input/Input';
 import type { WeatherPreset } from '../weather/Environment';
 import {
   Transmission,
@@ -214,6 +214,22 @@ export interface WeatherDriveInfo {
   accelBrakeMul: number;
 }
 
+/** One frame of driver controls, read once per rendered frame (v1.4.0 M1). */
+export interface DriveControls {
+  /** +1 = full left. */
+  steer: number;
+  throttle: number;
+  brake: number;
+  /** Gamepad / analog: skip the keyboard ramps. */
+  analog: boolean;
+  back: boolean;
+  clutch: boolean;
+  upshift: boolean;
+  downshift: boolean;
+  setGear: number | null;
+  autoCycle: boolean;
+}
+
 /**
  * Sim-cade tire model (FM4 / GT5 inspired):
  * weight transfer, grip circle, ABS/TCS, weather & surface.
@@ -270,6 +286,10 @@ export class Vehicle {
   private prevStepX = 0;
   private prevStepZ = 0;
   private prevStepHeading = 0;
+  /** v1.4.0 M1: driver inputs after keyboard ramps / pad smoothing. */
+  private steerIn = 0;
+  private throttleIn = 0;
+  private brakeIn = 0;
 
   constructor(spec: VehicleSpec, mesh: THREE.Group, transmissionMode: TransmissionMode = 'auto') {
     this.spec = spec;
@@ -363,15 +383,18 @@ export class Vehicle {
    * v1.4.0 M0: advance the physics by whole 1/120 s steps. The frame dt only feeds
    * the accumulator, so handling no longer depends on the frame rate.
    */
-  update(dt: number, input: Input, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
+  update(dt: number, input: DriverInput, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
     const frameDt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.1) : 0;
     this.stepAcc += frameDt;
     let steps = 0;
+    let ctl = Vehicle.readControls(input);
     while (this.stepAcc >= PHYS_DT && steps < MAX_SUBSTEPS) {
       this.prevStepX = this.position.x;
       this.prevStepZ = this.position.z;
       this.prevStepHeading = this.heading;
-      this.step(PHYS_DT, input, weather, surface);
+      this.step(PHYS_DT, ctl, weather, surface);
+      // shift requests are one-shot: only the first step of the frame sees them
+      if (steps === 0) ctl = { ...ctl, upshift: false, downshift: false, setGear: null, autoCycle: false };
       this.stepAcc -= PHYS_DT;
       steps++;
     }
@@ -380,8 +403,48 @@ export class Vehicle {
     this.syncMesh();
   }
 
-  private step(dt: number, input: Input, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
+  /** Read the input device once per frame (shift requests are consumed here). */
+  static readControls(input: DriverInput): DriveControls {
+    const clamp01 = (x: number): number => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
+    return {
+      steer: input.analog
+        ? THREE.MathUtils.clamp(Number.isFinite(input.steer) ? input.steer : 0, -1, 1)
+        : (input.left ? 1 : 0) - (input.right ? 1 : 0),
+      throttle: input.analog ? clamp01(input.throttle) : input.forward ? 1 : 0,
+      brake: input.analog ? clamp01(input.brakeAxis) : input.brake ? 1 : 0,
+      analog: input.analog,
+      back: input.back,
+      clutch: input.clutch,
+      upshift: input.consumeGearUp(),
+      downshift: input.consumeGearDown(),
+      setGear: input.consumeHGear(),
+      autoCycle: input.consumeAutoSelector(),
+    };
+  }
+
+  /**
+   * v1.4.0 M1: keyboard keys ramp like a real pedal / wheel instead of snapping;
+   * steering winds on more slowly at speed and returns to centre faster than it winds on.
+   * A gamepad goes straight through with light smoothing.
+   */
+  private filterDriverInputs(c: DriveControls, dt: number): void {
+    if (c.analog) {
+      this.steerIn = approach(this.steerIn, c.steer, dt * 10);
+      this.throttleIn = c.throttle;
+      this.brakeIn = c.brake;
+      return;
+    }
+    const speedK = 1 / (1 + Math.abs(this.vz) / 22);
+    const returning = c.steer === 0 || Math.sign(c.steer) !== Math.sign(this.steerIn);
+    const rate = returning ? 4.5 : 1.4 + 2.6 * speedK;
+    this.steerIn = approach(this.steerIn, c.steer, rate * dt);
+    this.throttleIn = approach(this.throttleIn, c.throttle, (c.throttle > this.throttleIn ? 6 : 12) * dt);
+    this.brakeIn = approach(this.brakeIn, c.brake, (c.brake > this.brakeIn ? 7 : 14) * dt);
+  }
+
+  private step(dt: number, ctl: DriveControls, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
     const s = this.spec;
+    this.filterDriverInputs(ctl, dt);
     const g = 9.81;
     // Prefer surface-aware grip (OSM surface × weather); fall back to roadFactor × weather.
     const surfaceGrip =
@@ -391,8 +454,7 @@ export class Vehicle {
     const mu = s.gripMu * surfaceGrip;
     const noise = THREE.MathUtils.clamp(surface.noise ?? 0, 0, 1);
 
-    const steerTarget =
-      ((input.left ? 1 : 0) + (input.right ? -1 : 0)) * s.steerLock;
+    const steerTarget = this.steerIn * s.steerLock;
     const steerRate =
       s.steerSpeed *
       (0.55 + 0.45 * (1 - THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1)));
@@ -420,20 +482,19 @@ export class Vehicle {
     const maxFyRear = mu * FzRear * 1.05;
 
     // --- Transmission ---
-    const hGear = input.consumeHGear();
-    this.transmission.update(dt, this.vz, input.forward ? 1 : 0, {
-      upshift: input.consumeGearUp(),
-      downshift: input.consumeGearDown(),
-      setGear: hGear,
-      clutch: input.clutch,
-      autoCycle: input.consumeAutoSelector(),
+    this.transmission.update(dt, this.vz, this.throttleIn, {
+      upshift: ctl.upshift,
+      downshift: ctl.downshift,
+      setGear: ctl.setGear,
+      clutch: ctl.clutch,
+      autoCycle: ctl.autoCycle,
     });
     const drive = this.transmission.getDriveRatio();
 
-    let throttle = input.forward ? 1 : 0;
-    let brake = input.brake ? 1 : 0;
+    let throttle = this.throttleIn;
+    let brake = this.brakeIn;
     // S: brake when moving forward; only drive when already in reverse gear/selector
-    if (input.back) {
+    if (ctl.back) {
       if (this.vz > 0.6 && !drive.reverse) brake = Math.max(brake, 0.7);
       else if (drive.reverse) throttle = Math.max(throttle, 0.85);
       else if (Math.abs(this.vz) <= 0.6) brake = Math.max(brake, 0.55);
@@ -443,8 +504,7 @@ export class Vehicle {
     const wantReverse = drive.reverse;
     if (this.transmission.mode === 'auto' && this.transmission.autoSelector === 0) {
       // In R: W goes reverse, S brakes
-      if (input.forward) throttle = 1;
-      if (input.back) {
+      if (ctl.back) {
         throttle = 0;
         brake = Math.max(brake, 0.7);
       }
@@ -584,7 +644,7 @@ export class Vehicle {
     // Brakes / Park hold the car at a standstill if the tyres can take it.
     let gAlong = this.gradeGravity ? -g * this.gradeSin : 0;
     const parked = this.transmission.mode === 'auto' && this.transmission.autoSelector === -1;
-    if (this.spawnHold && (throttle > 0 || brake > 0 || input.left || input.right || input.back)) {
+    if (this.spawnHold && (throttle > 0 || brake > 0 || ctl.steer !== 0 || ctl.back)) {
       this.spawnHold = false;
     }
     if ((brake > 0.2 || parked || this.spawnHold) && Math.abs(this.vz) < 0.8 && Math.abs(gAlong) < mu * g * 0.9) {

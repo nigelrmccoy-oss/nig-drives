@@ -78,7 +78,8 @@ export class HUD {
         <div class="controls-hint">
           W/↑ accel · S/↓ brake/reverse · A/D steer · Space brake · C camera<br/>
           G auto P-R-N-D · Q/E shift · 1–6/N/B H-pattern · Shift clutch<br/>
-          R weather · T time · P pause clock
+          R weather · T time · P pause clock<br/>
+          Gamepad: stick steer · RT/LT throttle/brake · LB/RB shift · B reverse · X clutch · Y camera
         </div>
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>

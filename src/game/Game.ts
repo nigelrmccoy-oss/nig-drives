@@ -402,6 +402,7 @@ export class Game {
       this.hud.setFps(this.fps, this.quality.label);
     }
 
+    this.input.poll(); // v1.4.0: gamepad (analog steer / pedals) once per frame
     if (this.input.consumeCameraToggle()) {
       this.chase.toggle();
       this.hud.setCameraMode(this.chase.mode);

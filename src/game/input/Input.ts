@@ -1,4 +1,28 @@
-export class Input {
+/**
+ * What the vehicle reads each frame (v1.4.0 M1). Input implements it; the headless
+ * bench passes its own object. steer +1 = full left, throttle / brakeAxis 0–1.
+ */
+export interface DriverInput {
+  forward: boolean;
+  back: boolean;
+  left: boolean;
+  right: boolean;
+  brake: boolean;
+  clutch: boolean;
+  steer: number;
+  throttle: number;
+  brakeAxis: number;
+  /** True while a gamepad drives (no keyboard ramps applied). */
+  analog: boolean;
+  consumeGearUp(): boolean;
+  consumeGearDown(): boolean;
+  consumeAutoSelector(): boolean;
+  consumeHGear(): number | null;
+}
+
+const PAD_DEADZONE = 0.08;
+
+export class Input implements DriverInput {
   forward = false;
   back = false;
   left = false;
@@ -6,6 +30,12 @@ export class Input {
   brake = false;
   /** Left Shift — optional-lite clutch for stick. */
   clutch = false;
+  /** v1.4.0 analog channels: keyboard writes 0/±1, a gamepad writes real values. */
+  steer = 0;
+  throttle = 0;
+  brakeAxis = 0;
+  analog = false;
+  private padPrev: boolean[] = [];
 
   private pressed = new Set<string>();
   private cameraToggleQueued = false;
@@ -38,6 +68,7 @@ export class Input {
     ) {
       e.preventDefault();
     }
+    this.analog = false; // a key press hands control back to the keyboard
     if (!this.pressed.has(k)) {
       if (k === 'KeyC') this.cameraToggleQueued = true;
       if (k === 'KeyR') this.weatherCycleQueued = true;
@@ -77,6 +108,62 @@ export class Input {
     this.right = this.pressed.has('KeyD') || this.pressed.has('ArrowRight');
     this.brake = this.pressed.has('Space');
     this.clutch = this.pressed.has('ShiftLeft') || this.pressed.has('ShiftRight');
+    if (!this.analog) {
+      this.steer = (this.left ? 1 : 0) - (this.right ? 1 : 0);
+      this.throttle = this.forward ? 1 : 0;
+      this.brakeAxis = this.brake ? 1 : 0;
+    }
+  }
+
+  /**
+   * v1.4.0 M1: read the first connected gamepad (standard mapping). Call once per frame.
+   * Left stick steer, RT throttle, LT brake, B reverse/brake, X clutch,
+   * RB/LB shift up/down, Y camera, View/Back cycles P-R-N-D.
+   */
+  poll(): void {
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+    let pad: Gamepad | null = null;
+    for (const p of pads) {
+      if (p && p.connected) {
+        pad = p;
+        break;
+      }
+    }
+    if (!pad) {
+      if (this.analog) {
+        this.analog = false;
+        this.sync();
+      }
+      return;
+    }
+    const gp = pad;
+    const held = (i: number): boolean => !!gp.buttons[i]?.pressed;
+    const edge = (i: number): boolean => {
+      const now = held(i);
+      const was = this.padPrev[i] ?? false;
+      this.padPrev[i] = now;
+      return now && !was;
+    };
+    if (edge(5)) this.gearUpQueued = true;
+    if (edge(4)) this.gearDownQueued = true;
+    if (edge(3)) this.cameraToggleQueued = true;
+    if (edge(8)) this.autoSelectorQueued = true;
+    const raw = gp.axes[0] ?? 0;
+    const stick = Math.abs(raw) < PAD_DEADZONE ? 0 : (Math.sign(raw) * (Math.abs(raw) - PAD_DEADZONE)) / (1 - PAD_DEADZONE);
+    const rt = gp.buttons[7]?.value ?? 0;
+    const lt = gp.buttons[6]?.value ?? 0;
+    const active = Math.abs(stick) > 0.02 || rt > 0.04 || lt > 0.04 || held(1) || held(2);
+    if (active) this.analog = true;
+    if (!this.analog) return;
+    this.steer = Math.max(-1, Math.min(1, -stick));
+    this.throttle = Math.max(0, Math.min(1, rt));
+    this.brakeAxis = Math.max(0, Math.min(1, lt));
+    this.forward = this.throttle > 0.5;
+    this.brake = this.brakeAxis > 0.5;
+    this.back = held(1);
+    this.left = this.steer > 0.25;
+    this.right = this.steer < -0.25;
+    this.clutch = held(2);
   }
 
   consumeCameraToggle(): boolean {
