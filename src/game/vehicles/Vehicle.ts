@@ -6,6 +6,7 @@ import {
   defaultForwardGears,
   type TransmissionMode,
 } from './Transmission';
+import { MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 
 /** Selectable drivetrains / transit variants (v1.2). */
 export type VehicleId =
@@ -264,6 +265,11 @@ export class Vehicle {
   private headlightMats: THREE.MeshStandardMaterial[] = [];
   private headSpots: THREE.SpotLight[] = [];
   private wheelSpin = 0;
+  /** v1.4.0 M0 fixed-step accumulator + pose of the previous step (render interpolation). */
+  private stepAcc = 0;
+  private prevStepX = 0;
+  private prevStepZ = 0;
+  private prevStepHeading = 0;
 
   constructor(spec: VehicleSpec, mesh: THREE.Group, transmissionMode: TransmissionMode = 'auto') {
     this.spec = spec;
@@ -346,10 +352,35 @@ export class Vehicle {
     this.steerAngle = 0;
     this.speed = 0;
     this.throttleLoad = 0;
+    this.stepAcc = 0;
+    this.prevStepX = x;
+    this.prevStepZ = z;
+    this.prevStepHeading = headingRad;
     this.syncMesh();
   }
 
+  /**
+   * v1.4.0 M0: advance the physics by whole 1/120 s steps. The frame dt only feeds
+   * the accumulator, so handling no longer depends on the frame rate.
+   */
   update(dt: number, input: Input, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
+    const frameDt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.1) : 0;
+    this.stepAcc += frameDt;
+    let steps = 0;
+    while (this.stepAcc >= PHYS_DT && steps < MAX_SUBSTEPS) {
+      this.prevStepX = this.position.x;
+      this.prevStepZ = this.position.z;
+      this.prevStepHeading = this.heading;
+      this.step(PHYS_DT, input, weather, surface);
+      this.stepAcc -= PHYS_DT;
+      steps++;
+    }
+    // Too far behind (tab was hidden, long hitch): drop the backlog instead of fast-forwarding.
+    if (this.stepAcc >= PHYS_DT) this.stepAcc = 0;
+    this.syncMesh();
+  }
+
+  private step(dt: number, input: Input, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
     const s = this.spec;
     const g = 9.81;
     // Prefer surface-aware grip (OSM surface × weather); fall back to roadFactor × weather.
@@ -610,8 +641,6 @@ export class Vehicle {
       this.vz = 0;
     }
     this.speed = Math.hypot(this.vx, this.vz);
-
-    this.syncMesh();
   }
 
   /** v1.3.4: water — heavy drag on every axis (no traction comes from the 0.1 grip). */
@@ -691,9 +720,18 @@ export class Vehicle {
   }
 
   private syncMesh(): void {
+    // Draw between the last two physics steps so 60/144 Hz displays both look smooth.
+    const a = Math.min(1, this.stepAcc / PHYS_DT);
+    if (!Number.isFinite(this.prevStepX) || !Number.isFinite(this.prevStepZ) || !Number.isFinite(this.prevStepHeading)) {
+      this.prevStepX = this.position.x;
+      this.prevStepZ = this.position.z;
+      this.prevStepHeading = this.heading;
+    }
     this.mesh.position.copy(this.position);
+    this.mesh.position.x = this.prevStepX + (this.position.x - this.prevStepX) * a;
+    this.mesh.position.z = this.prevStepZ + (this.position.z - this.prevStepZ) * a;
     this.mesh.rotation.order = 'YXZ';
-    this.mesh.rotation.y = this.heading;
+    this.mesh.rotation.y = this.prevStepHeading + (this.heading - this.prevStepHeading) * a;
     const roll = THREE.MathUtils.clamp(-this.vx * 0.015, -0.08, 0.08);
     const pitch = THREE.MathUtils.clamp(
       -this.vz * 0.002 + (this._prevVz - this.vz) * 0.01,
