@@ -60,6 +60,9 @@ export class Game {
   private waterTime = 0;
   private lastDry: { x: number; z: number; y: number; heading: number } | null = null;
   private lastDryAcc = 0;
+  /** v1.4.1 P2-11: last finite pose (every frame) and the spawn point, for NaN recovery. */
+  private lastGood: { x: number; z: number; y: number; heading: number } | null = null;
+  private spawnPose: { x: number; z: number; y: number; heading: number } | null = null;
   private splash = new Splash();
   private quality: QualitySettings;
   readonly textures: TextureLibrary;
@@ -231,6 +234,7 @@ export class Game {
       this.vehicle.mesh.position.y = snap.y;
       this.lastGroundY = snap.y;
       this.lastDry = { x: snap.x, z: snap.z, y: snap.y, heading };
+      this.spawnPose = { ...this.lastDry };
     } else {
       let y = this.tiles.getHeight(0, 0);
       if (!Number.isFinite(y)) y = 0;
@@ -343,6 +347,34 @@ export class Game {
     this.hud.setStatus('OSM roads streamed in');
   }
 
+  /**
+   * v1.4.1 P2-11: the pose went non-finite. Put the car back where it was — the last dry road point,
+   * else the road nearest the last finite position, else that position, else the spawn — never the
+   * map origin (which may be far away, in water or inside a building).
+   */
+  private recoverInvalidState(): void {
+    const v = this.vehicle!;
+    const tiles = this.tiles!;
+    let d = this.lastDry;
+    if (!d && this.lastGood) {
+      const p = tiles.findNearestRoadPoint(this.lastGood.x, this.lastGood.z);
+      d = p ? { x: p.x, z: p.z, y: p.y, heading: this.lastGood.heading } : this.lastGood;
+    }
+    if (!d) d = this.spawnPose;
+    if (!d) {
+      const p = tiles.findNearestRoadPoint(0, 0);
+      d = p ? { x: p.x, z: p.z, y: p.y, heading: 0 } : { x: 0, z: 0, y: tiles.getHeight(0, 0) || 0, heading: 0 };
+    }
+    const heading = Number.isFinite(d.heading) ? d.heading : 0;
+    v.setPose(d.x, d.z, heading);
+    v.position.y = d.y;
+    v.vy = 0;
+    v.mesh.position.set(d.x, d.y, d.z);
+    this.lastGroundY = d.y;
+    this.chase.reset();
+    this.hud.setStatus('Recovered from invalid vehicle state — back on the road');
+  }
+
   private resetToDry(): void {
     const v = this.vehicle!;
     const tiles = this.tiles!;
@@ -406,7 +438,9 @@ export class Game {
   private frame = (t: number): void => {
     if (!this.running || !this.vehicle || !this.tiles) return;
     const rawDt = Math.max(0, (t - this.lastT) / 1000);
-    const dt = Math.min(0.05, rawDt);
+    // v1.4.1 P2-6: a slow frame (down to 4 fps) still advances real time; physics stays at fixed
+    // 120 Hz substeps inside Vehicle.update. Longer stalls (tab switch, GC) are dropped.
+    const dt = Math.min(0.25, rawDt);
     this.lastT = t;
     this.fpsFrames++;
     this.fpsAcc += rawDt;
@@ -469,9 +503,10 @@ export class Game {
       !Number.isFinite(this.vehicle.position.z) ||
       !Number.isFinite(this.vehicle.heading)
     ) {
-      this.vehicle.setPose(0, 0, 0);
-      this.vehicle.position.y = this.tiles.getHeight(0, 0) || 0;
-      this.hud.setStatus('Recovered from invalid vehicle state');
+      this.recoverInvalidState();
+    } else {
+      const p = this.vehicle.position;
+      if (Number.isFinite(p.y)) this.lastGood = { x: p.x, z: p.z, y: p.y, heading: this.vehicle.heading };
     }
 
     this.tiles.update(this.vehicle.position.x, this.vehicle.position.z);

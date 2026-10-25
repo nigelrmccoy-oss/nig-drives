@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { DriverInput } from '../input/Input';
 import type { WeatherPreset } from '../weather/Environment';
 import { Transmission, type TransmissionMode } from './Transmission';
-import { MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
+import { MAX_FRAME_DT, MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
 import { Assists } from '../physics/Assists';
@@ -471,7 +471,7 @@ export class Vehicle {
    * the accumulator, so handling no longer depends on the frame rate.
    */
   update(dt: number, input: DriverInput, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
-    const frameDt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), 0.1) : 0;
+    const frameDt = Number.isFinite(dt) ? Math.min(Math.max(dt, 0), MAX_FRAME_DT) : 0;
     this.stepAcc += frameDt;
     let steps = 0;
     let ctl = Vehicle.readControls(input);
@@ -632,10 +632,14 @@ export class Vehicle {
       dt * 0.05,
     );
 
-    if (!Number.isFinite(this.heading)) this.heading = 0;
-    if (!Number.isFinite(this.position.x) || !Number.isFinite(this.position.z)) {
-      this.position.x = 0;
-      this.position.z = 0;
+    // v1.4.1 P2-11: a blown-up step goes back to the pose before it (stopped), not to the map origin.
+    if (!Number.isFinite(this.heading) || !Number.isFinite(this.position.x) || !Number.isFinite(this.position.z)) {
+      const ok = Number.isFinite(this.prevStepX) && Number.isFinite(this.prevStepZ) && Number.isFinite(this.prevStepHeading);
+      if (ok) {
+        this.position.x = this.prevStepX;
+        this.position.z = this.prevStepZ;
+        this.heading = this.prevStepHeading;
+      } else if (!Number.isFinite(this.heading)) this.heading = 0;
       this.sim.reset();
     }
     this.speed = Math.hypot(this.vx, this.vz);

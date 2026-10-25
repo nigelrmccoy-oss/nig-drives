@@ -5,5 +5,10 @@
  */
 export const PHYS_HZ = 120;
 export const PHYS_DT = 1 / PHYS_HZ;
-/** Spiral-of-death guard: at most this many steps per rendered frame. */
-export const MAX_SUBSTEPS = 8;
+/**
+ * Spiral-of-death guard: at most this many steps per rendered frame. v1.4.1 P2-6: 30 steps covers
+ * a 0.25 s frame (4 fps) so slow machines still run in real time instead of slow motion.
+ */
+export const MAX_SUBSTEPS = 30;
+/** Longest frame fed to the accumulator (matches the Game.frame clamp). */
+export const MAX_FRAME_DT = MAX_SUBSTEPS * PHYS_DT;
