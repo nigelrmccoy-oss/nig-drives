@@ -462,7 +462,12 @@ export class Game {
       this.env.toggleTimePause();
       this.hud.setTime(this.env.getTimeLabel(), this.env.timePaused, this.env.getDayLengthMinutes());
     }
-    if (this.input.consumeAssistPanel()) this.hud.toggleAssistPanel();
+    if (this.input.consumeAssistToggle()) {
+      // v1.4.1: F1 = all assists off, or all back on if any is off; the panel stays on the HUD button.
+      const cur = loadAssistPrefs();
+      const anyOn = cur.abs || cur.tcs || cur.stability;
+      this.applyAssists({ abs: !anyOn, tcs: !anyOn, stability: !anyOn });
+    }
     if (this.input.consumeTelemetryPlus()) this.telemetryPlus.toggle();
 
     const v = this.vehicle;

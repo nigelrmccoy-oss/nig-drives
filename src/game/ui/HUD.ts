@@ -72,7 +72,7 @@ export class HUD {
           <div class="label">Environment</div>
           <button type="button" class="hud-btn" id="hud-weather">Weather: Clear / dry (R)</button>
           <button type="button" class="hud-btn" id="hud-time">Time: Day (T)</button>
-          <button type="button" class="hud-btn" id="hud-assists">Assists (F1)</button>
+          <button type="button" class="hud-btn" id="hud-assists">Assists ▾</button>
           <div class="assist-panel" id="hud-assist-panel" hidden>
             ${ASSIST_KEYS.map((k) => `<button type="button" class="hud-btn assist-toggle" data-assist-toggle="${k}">${ASSIST_LABELS[k].name}: On</button>`).join('')}
           </div>
@@ -101,14 +101,14 @@ export class HUD {
         <div class="controls-hint">
           W/↑ accel · S/↓ brake/reverse · A/D steer · Space brake · C camera<br/>
           G auto P-R-N-D · Q/E shift · 1–6/N/B H-pattern · Shift clutch<br/>
-          R weather · T time · P pause clock · F1 assists · F2 Telemetry+<br/>
+          R weather · T time · P pause clock · F1 assists on/off · F2 Telemetry+<br/>
           Gamepad: stick steer · RT/LT throttle/brake · LB/RB shift · B reverse · X clutch · Y camera
         </div>
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
       <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
       <div class="fps-counter" id="hud-fps">— FPS</div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.4.0</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.4.1</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;
@@ -175,7 +175,7 @@ export class HUD {
       btn.classList.toggle('active', a[k]);
     }
     const off = ASSIST_KEYS.filter((k) => !a[k]).map((k) => ASSIST_LABELS[k].short);
-    this.assistBtn.textContent = off.length ? `Assists (F1): ${off.join(' · ')} off` : 'Assists (F1): all on';
+    this.assistBtn.textContent = off.length ? `Assists ▾ ${off.join(' · ')} off (F1 all on)` : 'Assists ▾ all on (F1 all off)';
   }
 
   setEnvHandlers(onWeather: () => void, onTime: () => void): void {

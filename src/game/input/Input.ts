@@ -52,7 +52,7 @@ export class Input implements DriverInput {
   private gearDownQueued = false;
   private autoSelectorQueued = false;
   private hGearQueued: number | null = null; // 0=N, -1=R, 1..6
-  private assistPanelQueued = false;
+  private assistToggleQueued = false;
   private telemetryPlusQueued = false;
 
   constructor() {
@@ -87,7 +87,7 @@ export class Input implements DriverInput {
       if (k === 'KeyE' || k === 'Equal' || k === 'NumpadAdd') this.gearUpQueued = true;
       if (k === 'KeyQ' || k === 'Minus' || k === 'NumpadSubtract') this.gearDownQueued = true;
       if (k === 'KeyG') this.autoSelectorQueued = true;
-      if (k === 'F1') this.assistPanelQueued = true;
+      if (k === 'F1') this.assistToggleQueued = true;
       if (k === 'F2') this.telemetryPlusQueued = true;
       // H-pattern: digits 1–6, KeyN = N, KeyB = reverse (R conflicts with weather)
       if (k === 'Digit1' || k === 'Numpad1') this.hGearQueued = 1;
@@ -188,10 +188,10 @@ export class Input implements DriverInput {
     this.clutch = held(2);
   }
 
-  /** v1.4.0: F1 opens / closes the assists panel. */
-  consumeAssistPanel(): boolean {
-    const v = this.assistPanelQueued;
-    this.assistPanelQueued = false;
+  /** v1.4.1: F1 switches all assists off / back on (the panel is the HUD button). */
+  consumeAssistToggle(): boolean {
+    const v = this.assistToggleQueued;
+    this.assistToggleQueued = false;
     return v;
   }
 

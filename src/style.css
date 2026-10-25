@@ -643,9 +643,9 @@ canvas.game-canvas {
 
 .secondary-btn {
   margin-top: 22px;
-  border: 1px solid #3a4f7a;
-  background: #18233a;
-  color: #e8eefc;
+  border: 1px solid #3a3228;
+  background: #14161c;
+  color: #e8e0d4;
   border-radius: 12px;
   padding: 14px 10px;
   font-size: 0.9rem;
@@ -654,8 +654,8 @@ canvas.game-canvas {
 }
 
 .secondary-btn:hover {
-  border-color: #6ea8ff;
-  background: #1e2d4d;
+  border-color: #c9a36a;
+  background: #1a1612;
 }
 
 .assist-lights {
@@ -721,7 +721,7 @@ canvas.game-canvas {
   position: fixed;
   right: 14px;
   top: 150px;
-  z-index: 30;
+  z-index: 9; /* v1.4.1: below #hud (10) so the open assists panel stays on top */
   padding: 6px 8px 8px;
   background: rgba(10, 14, 20, 0.78);
   border: 1px solid #3d3428;
@@ -833,4 +833,21 @@ canvas.game-canvas {
   font-size: 0.72rem;
   color: #7f93b8;
   margin: 10px 0 0;
+}
+
+/* --- v1.4.1: start menu fits 1600×900 without scrolling to Start / Dyno --- */
+@media (min-width: 720px) {
+  .choice-row#trans-choices,
+  .choice-row#quality-choices {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.menu-actions {
+  position: sticky;
+  bottom: -22px;
+  margin: 0 -28px -22px;
+  padding: 0 28px 14px;
+  background: linear-gradient(180deg, #0c0e1200, #0c0e12f2 22px);
+  z-index: 1;
 }
