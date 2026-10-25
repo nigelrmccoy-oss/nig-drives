@@ -1,10 +1,49 @@
 # Nig Drives
 
-Playable browser 3D driving game: take a stylized **VW Golf** (four engine options) or **New Flyer–style transit bus** (diesel / hybrid) or a **Tesla Model 3 Long Range AWD** (EV) onto real **OpenStreetMap** roads with **real elevation**, streaming chunks as you drive across North America.
+A browser driving game on real **OpenStreetMap** roads with **real elevation**, streamed in
+chunks as you drive across North America. Pick a stylized **VW Golf** (1.8 carb, 2.0, 1.9 TDI
+or VR6), a **New Flyer–style transit bus** (diesel or hybrid) or a **Tesla Model 3 Long Range
+AWD**. Each one runs on a sim-cade tyre and drivetrain model built from real spec sheets.
 
-Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API keys.
+Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no API keys.
 
 ## Changelog
+
+### v1.4.1 (package 1.4.1) — Handling and assist fixes, Dyno and menu fixes
+
+- **ESC** no longer brakes in steady cornering (it was active the whole time on some cars). At
+  full lock and low speed, traction control brakes the spinning inner wheel instead of cutting
+  the engine.
+- **Steering and stability.** Keyboard steering limits lock at speed, so a quick flick no longer
+  spins the car. The countersteer helper no longer kicks the wheel the other way when you let go
+  of a key. Buses get twin rear tyres and the Tesla has a more realistic yaw inertia.
+- **Low frame rates.** Physics catches up to real time down to 5 fps (it used to slow down
+  below about 20 fps). A NaN in the physics now resets the car in place instead of breaking it.
+- **Automatics creep** in D like a real torque converter, and hold on a gentle slope.
+- **Gamepad and keyboard.** A drifting stick no longer blocks the keys, and a held key no longer
+  locks out the stick.
+- **Real power figures.** VR6 128 kW (174 PS) and 1.8 66 kW (90 PS) with realistic weights; the
+  VR6 uses its real 5-speed ratios. The Tesla card shows the 350 kW the sim uses.
+- **Dyno.** Peak wheel power is a steady reading, so shift spikes no longer count. The roller run
+  goes on until the car reaches its real top speed.
+- **UI.** F1 switches all assists off or back on; single assists are in the HUD Assists panel.
+  Telemetry+ sits below the open Assists panel. At 1600×900 the menu fits, with Start and Dyno
+  always visible.
+
+Bench numbers (flat dry road, auto box, assists on):
+
+| Car | 0-50 | 0-100 | 400 m | Top | 100-0 | Skidpad |
+|-----|------|-------|-------|-----|-------|---------|
+| Tesla Model 3 LR AWD | 2.3 s | 4.4 s | 12.4 s | 200 km/h | 43.0 m | 0.93 g |
+| Golf 1.8 carb | 4.9 s | 12.7 s | 19.1 s | 177 km/h | 44.4 m | 0.87 g |
+| Golf 2.0 | 4.6 s | 12.2 s | 18.8 s | 190 km/h | 43.0 m | 0.87 g |
+| Golf 1.9 TDI | 4.9 s | 13.1 s | 19.3 s | 186 km/h | 43.0 m | 0.86 g |
+| Golf VR6 | 3.9 s | 9.2 s | 16.8 s | 222 km/h | 44.7 m | 0.86 g |
+| Bus diesel | 10.7 s | 42.3 s | 27.0 s | 103 km/h | 71.0 m | 0.66 g |
+| Bus hybrid | 8.5 s | 29.8 s | 24.7 s | 113 km/h | 58.5 m | 0.66 g |
+
+VW quotes 9.0 s for the VR6 automatic (7.6 s manual). The current Model 3 LR AWD tops out at
+201 km/h; the 233 km/h figure is for the 2021–23 car.
 
 ### v1.4.0 (package 1.4.0) — Real vehicle physics, Tesla Model 3, assists, Telemetry+, Dyno
 
@@ -256,7 +295,7 @@ That loads `http://localhost:5173`. Production Electron always loads packaged `d
 | N | Neutral (stick) |
 | B | Reverse gear (stick; R is weather) |
 | Shift | Clutch (optional-lite) |
-| F1 | Assists panel (ABS / TCS / ESC) |
+| F1 | All assists off / back on (single switches: HUD Assists button) |
 | F2 | Telemetry+ overlay |
 
 HUD buttons also switch weather and time of day. Click the **minimap** to expand/collapse.
@@ -291,7 +330,7 @@ Inspired by **Forza Motorsport 4 / Gran Turismo 5** feel — not a full sim clai
 
 - Weight transfer on brake/accel
 - Combined-slip tyre model per wheel (slip ratio and slip angle share a friction circle)
-- Progressive understeer/oversteer at the limit; switchable ABS / TCS / ESC (F1)
+- Progressive understeer/oversteer at the limit; switchable ABS / TCS / ESC (F1 or the HUD Assists panel)
 - Golf engines change torque band / weight / top speed; Bus diesel vs hybrid (regen); Tesla Model 3 dual-motor EV with regen; all use weather & surface grip
 - Weather and surface meaningfully change grip
 
