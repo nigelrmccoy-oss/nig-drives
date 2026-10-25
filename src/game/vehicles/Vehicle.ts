@@ -7,6 +7,7 @@ import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
 import { Assists } from '../physics/Assists';
 import { Powertrain } from '../physics/Powertrain';
+import { EvDrive } from '../physics/Motor';
 import { VehicleSim } from '../physics/VehicleSim';
 
 /** Selectable drivetrains / transit variants (v1.2). */
@@ -16,12 +17,13 @@ export type VehicleId =
   | 'golf_19tdi'
   | 'golf_28vr6'
   | 'bus_diesel'
-  | 'bus_hybrid';
+  | 'bus_hybrid'
+  | 'model3_lr_awd';
 
-export type VehicleClass = 'golf' | 'bus';
+export type VehicleClass = 'golf' | 'bus' | 'ev';
 
 export function vehicleClassOf(id: VehicleId): VehicleClass {
-  return id.startsWith('bus') ? 'bus' : 'golf';
+  return id.startsWith('bus') ? 'bus' : id.startsWith('model3') ? 'ev' : 'golf';
 }
 
 export interface VehicleSpec {
@@ -190,6 +192,36 @@ export const VEHICLE_SPECS: Record<VehicleId, VehicleSpec> = {
     regenBrakeMul: 1.35,
     coastRegen: 1.8,
   },
+  // v1.4.0 M7: battery-electric; driven by the hand spec (physics/specs/model3LrAwd.ts).
+  // The arcade fields below only feed camera, sound and menu hints.
+  model3_lr_awd: {
+    class: 'ev',
+    id: 'model3_lr_awd',
+    name: 'Tesla Model 3 Long Range AWD',
+    variantLabel: 'Dual Motor AWD',
+    mass: 1905,
+    accel: 9.5,
+    maxSpeed: 55.8,
+    brakeForce: 20,
+    wheelbase: 2.875,
+    track: 1.58,
+    gripMu: 1.15,
+    steerLock: 0.5,
+    steerSpeed: 3.2,
+    cgHeight: 0.46,
+    frontBias: 0.47,
+    cameraHeight: 3.1,
+    cameraDistance: 8.8,
+    length: 4.72,
+    width: 1.85,
+    height: 1.44,
+    torquePeak: 0.1,
+    lowEndMul: 1.6,
+    powerFadeExp: 1.2,
+    soundPitch: 1,
+    regenBrakeMul: 1,
+    coastRegen: 0,
+  },
 };
 
 export const GOLF_ENGINE_IDS: VehicleId[] = [
@@ -200,6 +232,9 @@ export const GOLF_ENGINE_IDS: VehicleId[] = [
 ];
 
 export const BUS_VARIANT_IDS: VehicleId[] = ['bus_diesel', 'bus_hybrid'];
+
+/** v1.4.0: battery-electric cars. */
+export const EV_VARIANT_IDS: VehicleId[] = ['model3_lr_awd'];
 
 export interface SurfaceInfo {
   roadFactor: number;
@@ -252,6 +287,8 @@ export class Vehicle {
   readonly sim: VehicleSim;
   /** v1.4.0 M4: engine, turbo and clutch. */
   readonly powertrain: Powertrain;
+  /** v1.4.0 M7: battery-electric drive (null for engine cars). */
+  readonly ev: EvDrive | null;
   private get vx(): number {
     return this.sim.v;
   }
@@ -284,6 +321,7 @@ export class Vehicle {
   sliding = false;
   private absActive = false;
   private tcsActive = false;
+  private escActive = false;
   /** 0–1 normalized load for engine sound. */
   throttleLoad = 0;
   /** Raw throttle / brake for telemetry (0–1). */
@@ -327,6 +365,9 @@ export class Vehicle {
     this.phys = physicsSpecFor(spec);
     this.sim = new VehicleSim(this.phys);
     this.powertrain = new Powertrain(this.phys);
+    this.ev = this.phys.ev ? new EvDrive(this.phys.ev) : null;
+    // EVs have one fixed reduction: no clutch, no gears, always the auto selector (P R N D)
+    if (this.ev) transmissionMode = 'auto';
     this.assists = new Assists(this.phys);
     this.drivenIdx = this.phys.drive === 'fwd' ? [0, 1] : this.phys.drive === 'rwd' ? [2, 3] : [0, 1, 2, 3];
     this.engineRpmActual = this.phys.engine.idleRpm;
@@ -413,6 +454,7 @@ export class Vehicle {
     this.heading = headingRad;
     this.sim.reset();
     this.powertrain.reset();
+    this.ev?.reset();
     this.assists.reset();
     this.steerAngle = 0;
     this.speed = 0;
@@ -545,7 +587,8 @@ export class Vehicle {
     // --- ABS / TCS / stability (work on the brake torques in place, return the engine throttle) ---
     const aids = this.assists.update(dt, this.sim, this.steerAngle, throttle, this.brakeTorque, this.drivenIdx);
     this.absActive = aids.abs;
-    this.tcsActive = aids.tcs || aids.esc;
+    this.tcsActive = aids.tcs;
+    this.escActive = aids.esc;
     if (parked || this.spawnHold) {
       for (let i = 0; i < 4; i++) {
         const base = i < 2 ? p.brakes.frontNm : p.brakes.rearNm;
@@ -554,7 +597,8 @@ export class Vehicle {
     }
 
     // --- engine → wheels ---
-    this.computeDrive(dt, aids.throttle, drive.engaged ? drive.ratio : 0, drive.reverse);
+    if (this.ev) this.computeEvDrive(dt, aids.throttle, drive.engaged ? (drive.reverse ? -1 : 1) : 0);
+    else this.computeDrive(dt, aids.throttle, drive.engaged ? drive.ratio : 0, drive.reverse);
 
     // --- chassis + tyres ---
     const gradeSin = this.gradeGravity ? this.gradeSin : 0;
@@ -651,6 +695,46 @@ export class Vehicle {
     this.engineRpm = THREE.MathUtils.clamp((rpm - e.idleRpm * 0.9) / (e.redlineRpm - e.idleRpm * 0.9), 0, 1);
     this.boost = this.powertrain.boost;
   }
+  /** v1.4.0 M7: front and rear motors straight to their axles (open diffs, equal split). */
+  private computeEvDrive(dt: number, throttle: number, direction: number): void {
+    const ev = this.ev!;
+    const out = ev.update(dt, {
+      throttle,
+      direction,
+      frontOmega: this.sim.meanOmega([0, 1]),
+      rearOmega: this.sim.meanOmega([2, 3]),
+      speed: this.sim.u,
+      mass: this.phys.chassis.mass,
+      wheelRadius: this.phys.tire.radius,
+      regenScale: THREE.MathUtils.clamp(1 - (Math.max(...this.sim.wheels.map((w) => w.slip)) - 0.5) / 0.4, 0, 1),
+    });
+    this.driveTorque[0] = this.driveTorque[1] = out.front / 2;
+    this.driveTorque[2] = this.driveTorque[3] = out.rear / 2;
+    this.extraInertia[0] = this.extraInertia[1] = out.inertiaFront / 2;
+    this.extraInertia[2] = this.extraInertia[3] = out.inertiaRear / 2;
+    this.engineRpmActual = ev.motorRpm;
+    this.engineRpm = THREE.MathUtils.clamp(ev.motorRpm / this.phys.ev!.maxMotorRpm, 0, 1);
+    this.throttleLoad = THREE.MathUtils.clamp(Math.abs(ev.batteryPowerW) / this.phys.ev!.systemPowerW, 0, 1);
+    this.boost = 0;
+  }
+
+  /** v1.4.0: battery-electric readout for the HUD (null for engine cars). */
+  getEvTelemetry(): { powerKw: number; regenKw: number; soc: number } | null {
+    if (!this.ev) return null;
+    return { powerKw: this.ev.batteryPowerW / 1000, regenKw: this.ev.regenPowerW / 1000, soc: this.ev.soc };
+  }
+
+  /** v1.4.0 M9: the driver's assist switches (start menu / F1). */
+  setAssistsEnabled(a: { abs: boolean; tcs: boolean; stability: boolean }): void {
+    this.assists.enabled.abs = a.abs;
+    this.assists.enabled.tcs = a.tcs;
+    this.assists.enabled.stability = a.stability;
+  }
+
+  getAssistsEnabled(): { abs: boolean; tcs: boolean; stability: boolean } {
+    return { ...this.assists.enabled };
+  }
+
   /** v1.3.4: water — heavy drag on every axis (no traction comes from the 0.1 grip). */
   applyWaterDrag(dt: number, k = 3.2): void {
     const f = Math.exp(-k * dt);
@@ -704,8 +788,8 @@ export class Vehicle {
     return new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
   }
 
-  getAssistFlags(): { abs: boolean; tcs: boolean; slide: boolean } {
-    return { abs: this.absActive, tcs: this.tcsActive, slide: this.sliding };
+  getAssistFlags(): { abs: boolean; tcs: boolean; esc: boolean; slide: boolean } {
+    return { abs: this.absActive, tcs: this.tcsActive, esc: this.escActive, slide: this.sliding };
   }
 
   /** RPM-ish 0–1 for audio / HUD. */

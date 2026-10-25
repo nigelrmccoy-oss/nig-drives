@@ -49,7 +49,8 @@ export class Transmission {
 
   constructor(cfg: TransmissionConfig) {
     this.mode = cfg.mode;
-    this.specRatios = cfg.ratios && cfg.ratios.length >= 3 ? [0, ...cfg.ratios] : null;
+    // v1.4.0: a single ratio is an EV's fixed reduction
+    this.specRatios = cfg.ratios && cfg.ratios.length >= 1 ? [0, ...cfg.ratios] : null;
     this.forwardGears = this.specRatios
       ? this.specRatios.length - 1
       : Math.max(4, Math.min(6, cfg.forwardGears));
@@ -107,7 +108,7 @@ export class Transmission {
     if (this.autoSelector === -1) return 'P';
     if (this.autoSelector === 0) return 'R';
     if (this.autoSelector === 1) return 'N';
-    return `D${this.currentGear}`;
+    return this.forwardGears === 1 ? 'D' : `D${this.currentGear}`;
   }
 
   /** Wheel speed (m/s) → engine RPM norm 0–1 given current gear. */

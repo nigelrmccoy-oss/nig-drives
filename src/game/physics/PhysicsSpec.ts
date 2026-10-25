@@ -25,7 +25,7 @@ export interface TurboSpec {
 }
 
 export interface EngineSpec {
-  fuel: 'diesel' | 'petrol';
+  fuel: 'diesel' | 'petrol' | 'electric';
   /** Full-load torque (with full boost if turbocharged), ascending rpm. */
   torqueCurve: TorquePoint[];
   idleRpm: number;
@@ -139,6 +139,41 @@ export interface RegenSpec {
   brakeMul: number;
 }
 
+/** One traction motor (v1.4.0 M7). Torque table is at the motor shaft. */
+export interface MotorUnit {
+  axle: 'front' | 'rear';
+  torqueCurve: TorquePoint[];
+  /** Continuous-peak mechanical power this motor can make (W). */
+  maxPowerW: number;
+  /** Rotor inertia (kg·m²). */
+  inertia: number;
+}
+
+/** Battery-electric drivetrain: no clutch, no gears, one reduction per motor. */
+export interface EvSpec {
+  motors: MotorUnit[];
+  /** Single-speed reduction (motor : wheel). */
+  reduction: number;
+  maxMotorRpm: number;
+  /** Battery / inverter power limit for all motors together (W). */
+  systemPowerW: number;
+  /** Software top-speed limiter (km/h). */
+  topSpeedKmh: number;
+  /** Torque response time constant (s): EVs are near-instant. */
+  responseS: number;
+  /** One-pedal regen deceleration off-throttle (m/s²), faded out at walking pace. */
+  regenDecel: number;
+  /** Regen power limit (W). */
+  regenMaxPowerW: number;
+  /** Share of regen taken on the front axle (AWD). */
+  regenFrontShare: number;
+  /** Usable battery energy (kWh) and the state of charge you start with (0–1). */
+  batteryKWh: number;
+  startSoc: number;
+  /** Battery → wheel efficiency (and wheel → battery on regen). */
+  efficiency: number;
+}
+
 export interface PhysicsSpec {
   id: string;
   /** Where the numbers came from (shown in docs / future telemetry). */
@@ -154,6 +189,8 @@ export interface PhysicsSpec {
   steering: SteeringSpec;
   assists: AssistDefaults;
   regen?: RegenSpec;
+  /** Battery-electric: replaces engine / clutch / gearbox when present. */
+  ev?: EvSpec;
 }
 
 /** Linear interpolation in a torque table (clamped at the ends). */

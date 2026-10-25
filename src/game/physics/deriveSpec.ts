@@ -1,6 +1,7 @@
 import type { VehicleSpec } from '../vehicles/Vehicle';
 import { peakPower, type PhysicsSpec, type TorquePoint } from './PhysicsSpec';
 import { GOLF_19TDI } from './specs/golf19tdi';
+import { MODEL3_LR_AWD } from './specs/model3LrAwd';
 
 const G = 9.81;
 const RHO = 1.225;
@@ -8,6 +9,7 @@ const RHO = 1.225;
 /** Hand-written specs win; everything else is derived so all generated vehicles keep driving. */
 const HAND_SPECS: Record<string, PhysicsSpec> = {
   golf_19tdi: GOLF_19TDI,
+  model3_lr_awd: MODEL3_LR_AWD,
 };
 
 export function physicsSpecFor(spec: VehicleSpec): PhysicsSpec {
