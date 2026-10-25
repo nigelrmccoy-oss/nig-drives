@@ -350,6 +350,181 @@ function buildGolf(): THREE.Group {
 }
 
 /**
+ * v1.4.0 M8: Tesla Model 3 (Highland)-style saloon, procedural: low nose with no grille, slim
+ * headlights, one-piece glass roof, fastback greenhouse, short boot with a lip, wraparound
+ * tail-light bar, 18" aero wheels. 4.72 m × 1.85 m × 1.44 m, 2.875 m wheelbase.
+ */
+function buildModel3(): THREE.Group {
+  const g = new THREE.Group();
+  const body = std(0x1d3f73, { metalness: 0.55, roughness: 0.3 }); // deep blue metallic
+  const dark = std(0x16171a, { metalness: 0.2, roughness: 0.6 });
+  const glass = glassMat();
+  const roofGlass = new THREE.MeshStandardMaterial({ color: 0x0d1117, metalness: 0.7, roughness: 0.06, envMapIntensity: 1.5 });
+
+  const lower = extrudeProfile(
+    [
+      [2.28, 0.17],
+      [2.37, 0.3],
+      [2.35, 0.46],
+      [2.18, 0.6],
+      [1.6, 0.7],
+      [0.8, 0.8],
+      [-1.6, 0.86],
+      [-2.2, 0.88],
+      [-2.34, 0.76],
+      [-2.36, 0.42],
+      [-2.28, 0.17],
+      [-1.5, 0.16],
+      [1.5, 0.16],
+    ],
+    1.78,
+    0.04,
+  );
+  addMesh(g, lower, body);
+
+  const cabin = extrudeProfile(
+    [
+      [0.84, 0.8],
+      [-0.02, 1.4],
+      [-0.62, 1.44],
+      [-1.2, 1.31],
+      [-1.86, 0.94],
+      [-1.8, 0.85],
+      [0.78, 0.8],
+    ],
+    1.5,
+    0.035,
+  );
+  addMesh(g, cabin, body);
+
+  // one-piece tinted glass roof running into the rear window
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.02, 0.62), roofGlass);
+  roof.position.set(0, 1.44, -0.32);
+  g.add(roof);
+
+  // windshield: (0.84, 0.80) → (−0.02, 1.40)
+  const wind = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 1.05), glass);
+  wind.position.set(0, 1.115, 0.43);
+  wind.rotation.x = -0.96;
+  g.add(wind);
+  // rear window: (−0.64, 1.44) → (−1.8, 0.96)
+  const rearG = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.24), roofGlass);
+  rearG.position.set(0, 1.215, -1.23);
+  rearG.rotation.y = Math.PI;
+  rearG.rotation.x = 1.18;
+  g.add(rearG);
+
+  for (const side of [-1, 1]) {
+    const rot = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.4), glass);
+    front.position.set(side * 0.765, 1.1, 0.12);
+    front.rotation.y = rot;
+    g.add(front);
+    const rear = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.36), glass);
+    rear.position.set(side * 0.765, 1.09, -0.78);
+    rear.rotation.y = rot;
+    g.add(rear);
+    // black window surround / B-pillar
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.44, 0.08), dark);
+    pillar.position.set(side * 0.77, 1.1, -0.36);
+    g.add(pillar);
+    // side sill
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 2.5), dark);
+    sill.position.set(side * 0.9, 0.24, 0.0);
+    g.add(sill);
+    // mirror
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.2), body);
+    cap.position.set(side * 0.96, 0.98, 0.62);
+    g.add(cap);
+  }
+
+  // boot lip spoiler
+  const lip = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.03, 0.12), body);
+  lip.position.set(0, 0.9, -2.2);
+  g.add(lip);
+
+  // front: no grille, a low dark intake and a small badge
+  const intake = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 0.06), dark);
+  intake.position.set(0, 0.24, 2.33);
+  g.add(intake);
+  const badge = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.06, 0.02),
+    std(0xcfd4da, { metalness: 0.85, roughness: 0.18 }),
+  );
+  badge.position.set(0, 0.54, 2.3);
+  g.add(badge);
+  const plateMat = new THREE.MeshStandardMaterial({ color: 0xf0f0e8, roughness: 0.6 });
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.02), plateMat);
+  plate.position.set(0, 0.6, -2.37);
+  g.add(plate);
+
+  // slim headlights
+  const hlMat = new THREE.MeshStandardMaterial({
+    color: LIGHT_ON,
+    emissive: 0xe8f0ff,
+    emissiveIntensity: 0.6,
+    metalness: 0.4,
+    roughness: 0.15,
+  });
+  for (const side of [-1, 1]) {
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.08), hlMat);
+    hl.position.set(side * 0.6, 0.6, 2.2);
+    hl.rotation.y = -side * 0.32;
+    hl.rotation.z = side * 0.06;
+    hl.userData.headlight = true;
+    g.add(hl);
+  }
+
+  // wraparound tail-light bar
+  const tlMat = new THREE.MeshStandardMaterial({ color: TAIL, emissive: 0xff2208, emissiveIntensity: 0.5, roughness: 0.25 });
+  for (const side of [-1, 1]) {
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.07, 0.06), tlMat);
+    tl.position.set(side * 0.6, 0.8, -2.33);
+    tl.rotation.y = side * 0.25;
+    g.add(tl);
+  }
+  const diffuser = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 0.06), dark);
+  diffuser.position.set(0, 0.24, -2.33);
+  g.add(diffuser);
+
+  for (const sx of [-0.55, 0.55]) {
+    const spot = new THREE.SpotLight(0xf2f6ff, 0, 42, Math.PI / 7.5, 0.45, 1.15);
+    spot.position.set(sx, 0.6, 2.25);
+    const tgt = new THREE.Object3D();
+    tgt.position.set(sx * 0.15, 0.25, 15);
+    g.add(tgt);
+    spot.target = tgt;
+    spot.userData.headSpot = true;
+    g.add(spot);
+  }
+
+  const wr = 0.336;
+  const ww = 0.235;
+  const track = 0.8;
+  const zf = 1.46;
+  const zr = -1.415;
+  const wheels: Array<[number, number, number, boolean]> = [
+    [-track, wr, zf, true],
+    [track, wr, zf, true],
+    [-track, wr, zr, false],
+    [track, wr, zr, false],
+  ];
+  const aero = new THREE.MeshStandardMaterial({ color: 0x2a2c30, metalness: 0.6, roughness: 0.35 });
+  for (const [x, y, z, steer] of wheels) {
+    const w = makeWheel(wr, ww, steer);
+    // flat aero cover on the outer face
+    const cover = new THREE.Mesh(new THREE.CylinderGeometry(wr * 0.66, wr * 0.66, 0.02, 20), aero);
+    cover.rotation.z = Math.PI / 2;
+    cover.position.x = Math.sign(x) * ww * 0.3;
+    w.children[0].add(cover);
+    w.position.set(x, y, z);
+    g.add(w);
+    fenderArch(g, Math.sign(x) * 0.84, z, wr, body);
+  }
+  return g;
+}
+
+/**
  * New Flyer–style 40' transit: raked windshield, destination sign, beltline,
  * window bays, wheel wells — not a refrigerator.
  */
@@ -539,7 +714,7 @@ function buildNewFlyerBus(hybrid: boolean): THREE.Group {
 export function createVehicle(id: VehicleId, transmission: TransmissionMode = 'auto'): Vehicle {
   const spec = VEHICLE_SPECS[id];
   const cls = vehicleClassOf(id);
-  const mesh = cls === 'golf' ? buildGolf() : buildNewFlyerBus(id === 'bus_hybrid');
+  const mesh = cls === 'golf' ? buildGolf() : cls === 'ev' ? buildModel3() : buildNewFlyerBus(id === 'bus_hybrid');
   mesh.name = spec.name;
   return new Vehicle(spec, mesh, transmission);
 }

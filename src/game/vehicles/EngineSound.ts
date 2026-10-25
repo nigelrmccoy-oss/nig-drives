@@ -18,6 +18,7 @@ export class EngineSound {
   private noise: AudioBufferSourceNode | null = null;
   private noiseGain: GainNode | null = null;
   private filter: BiquadFilterNode | null = null;
+  private noiseFilter: BiquadFilterNode | null = null;
   private started = false;
   private enabled = true;
   private character: EngineCharacter = 'aba';
@@ -41,17 +42,7 @@ export class EngineSound {
       this.character = characterFor(vehicleId ?? 'golf_20aba');
       const recipe = recipes[this.character];
 
-      for (const L of recipe.layers) {
-        const osc = this.ctx.createOscillator();
-        osc.type = L.type;
-        osc.frequency.value = 60;
-        const gain = this.ctx.createGain();
-        gain.gain.value = 0;
-        osc.connect(gain);
-        gain.connect(this.filter);
-        osc.start();
-        this.layers.push({ osc, gain, type: L.type, ratio: L.ratio, level: L.level });
-      }
+      this.buildLayers(recipe);
 
       // Soft noise bed (diesel clatter / intake)
       const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.5, this.ctx.sampleRate);
@@ -65,6 +56,7 @@ export class EngineSound {
       const nFilter = this.ctx.createBiquadFilter();
       nFilter.type = 'bandpass';
       nFilter.frequency.value = recipe.noiseFreq;
+      this.noiseFilter = nFilter;
       nFilter.Q.value = 0.6;
       this.noise.connect(nFilter);
       nFilter.connect(this.noiseGain);
@@ -78,12 +70,43 @@ export class EngineSound {
     }
   }
 
+  /** One oscillator per recipe layer, silent until update() sets the levels. */
+  private buildLayers(recipe: Recipe): void {
+    if (!this.ctx || !this.filter) return;
+    for (const L of recipe.layers) {
+      const osc = this.ctx.createOscillator();
+      osc.type = L.type;
+      osc.frequency.value = 60;
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(this.filter);
+      osc.start();
+      this.layers.push({ osc, gain, type: L.type, ratio: L.ratio, level: L.level });
+    }
+  }
+
   setVehicle(vehicleId: string): void {
-    this.character = characterFor(vehicleId);
-    // Rebuild only if already started — dispose + restart layers would click; adjust levels live
+    const next = characterFor(vehicleId);
+    const changed = next !== this.character;
+    this.character = next;
     const recipe = recipes[this.character];
     if (this.filter) {
       this.filter.frequency.value = recipe.filterHz;
+    }
+    if (this.noiseFilter) this.noiseFilter.frequency.value = recipe.noiseFreq;
+    // v1.4.0: a different car (e.g. Golf → Tesla) needs its own oscillator set
+    if (changed && this.started) {
+      for (const L of this.layers) {
+        try {
+          L.osc.stop();
+          L.gain.disconnect();
+        } catch {
+          /* already stopped */
+        }
+      }
+      this.layers = [];
+      this.buildLayers(recipe);
     }
   }
 
@@ -121,8 +144,10 @@ export class EngineSound {
       this.noiseGain.gain.setTargetAtTime(nVol, now, 0.08);
     }
 
+    // EV: a motor whine that fades in with speed (silent at a standstill), not an idle
+    const evFade = this.character === 'ev' ? Math.min(1, rpm * 8) : 1;
     const vol =
-      (0.022 + rpm * 0.055 + load * 0.05) * recipe.master * (vehicle.spec.class === 'bus' ? 0.95 : 1);
+      (0.022 + rpm * 0.055 + load * 0.05) * recipe.master * (vehicle.spec.class === 'bus' ? 0.95 : 1) * evFade;
     this.master.gain.setTargetAtTime(Math.min(0.16, vol), now, 0.05);
   }
 
@@ -144,7 +169,7 @@ export class EngineSound {
   }
 }
 
-type EngineCharacter = 'carb' | 'aba' | 'tdi' | 'vr6' | 'bus_diesel' | 'bus_hybrid';
+type EngineCharacter = 'carb' | 'aba' | 'tdi' | 'vr6' | 'bus_diesel' | 'bus_hybrid' | 'ev';
 
 interface LayerRecipe {
   type: OscillatorType;
@@ -249,6 +274,22 @@ const recipes: Record<EngineCharacter, Recipe> = {
       { type: 'sawtooth', ratio: 0.5, level: 0.012 },
     ],
   },
+  // v1.4.0: permanent-magnet motor whine (pitch follows motor speed, ~600 Hz at 100 km/h),
+  // a quieter inverter harmonic above it, a low hum, and road/wind hiss instead of exhaust.
+  ev: {
+    baseHz: 30,
+    rpmSpan: 1300,
+    filterHz: 1600,
+    filterSpan: 1800,
+    noiseFreq: 650,
+    noiseLevel: 0.022,
+    master: 0.7,
+    layers: [
+      { type: 'sine', ratio: 1, level: 0.03 },
+      { type: 'sine', ratio: 2.02, level: 0.01 },
+      { type: 'triangle', ratio: 0.25, level: 0.014 },
+    ],
+  },
 };
 
 function characterFor(id: string): EngineCharacter {
@@ -257,6 +298,7 @@ function characterFor(id: string): EngineCharacter {
   if (id.includes('28vr6')) return 'vr6';
   if (id === 'bus_diesel') return 'bus_diesel';
   if (id === 'bus_hybrid') return 'bus_hybrid';
+  if (id.startsWith('model3')) return 'ev';
   return 'aba';
 }
 
