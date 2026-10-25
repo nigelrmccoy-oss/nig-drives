@@ -1,10 +1,51 @@
 # Nig Drives
 
-Playable browser 3D driving game: take a stylized **VW Golf** (four engine options) or **New Flyer–style transit bus** (diesel / hybrid) onto real **OpenStreetMap** roads with **real elevation**, streaming chunks as you drive across North America.
+Playable browser 3D driving game: take a stylized **VW Golf** (four engine options) or **New Flyer–style transit bus** (diesel / hybrid) or a **Tesla Model 3 Long Range AWD** (EV) onto real **OpenStreetMap** roads with **real elevation**, streaming chunks as you drive across North America.
 
 Built with **Vite + TypeScript + Three.js**. No Google Maps/Earth data. No API keys.
 
 ## Changelog
+
+### v1.4.0 (package 1.4.0) — Real vehicle physics, Tesla Model 3, assists, Telemetry+, Dyno
+
+The "Mario Kart" handling is gone. The car is now a proper sim-cade model at a
+fixed 120 Hz step, with spec sheets taken from real manufacturer data.
+
+- **Tyres and chassis.** Per-wheel suspension and load (weight transfer front/rear
+  and side to side, anti-roll split), a combined-slip tyre model (slip ratio and
+  slip angle share one friction circle), yaw inertia and aero drag/downforce.
+  Weather and surface grip still apply on top.
+- **Powertrain.** Engine torque tables, friction, idle governor and rev limiter,
+  turbo spool and lag for the turbo engines, an auto-clutch that launches
+  and shifts like a driver's left foot, and real gear ratios and final drives.
+- **Brakes and assists.** Brake torque per axle, ABS, traction control and
+  stability control. Each can be switched on or off on the start menu or in game
+  (**F1** or the HUD Assists button); the choice is remembered. HUD lights show
+  when ABS, TCS or ESC are working and when the car is sliding.
+- **Tesla Model 3 Long Range AWD (EV class).** Dual-motor drive with per-motor
+  torque/power limits, a single-speed reduction, battery power and state of
+  charge, one-pedal regen that backs off when the tyres slide, a new low-poly
+  body and an electric motor sound. HUD shows power, regen and battery.
+- **Golfs and buses** keep their four engines and two drivetrains, now with real
+  spec sheets; the 1.9 TDI got a launch/shift tune (0-100 km/h about 12.9 s,
+  still 90 PS). Generated/procedural vehicles stay drivable.
+- **Telemetry+ (F2).** Per-wheel load, slip ratio, slip angle and grip use, a
+  friction circle with trail, pedals and steering.
+- **Dyno.** A Dyno button on the start menu shows torque and power curves (and
+  boost, or per-motor and battery power for the EV), plus a rolling-road pull.
+- Menu, HUD badge and window title read v1.4.0.
+
+Bench numbers (flat dry road, assists on):
+
+| Car | 0-50 | 0-100 | 400 m | Top | 100-0 | Skidpad |
+|-----|------|-------|-------|-----|-------|---------|
+| Tesla Model 3 LR AWD | 2.3 s | 4.4 s | 12.4 s | 200 km/h | 43.0 m | 0.94 g |
+| Golf 1.8 carb | 6.5 s | 18.7 s | 21.9 s | 160 km/h | 44.4 m | 0.86 g |
+| Golf 2.0 | 5.0 s | 12.7 s | 19.2 s | 190 km/h | 43.1 m | 0.85 g |
+| Golf 1.9 TDI | 4.6 s | 12.9 s | 19.1 s | 186 km/h | 43.6 m | 0.85 g |
+| Golf VR6 | 4.8 s | 10.4 s | 17.9 s | 218 km/h | 45.7 m | 0.87 g |
+| Bus diesel | 11.1 s | 42.7 s | 27.3 s | 103 km/h | 70.9 m | 0.65 g |
+| Bus hybrid | 8.8 s | 30.2 s | 25.0 s | 113 km/h | 62.0 m | 0.69 g |
 
 ### v1.3.6 (package 1.3.11) — Stream OSM after ready, water agreement, dry roads
 
@@ -168,7 +209,7 @@ npm run preview
 
 ## Windows desktop build
 
-Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.3.4**).
+Download a ready-made **portable** executable from [GitHub Releases](https://github.com/nigelrmccoy-oss/nig-drives/releases) (asset like `NigDrives-*-portable.exe`). Latest gameplay features are in the web build (**v1.4.0**).
 
 **Run:** double-click the `.exe` — no installer. Windows SmartScreen may warn on first run (unsigned build); choose *More info* → *Run anyway* if you trust the release.
 
@@ -215,6 +256,8 @@ That loads `http://localhost:5173`. Production Electron always loads packaged `d
 | N | Neutral (stick) |
 | B | Reverse gear (stick; R is weather) |
 | Shift | Clutch (optional-lite) |
+| F1 | Assists panel (ABS / TCS / ESC) |
+| F2 | Telemetry+ overlay |
 
 HUD buttons also switch weather and time of day. Click the **minimap** to expand/collapse.
 
@@ -247,9 +290,9 @@ HUD buttons also switch weather and time of day. Click the **minimap** to expand
 Inspired by **Forza Motorsport 4 / Gran Turismo 5** feel — not a full sim claim:
 
 - Weight transfer on brake/accel
-- Simplified tire grip circle (lateral vs longitudinal tradeoff)
-- Progressive understeer/oversteer at the limit; subtle ABS/TCS
-- Golf engines change torque band / weight / top speed; Bus diesel vs hybrid (regen); both use weather & surface grip
+- Combined-slip tyre model per wheel (slip ratio and slip angle share a friction circle)
+- Progressive understeer/oversteer at the limit; switchable ABS / TCS / ESC (F1)
+- Golf engines change torque band / weight / top speed; Bus diesel vs hybrid (regen); Tesla Model 3 dual-motor EV with regen; all use weather & surface grip
 - Weather and surface meaningfully change grip
 
 ## Streaming architecture
