@@ -21,6 +21,11 @@ export interface DriverInput {
 }
 
 const PAD_DEADZONE = 0.08;
+/** v1.4.1 P2-8: a stick resting off-centre (drift) below this never takes over from the keys. */
+const PAD_TAKEOVER = 0.15;
+/** Change per poll that counts as the pad being used right now. */
+const PAD_MOVE = 0.04;
+const DRIVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
 
 export class Input implements DriverInput {
   forward = false;
@@ -36,6 +41,7 @@ export class Input implements DriverInput {
   brakeAxis = 0;
   analog = false;
   private padPrev: boolean[] = [];
+  private padPrevAxes = { stick: 0, rt: 0, lt: 0 };
 
   private pressed = new Set<string>();
   private cameraToggleQueued = false;
@@ -72,7 +78,7 @@ export class Input implements DriverInput {
     ) {
       e.preventDefault();
     }
-    this.analog = false; // a key press hands control back to the keyboard
+    if (DRIVE_KEYS.includes(k)) this.analog = false; // a driving key hands control back to the keyboard
     if (!this.pressed.has(k)) {
       if (k === 'KeyC') this.cameraToggleQueued = true;
       if (k === 'KeyR') this.weatherCycleQueued = true;
@@ -158,8 +164,18 @@ export class Input implements DriverInput {
     const stick = Math.abs(raw) < PAD_DEADZONE ? 0 : (Math.sign(raw) * (Math.abs(raw) - PAD_DEADZONE)) / (1 - PAD_DEADZONE);
     const rt = gp.buttons[7]?.value ?? 0;
     const lt = gp.buttons[6]?.value ?? 0;
-    const active = Math.abs(stick) > 0.02 || rt > 0.04 || lt > 0.04 || held(1) || held(2);
-    if (active) this.analog = true;
+    // v1.4.1 P2-8: the most recently used device drives. The pad takes over when it is being moved
+    // (stick past the takeover threshold, a trigger or B/X), or when it is held deflected while no
+    // driving key is down. A slightly deflected / drifting stick no longer blocks keyboard steering.
+    const prev = this.padPrevAxes;
+    const moving =
+      Math.abs(stick - prev.stick) > PAD_MOVE || Math.abs(rt - prev.rt) > PAD_MOVE || Math.abs(lt - prev.lt) > PAD_MOVE;
+    prev.stick = stick;
+    prev.rt = rt;
+    prev.lt = lt;
+    const engaged = Math.abs(stick) > PAD_TAKEOVER || rt > 0.04 || lt > 0.04 || held(1) || held(2);
+    const keysDown = DRIVE_KEYS.some((k) => this.pressed.has(k));
+    if (engaged && (moving || !keysDown || held(1) || held(2))) this.analog = true;
     if (!this.analog) return;
     this.steer = Math.max(-1, Math.min(1, -stick));
     this.throttle = Math.max(0, Math.min(1, rt));
