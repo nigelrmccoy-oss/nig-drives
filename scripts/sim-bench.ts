@@ -159,12 +159,14 @@ function laneChange(id: VehicleId, stability: boolean, amp = 0.45): { beta: numb
   let t = 0;
   while (v.getSpeedKmh() < 100 && t < 60) { tick(v, inp); t += FRAME; }
   inp.setThrottle(0);
-  inp.analog = true;
+  const keys = process.env.KEYS === '1';
+  inp.analog = !keys;
   let peak = 0;
   for (let i = 0; i < 60 * 5; i++) {
     const ts = i * FRAME;
     const s = ts < 2.4 ? amp * Math.sin((ts / 2.4) * 2 * Math.PI) : 0;
-    inp.setSteer(s);
+    // keyboard: hold the key while the sine is past 30 % of its amplitude (a jab left, then right)
+    inp.setSteer(keys ? (Math.abs(s) > amp * 0.3 ? Math.sign(s) : 0) : s);
     tick(v, inp);
     const b = Math.abs(Math.atan2(internals.sim.v, Math.max(0.1, Math.abs(internals.sim.u))));
     peak = Math.max(peak, b);

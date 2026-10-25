@@ -271,6 +271,7 @@ export class Vehicle {
     this.sim.r = x;
   }
   private steerAngle = 0;
+  private analogInput = false;
   /** Real engine speed (rpm) behind the 0–1 engineRpm used by the sound. */
   private engineRpmActual = 850;
   /** Wheels that receive drive torque. */
@@ -472,15 +473,17 @@ export class Vehicle {
    * A gamepad goes straight through with light smoothing.
    */
   private filterDriverInputs(c: DriveControls, dt: number): void {
+    this.analogInput = c.analog;
     if (c.analog) {
       this.steerIn = approach(this.steerIn, c.steer, dt * 10);
       this.throttleIn = c.throttle;
       this.brakeIn = c.brake;
       return;
     }
-    const speedK = 1 / (1 + Math.abs(this.vz) / 22);
+    const speedK = 1 / (1 + Math.abs(this.vz) / this.phys.steering.halfLockSpeed);
     const returning = c.steer === 0 || Math.sign(c.steer) !== Math.sign(this.steerIn);
-    const rate = returning ? 4.5 : 1.4 + 2.6 * speedK;
+    // self-aligning: caster pulls the wheel back to centre harder the faster you go
+    const rate = returning ? 4.5 + 3 * (1 - speedK) : 1.4 + 2.6 * speedK;
     this.steerIn = approach(this.steerIn, c.steer, rate * dt);
     this.throttleIn = approach(this.throttleIn, c.throttle, (c.throttle > this.throttleIn ? 6 : 12) * dt);
     this.brakeIn = approach(this.brakeIn, c.brake, (c.brake > this.brakeIn ? 7 : 14) * dt);
@@ -498,8 +501,7 @@ export class Vehicle {
     const noise = THREE.MathUtils.clamp(surface.noise ?? 0, 0, 1);
 
     // --- steering (road-wheel angle) ---
-    const steerTarget = this.steerIn * p.steering.maxAngle;
-    this.steerAngle = approach(this.steerAngle, steerTarget, p.steering.maxAngle * 6 * dt);
+    this.steerAngle = approach(this.steerAngle, this.steeringTarget(surfaceGrip), p.steering.maxAngle * 6 * dt);
 
     // --- transmission ---
     this.transmission.update(dt, this.vz, this.throttleIn, {
@@ -593,6 +595,30 @@ export class Vehicle {
       this.sim.reset();
     }
     this.speed = Math.hypot(this.vx, this.vz);
+  }
+
+  /**
+   * Road-wheel angle the driver is asking for. Keyboard and pad have no force feedback, so:
+   *  - lock shrinks with speed to about what the front tyres can use (full stick = near the limit,
+   *    not 3x past it), with extra room on a pad
+   *  - on the keyboard, a countersteer helper points the front wheels along the slide when the
+   *    rear steps out, the way a real wheel self-aligns in your hands
+   */
+  private steeringTarget(surfaceGrip: number): number {
+    const p = this.phys;
+    const u = Math.abs(this.sim.u);
+    const g = 9.81;
+    const ayLimit = p.tire.mu * Math.max(0.3, surfaceGrip) * g;
+    const gripLock = (p.chassis.wheelbase * ayLimit) / Math.max(1, u * u) + p.tire.peakAngle * (this.analogInput ? 1.0 : 0.6);
+    const maxNow = Math.min(p.steering.maxAngle, gripLock);
+    let target = this.steerIn * maxNow;
+    const rearSliding = Math.max(this.sim.wheels[2].slip, this.sim.wheels[3].slip) > 0.9;
+    if (!this.analogInput && u > 4 && rearSliding) {
+      const beta = Math.atan2(this.sim.v, u);
+      const excess = Math.abs(beta) - 0.04;
+      if (excess > 0) target += Math.sign(beta) * excess * 1.6 * (1 - 0.5 * Math.abs(this.steerIn));
+    }
+    return THREE.MathUtils.clamp(target, -p.steering.maxAngle, p.steering.maxAngle);
   }
 
   /** Engine → clutch → gearbox → open differential (equal torque to each driven wheel). */
