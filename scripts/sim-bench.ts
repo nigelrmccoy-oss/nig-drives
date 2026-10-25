@@ -106,6 +106,7 @@ function brakeRun(id: VehicleId): { dist: number; time: number } {
  */
 function skidpad(id: VehicleId, radius = 30.5): { g: number; kmh: number } {
   const { v, inp } = makeCar(id);
+  inp.analog = true; // a steady hand: analog steering / throttle like a pad
   let target = 15 * KMH;
   let prevH = v.heading;
   let best = { g: 0, kmh: 0 };

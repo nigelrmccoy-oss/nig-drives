@@ -9,6 +9,8 @@ import {
 import { MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
+import { torqueAt } from '../physics/PhysicsSpec';
+import { VehicleSim } from '../physics/VehicleSim';
 
 /** Selectable drivetrains / transit variants (v1.2). */
 export type VehicleId =
@@ -249,10 +251,34 @@ export class Vehicle {
    * Vehicle.compassToYaw() to convert (world is X east, Z south since v1.3.2).
    */
   heading = 0;
-  private vx = 0;
-  private vz = 0;
-  private yawRate = 0;
+  /** v1.4.0: the chassis / tyre simulation (owns the body velocities). */
+  readonly sim: VehicleSim;
+  private get vx(): number {
+    return this.sim.v;
+  }
+  private set vx(x: number) {
+    this.sim.v = x;
+  }
+  private get vz(): number {
+    return this.sim.u;
+  }
+  private set vz(x: number) {
+    this.sim.u = x;
+  }
+  private get yawRate(): number {
+    return this.sim.r;
+  }
+  private set yawRate(x: number) {
+    this.sim.r = x;
+  }
   private steerAngle = 0;
+  /** Real engine speed (rpm) behind the 0–1 engineRpm used by the sound. */
+  private engineRpmActual = 850;
+  /** Wheels that receive drive torque. */
+  private readonly drivenIdx: number[];
+  private readonly driveTorque = [0, 0, 0, 0];
+  private readonly brakeTorque = [0, 0, 0, 0];
+  private readonly extraInertia = [0, 0, 0, 0];
   speed = 0;
   sliding = false;
   private absActive = false;
@@ -269,7 +295,7 @@ export class Vehicle {
   /** Simple coolant 0–1 (warms with load). */
   coolant = 0.35;
   transmission: Transmission;
-  private _prevVz = 0;
+
   /** v1.3.2 ground contact: sin(grade) along the car (+ = nose up), body pitch/roll from the 4 wheels. */
   private gradeSin = 0;
   private groundPitch = 0;
@@ -298,6 +324,9 @@ export class Vehicle {
   constructor(spec: VehicleSpec, mesh: THREE.Group, transmissionMode: TransmissionMode = 'auto') {
     this.spec = spec;
     this.phys = physicsSpecFor(spec);
+    this.sim = new VehicleSim(this.phys);
+    this.drivenIdx = this.phys.drive === 'fwd' ? [0, 1] : this.phys.drive === 'rwd' ? [2, 3] : [0, 1, 2, 3];
+    this.engineRpmActual = this.phys.engine.idleRpm;
     this.mesh = mesh;
     this.transmission = new Transmission({
       mode: transmissionMode,
@@ -336,8 +365,9 @@ export class Vehicle {
       s.intensity = spotI;
     }
 
-    const r = (this.wheelPivots[0]?.userData.wheelRadius as number | undefined) ?? 0.32;
-    this.wheelSpin += (this.vz / Math.max(0.2, r)) * dt;
+    // v1.4.0: the visible wheels turn at the front tyres' real spin (shows wheelspin and lock-ups)
+    const fw = this.sim.wheels;
+    this.wheelSpin += ((fw[0].omega + fw[1].omega) / 2) * dt;
     for (const m of this.spinMeshes) {
       m.rotation.x = this.wheelSpin;
     }
@@ -371,9 +401,7 @@ export class Vehicle {
     this.groundRoll = 0;
     this.position.set(x, 0, z);
     this.heading = headingRad;
-    this.vx = 0;
-    this.vz = 0;
-    this.yawRate = 0;
+    this.sim.reset();
     this.steerAngle = 0;
     this.speed = 0;
     this.throttleLoad = 0;
@@ -448,45 +476,21 @@ export class Vehicle {
   }
 
   private step(dt: number, ctl: DriveControls, weather: WeatherDriveInfo, surface: SurfaceInfo): void {
-    const s = this.spec;
-    this.filterDriverInputs(ctl, dt);
+    const p = this.phys;
     const g = 9.81;
+    this.filterDriverInputs(ctl, dt);
     // Prefer surface-aware grip (OSM surface × weather); fall back to roadFactor × weather.
     const surfaceGrip =
       surface.grip !== undefined && Number.isFinite(surface.grip)
         ? THREE.MathUtils.clamp(surface.grip, 0.1, 1.2)
         : weather.gripMul * THREE.MathUtils.clamp(surface.roadFactor, 0.25, 1.0);
-    const mu = s.gripMu * surfaceGrip;
     const noise = THREE.MathUtils.clamp(surface.noise ?? 0, 0, 1);
 
-    const steerTarget = this.steerIn * s.steerLock;
-    const steerRate =
-      s.steerSpeed *
-      (0.55 + 0.45 * (1 - THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1)));
-    this.steerAngle = approach(this.steerAngle, steerTarget, steerRate * s.steerLock * dt);
+    // --- steering (road-wheel angle) ---
+    const steerTarget = this.steerIn * p.steering.maxAngle;
+    this.steerAngle = approach(this.steerAngle, steerTarget, p.steering.maxAngle * 6 * dt);
 
-    const axApprox = (this.vz - this._prevVz) / Math.max(dt, 1e-4);
-    this._prevVz = this.vz;
-    const transfer = THREE.MathUtils.clamp(
-      (s.mass * axApprox * s.cgHeight) / (s.wheelbase * s.mass * g),
-      -0.28,
-      0.28,
-    );
-    let wFront = THREE.MathUtils.clamp(s.frontBias - transfer, 0.28, 0.78);
-    let wRear = 1 - wFront;
-    if (s.class === 'bus') {
-      wRear = Math.min(0.62, wRear + 0.02);
-      wFront = 1 - wRear;
-    }
-
-    const FzFront = s.mass * g * wFront;
-    const FzRear = s.mass * g * wRear;
-    const maxFxFront = mu * FzFront;
-    const maxFxRear = mu * FzRear;
-    const maxFyFront = mu * FzFront * 1.05;
-    const maxFyRear = mu * FzRear * 1.05;
-
-    // --- Transmission ---
+    // --- transmission ---
     this.transmission.update(dt, this.vz, this.throttleIn, {
       upshift: ctl.upshift,
       downshift: ctl.downshift,
@@ -504,210 +508,108 @@ export class Vehicle {
       else if (drive.reverse) throttle = Math.max(throttle, 0.85);
       else if (Math.abs(this.vz) <= 0.6) brake = Math.max(brake, 0.55);
     }
-
-    // Auto reverse via selector; stick reverse via gear
-    const wantReverse = drive.reverse;
-    if (this.transmission.mode === 'auto' && this.transmission.autoSelector === 0) {
+    if (this.transmission.mode === 'auto' && this.transmission.autoSelector === 0 && ctl.back) {
       // In R: W goes reverse, S brakes
-      if (ctl.back) {
-        throttle = 0;
-        brake = Math.max(brake, 0.7);
-      }
-    }
-
-    // Park: lock
-    if (this.transmission.mode === 'auto' && this.transmission.autoSelector === -1) {
       throttle = 0;
-      this.vz *= Math.exp(-8 * dt);
-      this.vx *= Math.exp(-8 * dt);
+      brake = Math.max(brake, 0.7);
     }
-
+    const parked = this.transmission.mode === 'auto' && this.transmission.autoSelector === -1;
+    if (parked) throttle = 0;
+    if (this.spawnHold && (throttle > 0 || brake > 0 || ctl.steer !== 0 || ctl.back)) {
+      this.spawnHold = false;
+    }
     this.throttleInput = throttle;
     this.brakeInput = brake;
     this.throttleLoad = throttle;
 
-    // RPM from gear × speed; freer when clutch or N
-    let rpm = this.transmission.rpmFromSpeed(this.vz);
-    if (!drive.engaged || this.transmission.clutchIn) {
-      rpm = THREE.MathUtils.clamp(0.12 + throttle * 0.75, 0.12, 1);
-    } else if (throttle > 0.1) {
-      rpm = THREE.MathUtils.clamp(rpm + throttle * 0.08, 0.12, 1);
-    }
-    this.engineRpm = rpm;
+    // --- engine → wheels ---
+    this.computeDrive(dt, throttle, drive.engaged && !this.transmission.clutchIn, drive.reverse);
 
-    // Fake boost (TDI / VR6)
-    const wantsBoost = s.id.includes('tdi') || s.id.includes('vr6');
-    const boostTarget = wantsBoost ? throttle * THREE.MathUtils.smoothstep(rpm, 0.25, 0.75) : 0;
-    this.boost = approach(this.boost, boostTarget, dt * 1.8);
-    this.coolant = approach(
-      this.coolant,
-      THREE.MathUtils.clamp(0.3 + rpm * 0.35 + throttle * 0.2, 0.3, 0.95),
-      dt * 0.05,
-    );
-
-    const spdFrac = THREE.MathUtils.clamp(Math.abs(this.vz) / s.maxSpeed, 0, 1);
-    const bandDist = Math.abs(spdFrac - s.torquePeak);
-    const band = 1 + (s.lowEndMul - 1) * Math.max(0, 1 - bandDist / 0.45);
-    const gearTorque = drive.engaged && !this.transmission.clutchIn ? this.transmission.torqueMul() : 0;
-    let engAx = throttle * s.accel * weather.accelBrakeMul * band * gearTorque;
-    engAx *= 1 - spdFrac ** s.powerFadeExp;
-    if (wantsBoost) engAx *= 1 + this.boost * 0.18;
-
-    // Direction: reverse gears apply negative long force when throttling
-    if (wantReverse && throttle > 0) {
-      engAx = -Math.abs(engAx);
-    } else if (!wantReverse && throttle > 0) {
-      engAx = Math.abs(engAx);
+    // --- brakes (Park / spawn hold lock the wheels like a parking pawl + handbrake) ---
+    const regenMul = p.regen?.brakeMul ?? 1;
+    for (let i = 0; i < 4; i++) {
+      const base = i < 2 ? p.brakes.frontNm : p.brakes.rearNm;
+      this.brakeTorque[i] = brake * base * regenMul;
+      if (parked || this.spawnHold) this.brakeTorque[i] = Math.max(this.brakeTorque[i], base * 3);
     }
 
-    let brakeAx = 0;
-    if (brake > 0 && Math.abs(this.vz) > 0.15) {
-      brakeAx = -Math.sign(this.vz || 1) * brake * s.brakeForce * s.regenBrakeMul * weather.accelBrakeMul;
-    } else if (throttle === 0 && brake === 0 && Math.abs(this.vz) > 0.5 && s.coastRegen > 0) {
-      brakeAx = -Math.sign(this.vz) * s.coastRegen * weather.accelBrakeMul;
-    }
+    // --- chassis + tyres ---
+    const gradeSin = this.gradeGravity ? this.gradeSin : 0;
+    const hold =
+      (brake > 0.2 || parked || this.spawnHold) &&
+      Math.abs(this.vz) < 0.8 &&
+      Math.abs(g * gradeSin) < p.tire.mu * surfaceGrip * g * 0.9;
+    this.sim.step(dt, {
+      steer: this.steerAngle,
+      driveTorque: this.driveTorque,
+      brakeTorque: this.brakeTorque,
+      extraInertia: this.extraInertia,
+      mu: surfaceGrip,
+      noise,
+      gradeSin,
+      hold,
+    });
 
-    // Neutral / clutch: no engine force
-    if (!drive.engaged || this.transmission.clutchIn) {
-      engAx = 0;
-    }
-
-    // Rolling resistance: more on grass/dirt so a car parked on a gentle verge doesn't creep away
-    const rollC = 0.012 + (1 - THREE.MathUtils.clamp(surface.roadFactor, 0.35, 1)) * 0.06;
-    const drag = rollC * g * Math.sign(this.vz) + 0.00045 * this.vz * Math.abs(this.vz);
-    // v1.3.2 engine braking with the throttle closed in gear (weaker through an
-    // auto's torque converter) + over-rev limiter, so a hill doesn't become a launch ramp
-    let engBrake = 0;
-    if (drive.engaged && !this.transmission.clutchIn && throttle < 0.05 && Math.abs(this.vz) > 0.3) {
-      const revs = ((Math.abs(this.vz) / 0.32) * drive.ratio) / 520;
-      const k = this.transmission.mode === 'auto' ? 0.5 : 1;
-      engBrake =
-        -Math.sign(this.vz) *
-        ((0.25 + 0.9 * Math.min(revs, 1)) * this.transmission.torqueMul() * k + Math.min(Math.max(0, revs - 1), 1) * 3);
-    }
-    let longDemand = engAx - drag + brakeAx + engBrake;
-
-    this.tcsActive = false;
-    if (longDemand > 0) {
-      // Allow a bit more drive force so sustained throttle reaches highway speeds;
-      // TCS still clips egregious spin on low grip.
-      const driveCap = (maxFxRear * 1.08) / s.mass;
-      if (longDemand > driveCap) {
-        longDemand = driveCap;
-        this.tcsActive = throttle > 0.35 && surfaceGrip < 0.85;
-      }
-    }
-
-    this.absActive = false;
-    if (longDemand < 0) {
-      const brakeCap = -((maxFxFront + maxFxRear) * 0.9) / s.mass;
-      if (longDemand < brakeCap) {
-        longDemand = brakeCap;
-        this.absActive = brake > 0.3;
-      }
-    }
-
-    const vSafe = Math.max(Math.abs(this.vz), 1.2);
-    const yaw = this.yawRate;
-    const aFront = Math.atan2(this.vx + yaw * (s.wheelbase * wRear), vSafe) - this.steerAngle;
-    const aRear = Math.atan2(this.vx - yaw * (s.wheelbase * wFront), vSafe);
-
-    const Cf = (FzFront / (s.mass * g)) * 9.5 * mu * s.mass * g;
-    const Cr = (FzRear / (s.mass * g)) * 10.5 * mu * s.mass * g;
-
-    let FyFront = -Cf * Math.tan(THREE.MathUtils.clamp(aFront, -0.6, 0.6));
-    let FyRear = -Cr * Math.tan(THREE.MathUtils.clamp(aRear, -0.6, 0.6));
-
-    let FxFront = 0;
-    let FxRear = 0;
-    const Flong = longDemand * s.mass;
-    if (Flong >= 0) {
-      FxRear = Flong;
-    } else {
-      FxFront = Flong * wFront;
-      FxRear = Flong * wRear;
-    }
-
-    const frontCombo = combineGrip(FxFront, FyFront, maxFxFront, maxFyFront);
-    FxFront = frontCombo.fx;
-    FyFront = frontCombo.fy;
-    const rearCombo = combineGrip(FxRear, FyRear, maxFxRear, maxFyRear);
-    FxRear = rearCombo.fx;
-    FyRear = rearCombo.fy;
-
-    this.sliding = frontCombo.sliding || rearCombo.sliding;
-
-    const cos = Math.cos(this.steerAngle);
-    const sin = Math.sin(this.steerAngle);
-    const Fx = FxRear + FxFront * cos - FyFront * sin;
-    const Fy = FyRear + FyFront * cos + FxFront * sin;
-
-    const ax = Fy / s.mass + this.vz * yaw;
-    const az = Fx / s.mass - this.vx * yaw;
-
-    // v1.3.2: gravity along the grade — slows you uphill, pulls you downhill.
-    // Brakes / Park hold the car at a standstill if the tyres can take it.
-    let gAlong = this.gradeGravity ? -g * this.gradeSin : 0;
-    const parked = this.transmission.mode === 'auto' && this.transmission.autoSelector === -1;
-    if (this.spawnHold && (throttle > 0 || brake > 0 || ctl.steer !== 0 || ctl.back)) {
-      this.spawnHold = false;
-    }
-    if ((brake > 0.2 || parked || this.spawnHold) && Math.abs(this.vz) < 0.8 && Math.abs(gAlong) < mu * g * 0.9) {
-      gAlong = 0;
-      this.vz *= Math.exp(-10 * dt);
-    }
-
-    this.vx += ax * dt;
-    this.vz += (az + gAlong) * dt;
-
-    const yawMoment =
-      FyFront * cos * (s.wheelbase * wRear) -
-      FyRear * (s.wheelbase * wFront) +
-      FxFront * sin * (s.wheelbase * wRear) * 0.35;
-    const Iz = s.mass * (s.wheelbase * 0.5) ** 2 * (s.class === 'bus' ? 1.35 : 0.95);
-    this.yawRate += (yawMoment / Iz) * dt;
-
-    const yawDamp = 1.8 + mu * 1.2;
-    this.yawRate *= Math.exp(-yawDamp * dt * (0.4 + 0.6 * Math.min(1, vSafe / 12)));
-
-    const worldYaw = this.heading;
-    const c = Math.cos(worldYaw);
-    const sn = Math.sin(worldYaw);
+    const c = Math.cos(this.heading);
+    const sn = Math.sin(this.heading);
     const wx = sn * this.vz + c * this.vx;
     const wz = c * this.vz - sn * this.vx;
     this.position.x += wx * dt;
     this.position.z += wz * dt;
     this.heading += this.yawRate * dt;
 
-    // Surface noise: small lateral jitter on rough surfaces (gravel/dirt/cobble)
-    if (noise > 0.1 && Math.abs(this.vz) > 2) {
-      this.vx += (Math.random() - 0.5) * noise * 0.35 * dt * Math.min(Math.abs(this.vz), 20);
-    }
+    this.sliding = this.speed > 3 && this.sim.wheels.some((w) => w.slip > 1.25);
+    this.coolant = approach(
+      this.coolant,
+      THREE.MathUtils.clamp(0.3 + this.engineRpm * 0.35 + throttle * 0.2, 0.3, 0.95),
+      dt * 0.05,
+    );
 
-    this.speed = Math.hypot(this.vx, this.vz);
-
-    // Hard clamps — prevent runaway / NaN cascade
-    if (this.vz < -s.maxSpeed * 0.28) this.vz = -s.maxSpeed * 0.28;
-    if (this.vz > s.maxSpeed * 1.05) this.vz = s.maxSpeed * 1.05;
-    const maxLat = s.maxSpeed * 0.55;
-    if (this.vx > maxLat) this.vx = maxLat;
-    if (this.vx < -maxLat) this.vx = -maxLat;
-    if (this.yawRate > 3.5) this.yawRate = 3.5;
-    if (this.yawRate < -3.5) this.yawRate = -3.5;
-
-    if (!Number.isFinite(this.vx)) this.vx = 0;
-    if (!Number.isFinite(this.vz)) this.vz = 0;
-    if (!Number.isFinite(this.yawRate)) this.yawRate = 0;
     if (!Number.isFinite(this.heading)) this.heading = 0;
     if (!Number.isFinite(this.position.x) || !Number.isFinite(this.position.z)) {
       this.position.x = 0;
       this.position.z = 0;
-      this.vx = 0;
-      this.vz = 0;
+      this.sim.reset();
     }
     this.speed = Math.hypot(this.vx, this.vz);
   }
 
+  /** Gear ratio × final drive from the car's own gearbox spec. */
+  private overallRatio(reverse: boolean): number {
+    const gb = this.phys.gearbox;
+    if (reverse) return gb.reverse * gb.finalDrive;
+    const gi = Math.max(1, Math.min(gb.ratios.length, this.transmission.currentGear));
+    return gb.ratios[gi - 1] * gb.finalDrive;
+  }
+
+  /**
+   * M3 drivetrain: engine torque curve coupled straight to the driven wheels through the
+   * current gear (engine sits at idle and slips below it). Replaced by Powertrain in M4.
+   */
+  private computeDrive(dt: number, throttle: number, coupled: boolean, reverse: boolean): void {
+    const e = this.phys.engine;
+    const gb = this.phys.gearbox;
+    this.driveTorque.fill(0);
+    this.extraInertia.fill(0);
+    const ratio = coupled ? this.overallRatio(reverse) : 0;
+    let rpm: number;
+    if (ratio > 0) {
+      rpm = Math.max(e.idleRpm, ((Math.abs(this.sim.meanOmega(this.drivenIdx)) * ratio * 30) / Math.PI));
+      let te = throttle * torqueAt(e.torqueCurve, rpm) - (1 - throttle) * (e.frictionNm + (e.frictionPerKrpm * rpm) / 1000);
+      if (rpm >= e.limiterRpm) te = -(e.frictionNm + (e.frictionPerKrpm * rpm) / 1000);
+      const tw = te * ratio * gb.efficiency * (reverse ? -1 : 1);
+      const n = this.drivenIdx.length;
+      for (const i of this.drivenIdx) {
+        this.driveTorque[i] = tw / n;
+        this.extraInertia[i] = (e.inertia * ratio * ratio) / n;
+      }
+    } else {
+      const target = e.idleRpm + throttle * (e.redlineRpm - e.idleRpm);
+      rpm = approach(this.engineRpmActual, target, dt * 6000);
+    }
+    this.engineRpmActual = rpm;
+    this.engineRpm = THREE.MathUtils.clamp((rpm - e.idleRpm * 0.9) / (e.redlineRpm - e.idleRpm * 0.9), 0, 1);
+  }
   /** v1.3.4: water — heavy drag on every axis (no traction comes from the 0.1 grip). */
   applyWaterDrag(dt: number, k = 3.2): void {
     const f = Math.exp(-k * dt);
@@ -776,12 +678,9 @@ export class Vehicle {
       : this.transmission.getLabel();
   }
 
+  /** v1.4.0: the engine's real rpm. */
   getEngineRpmDisplay(): number {
-    // Map 0–1 → ~800–6500 rpm (diesel lower redline)
-    const diesel = this.spec.id.includes('tdi') || this.spec.id.includes('bus_diesel');
-    const min = diesel ? 750 : 850;
-    const max = diesel ? 4500 : this.spec.id.includes('vr6') ? 6800 : 6200;
-    return Math.round(min + this.getEngineRpmNorm() * (max - min));
+    return Math.round(this.engineRpmActual);
   }
 
   private syncMesh(): void {
@@ -797,12 +696,9 @@ export class Vehicle {
     this.mesh.position.z = this.prevStepZ + (this.position.z - this.prevStepZ) * a;
     this.mesh.rotation.order = 'YXZ';
     this.mesh.rotation.y = this.prevStepHeading + (this.heading - this.prevStepHeading) * a;
-    const roll = THREE.MathUtils.clamp(-this.vx * 0.015, -0.08, 0.08);
-    const pitch = THREE.MathUtils.clamp(
-      -this.vz * 0.002 + (this._prevVz - this.vz) * 0.01,
-      -0.06,
-      0.06,
-    );
+    // v1.4.0: body roll / pitch from the sprung-mass response (same signal that moves the load)
+    const roll = THREE.MathUtils.clamp(this.sim.bodyRoll(), -0.12, 0.12);
+    const pitch = THREE.MathUtils.clamp(this.sim.bodyPitch(), -0.08, 0.08);
     // Ground pitch: rotation.x > 0 tips the nose (+Z) down, so nose-up = negative.
     this.mesh.rotation.z = roll + this.groundRoll;
     this.mesh.rotation.x = pitch + this.groundPitch;
@@ -812,18 +708,4 @@ export class Vehicle {
 function approach(current: number, target: number, maxDelta: number): number {
   if (current < target) return Math.min(current + maxDelta, target);
   return Math.max(current - maxDelta, target);
-}
-
-function combineGrip(
-  fx: number,
-  fy: number,
-  maxFx: number,
-  maxFy: number,
-): { fx: number; fy: number; sliding: boolean } {
-  const nx = maxFx > 1e-3 ? fx / maxFx : 0;
-  const ny = maxFy > 1e-3 ? fy / maxFy : 0;
-  const mag = Math.hypot(nx, ny);
-  if (mag <= 1) return { fx, fy, sliding: mag > 0.92 };
-  const scale = (1 / mag) * (0.92 + 0.08 / mag);
-  return { fx: fx * scale, fy: fy * scale, sliding: true };
 }
