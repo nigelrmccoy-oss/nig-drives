@@ -693,6 +693,7 @@ export class Vehicle {
       wheelOmega: this.sim.meanOmega(this.drivenIdx),
       clutchPedal: this.transmission.clutchIn,
       shifting: this.transmission.shiftTimer > 0,
+      converter: this.transmission.mode === 'auto',
     });
     this.driveTorque.fill(0);
     this.extraInertia.fill(0);

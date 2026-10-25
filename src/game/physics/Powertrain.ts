@@ -19,7 +19,18 @@ export interface PowertrainInput {
   clutchPedal: boolean;
   /** A gear change is in progress (clutch open, throttle cut). */
   shifting: boolean;
+  /**
+   * v1.4.1 P2-7: automatic gearbox — a torque converter (fluid coupling with torque multiplication
+   * and a lock-up clutch) instead of the auto-clutch, so D creeps at idle and a light pedal drives.
+   */
+  converter?: boolean;
 }
+
+/** Converter stall torque ratio (typical 1990s 4-speed auto ≈ 2) and coupling-point speed ratio. */
+const TC_STALL_RATIO = 2.0;
+const TC_COUPLING_SR = 0.85;
+/** Lock-up clutch closes above this speed ratio (engine within ~10 % of the gearbox input). */
+const TC_LOCK_SR = 0.9;
 
 export interface PowertrainOutput {
   /** Total torque at the driven wheels (Nm, + = forward). */
@@ -38,10 +49,21 @@ export class Powertrain {
   private locked = false;
   private readonly spec: PhysicsSpec;
   private readonly out: PowertrainOutput = { wheelTorque: 0, wheelInertia: 0 };
+  /** Converter capacity k in T_pump = k·ω²·(1 − SR⁴) (Nm per (rad/s)²), from the stall speed. */
+  private readonly tcK: number;
+  /** Gearbox input speed seen by the converter, lightly filtered (keeps the fluid coupling smooth). */
+  private tcShaft = 0;
 
   constructor(spec: PhysicsSpec) {
     this.spec = spec;
     this.omega = (spec.engine.idleRpm * Math.PI) / 30;
+    // full-throttle stall speed ≈ 2.8 × idle (≈2400 rpm Golf, ≈1800 rpm bus diesel)
+    const e = spec.engine;
+    const stallRpm = Math.min(e.redlineRpm * 0.55, e.idleRpm * 2.8);
+    const ws = (stallRpm * Math.PI) / 30;
+    // (a turbo engine is matched on its off-boost torque, so the converter lets it rev into boost)
+    const offBoost = e.turbo ? 1 - e.turbo.boostShare : 1;
+    this.tcK = (torqueAt(e.torqueCurve, stallRpm) * offBoost) / (ws * ws);
   }
 
   get rpm(): number {
@@ -66,6 +88,7 @@ export class Powertrain {
     this.boost = 0;
     this.engage = 1;
     this.locked = false;
+    this.tcShaft = 0;
   }
 
   /** Net engine torque at the crank for this throttle and rpm (Nm). */
@@ -125,6 +148,8 @@ export class Powertrain {
     this.engage = target < this.engage ? target : Math.min(target, this.engage + dt / 0.1);
     const cap = this.engage * this.spec.clutch.maxTorqueNm;
 
+    if (inp.converter) return this.updateConverter(dt, inp, tEng, inGear, shaftOmega, shaftRpm);
+
     if (this.locked) {
       // unlock when the clutch opens, can't carry the torque, or the engine would stall
       if (!inGear || this.engage < 0.98 || Math.abs(tEng) > cap || shaftRpm < e.idleRpm * 0.9) this.locked = false;
@@ -150,6 +175,48 @@ export class Powertrain {
       }
     }
     if (!Number.isFinite(this.omega)) this.omega = (e.idleRpm * Math.PI) / 30;
+    return out;
+  }
+
+  /**
+   * v1.4.1 P2-7: torque converter. Pump torque k·ω_e²·(1 − SR⁴) (SR = turbine / pump speed),
+   * multiplied 2.0× at stall falling to 1.0× at the coupling point. At idle in D that is enough
+   * to creep (~6 km/h on the flat) and to hold a moderate slope; a light pedal drives the car.
+   * The lock-up clutch closes once the converter is nearly coupled above ~1.5 × idle.
+   */
+  private updateConverter(dt: number, inp: PowertrainInput, tEng: number, inGear: boolean, shaftOmega: number, shaftRpm: number): PowertrainOutput {
+    const e = this.spec.engine;
+    const eff = this.spec.gearbox.efficiency;
+    const out = this.out;
+    const idle = (e.idleRpm * Math.PI) / 30;
+    if (!inGear || inp.clutchPedal) {
+      this.locked = false;
+      this.tcShaft = shaftOmega;
+      this.omega = Math.max(0, this.omega + (dt * tEng) / e.inertia);
+      if (!Number.isFinite(this.omega)) this.omega = idle;
+      return out;
+    }
+    this.tcShaft += (shaftOmega - this.tcShaft) * Math.min(1, dt / 0.03);
+    const sr = this.omega > 1 ? this.tcShaft / this.omega : 1;
+    const lockRpm = e.idleRpm * 1.5;
+    if (this.locked) {
+      if (inp.shifting || shaftRpm < lockRpm * 0.85 || Math.abs(tEng) > this.spec.clutch.maxTorqueNm) this.locked = false;
+    } else if (!inp.shifting && sr > TC_LOCK_SR && sr < 1.05 && shaftRpm > lockRpm) {
+      this.locked = true;
+    }
+    if (this.locked) {
+      this.omega = shaftOmega;
+      out.wheelTorque = tEng * inp.ratio * eff * inp.direction;
+      out.wheelInertia = e.inertia * inp.ratio * inp.ratio;
+      return out;
+    }
+    const srC = Math.max(-1, Math.min(1.3, sr));
+    const pump = this.tcK * this.omega * this.omega * Math.max(-1, 1 - srC ** 4);
+    const tr = TC_STALL_RATIO - (TC_STALL_RATIO - 1) * Math.min(1, Math.max(0, srC) / TC_COUPLING_SR);
+    this.omega += (dt * (tEng - pump)) / e.inertia;
+    if (this.omega < 0) this.omega = 0;
+    if (!Number.isFinite(this.omega)) this.omega = idle;
+    out.wheelTorque = pump * (pump > 0 ? tr : 1) * inp.ratio * eff * inp.direction;
     return out;
   }
 }
