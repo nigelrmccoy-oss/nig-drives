@@ -39,6 +39,11 @@ export interface PowertrainOutput {
   wheelInertia: number;
 }
 
+/** v1.4.2: pedal -> load exponent (1 = linear). 1.6 gives an even response from ~10 % pedal. */
+const PEDAL_PROGRESSION = 1.6;
+/** Pedal held through a shift: the same 10 % engine load as before the progressive map. */
+const SHIFT_PEDAL = 1 - Math.pow(0.9, 1 / PEDAL_PROGRESSION);
+
 export class Powertrain {
   /** Engine speed (rad/s). */
   private omega: number;
@@ -98,7 +103,17 @@ export class Powertrain {
     if (rpm >= e.limiterRpm) return -friction; // fuel cut
     let full = torqueAt(e.torqueCurve, rpm);
     if (e.turbo) full *= 1 - e.turbo.boostShare * (1 - this.boost);
-    let t = throttle * full - (1 - throttle) * friction;
+    // v1.4.2: pedal -> engine load is progressive (a throttle plate / injection map gives most of
+    // its airflow / fuel in the first part of the travel), and it adds on top of the idle fuelling
+    // instead of having to out-fuel it first (the idle governor's share fades out ~500 rpm above
+    // idle). Before this 10-30 % pedal barely beat the pumping losses: the TDI only crept to 30 %.
+    // 0 % (above idle) and 100 % are unchanged.
+    const pedal = 1 - Math.pow(1 - Math.min(1, Math.max(0, throttle)), PEDAL_PROGRESSION);
+    const fIdle = e.frictionNm + (e.frictionPerKrpm * e.idleRpm) / 1000;
+    const idleLoad = fIdle / Math.max(1, torqueAt(e.torqueCurve, e.idleRpm) * (e.turbo ? 1 - e.turbo.boostShare : 1) + fIdle);
+    const gov = idleLoad * Math.min(1, Math.max(0, 1 - (rpm - e.idleRpm) / 500));
+    const load = gov + pedal * (1 - gov);
+    let t = load * full - (1 - load) * friction;
     // idle governor: fuel the engine back up to idle
     if (rpm < e.idleRpm) {
       const idleT = Math.min((e.idleRpm - rpm) * 0.25, torqueAt(e.torqueCurve, e.idleRpm) * 0.7);
@@ -110,7 +125,7 @@ export class Powertrain {
   update(dt: number, inp: PowertrainInput): PowertrainOutput {
     const e = this.spec.engine;
     const eff = this.spec.gearbox.efficiency;
-    const throttle = inp.shifting ? Math.min(inp.throttle, 0.1) : inp.throttle;
+    const throttle = inp.shifting ? Math.min(inp.throttle, SHIFT_PEDAL) : inp.throttle;
     const rpm = this.rpm;
 
     // turbo spool (fast blow-off, slower build)
