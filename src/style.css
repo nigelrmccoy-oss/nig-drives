@@ -721,7 +721,7 @@ canvas.game-canvas {
   position: fixed;
   right: 14px;
   top: 150px;
-  z-index: 9; /* v1.4.1: below #hud (10) so the open assists panel stays on top */
+  z-index: 9; /* below #hud (10); v1.4.2 moves it clear of the open assists panel (below) */
   padding: 6px 8px 8px;
   background: rgba(10, 14, 20, 0.78);
   border: 1px solid #3d3428;
@@ -732,6 +732,12 @@ canvas.game-canvas {
 
 .telemetry-plus[hidden] {
   display: none;
+}
+
+/* v1.4.2: the open Assists panel (HUD top right, down to ~250 px) and Telemetry+ shared the same
+   corner. Telemetry+ moves down below the panel while the panel is open. */
+body:has(#hud-assist-panel:not([hidden])) .telemetry-plus {
+  top: 262px;
 }
 
 .tp-title {
