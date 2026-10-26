@@ -53,8 +53,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.4.1</span></h1>
-        <p class="tagline">v1.4.1: real tyre &amp; drivetrain physics · Tesla Model 3 · assists you can switch off (F1) · Telemetry+ (F2) · Dyno.</p>
+        <h1>Nig Drives <span class="ver">v1.4.2</span></h1>
+        <p class="tagline">v1.4.2: real tyre &amp; drivetrain physics · Tesla Model 3 · assists you can switch off (F1) · Telemetry+ (F2) · Dyno.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">

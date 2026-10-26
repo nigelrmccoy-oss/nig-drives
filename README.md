@@ -9,6 +9,30 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ## Changelog
 
+### v1.4.2 (package 1.4.2) — Code Critic's v1.4.1 findings
+
+- **No kick when you let go of a key.** Keyboard steering at speed now asks for about 0.8 of the
+  grip-limited cornering force (using each car's own understeer), so a held key no longer drags
+  the rear past its grip and there is nothing to catch on release. The countersteer helper only
+  acts on a real slide: the car yawing more than you asked for, the rear axle past its peak and
+  the tail swinging out further. Steer kick on release at 125 and 170 km/h: up to −0.61 → 0.00.
+- **Tesla settles hands-off with assists off,** like the Golfs (beta 43.7° and a spin → 2.6°).
+  It was a linear oversteerer (negative understeer gradient); the rear tyres now have a smaller
+  peak slip angle (stiffer rear axle). Regen splits front/rear by motor power (0.43 front) and
+  each axle's regen stays inside the grip it has left after cornering.
+- **Gamepad flick at speed.** A full stick's slip-angle allowance shrinks with speed like the
+  keyboard's: Golf 2.0 pad flick at 110 km/h with assists off 57.2° (spin) → 10.7°. An unlocked
+  torque converter no longer passes stale engine inertia to the wheels.
+- **Pedal.** The pedal map is progressive and adds to the idle fuelling, so every petrol and
+  diesel car pulls smoothly from about 10 % pedal (the TDI needed 30 %). Full-pedal times are
+  unchanged within 0.1 s.
+- **UI.** Telemetry+ moves below the Assists panel while it is open (they overlapped at 1600×900).
+- Menu, HUD badge and window title read v1.4.2.
+
+Known limitation: a full-stick pendulum flick with assists off can still spin the Golfs at
+120–130 km/h and up, and the Tesla at 80–100 and 130 km/h and up (25 of 50 speed/car cases,
+down from 37 in 1.4.0 and 34 in 1.4.1). With ESC on, none spin.
+
 ### v1.4.1 (package 1.4.1) — Handling and assist fixes, Dyno and menu fixes
 
 - **ESC** no longer brakes in steady cornering (it was active the whole time on some cars). At
@@ -43,7 +67,7 @@ Bench numbers (flat dry road, auto box, assists on):
 | Bus hybrid | 8.5 s | 29.8 s | 24.7 s | 113 km/h | 58.5 m | 0.66 g |
 
 VW quotes 9.0 s for the VR6 automatic (7.6 s manual). The current Model 3 LR AWD tops out at
-201 km/h; the 233 km/h figure is for the 2021–23 car.
+200 km/h (the sim measures 200.4); the 233 km/h figure is for the 2021–23 car.
 
 ### v1.4.0 (package 1.4.0) — Real vehicle physics, Tesla Model 3, assists, Telemetry+, Dyno
 
