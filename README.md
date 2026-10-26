@@ -23,9 +23,11 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 - **Gamepad flick at speed.** A full stick's slip-angle allowance shrinks with speed like the
   keyboard's: Golf 2.0 pad flick at 110 km/h with assists off 57.2° (spin) → 10.7°. An unlocked
   torque converter no longer passes stale engine inertia to the wheels.
-- **Pedal.** The pedal map is progressive and adds to the idle fuelling, so every petrol and
-  diesel car pulls smoothly from about 10 % pedal (the TDI needed 30 %). Full-pedal times are
-  unchanged within 0.1 s.
+- **Pedal.** The pedal map is progressive and adds to the idle fuelling, so the petrol cars
+  pull smoothly from about 10 % pedal. The 1.9 TDI sits at creep at 10 % and starts pulling
+  from about 15 % (it needed 30 %). Full-pedal times are unchanged within 0.1 s.
+- **Bench skidpad.** With the new pedal map the bench skidpad for the Golfs reads about
+  0.837 g (it was 0.868 g in 1.4.1). In game the Golfs corner at about 0.80–0.83 g.
 - **UI.** Telemetry+ moves below the Assists panel while it is open (they overlapped at 1600×900).
 - Menu, HUD badge and window title read v1.4.2.
 
@@ -65,6 +67,9 @@ Bench numbers (flat dry road, auto box, assists on):
 | Golf VR6 | 3.9 s | 9.2 s | 16.8 s | 222 km/h | 44.7 m | 0.86 g |
 | Bus diesel | 10.7 s | 42.3 s | 27.0 s | 103 km/h | 71.0 m | 0.66 g |
 | Bus hybrid | 8.5 s | 29.8 s | 24.7 s | 113 km/h | 58.5 m | 0.66 g |
+
+These are the 1.4.1 bench numbers. In 1.4.2 the bench skidpad for the Golfs dropped to about
+0.837 g (from 0.868 g) because of the new pedal map; in game they corner at about 0.80–0.83 g.
 
 VW quotes 9.0 s for the VR6 automatic (7.6 s manual). The current Model 3 LR AWD tops out at
 200 km/h (the sim measures 200.4); the 233 km/h figure is for the 2021–23 car.
