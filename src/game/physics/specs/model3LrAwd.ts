@@ -34,6 +34,10 @@ export const MODEL3_LR_AWD: PhysicsSpec = {
     C: 1.6,
     peakSlip: 0.1,
     peakAngle: 0.12,
+    // v1.4.2 P2-10: 47/53 weight on equal tyres made the car a linear oversteerer (K < 0, critical
+    // speed ~330 km/h): hands-off it kept rotating after a lift. Rear toe-in / compliance and the
+    // stiffer rear setup give the real car mild understeer; K ≈ +0.7e-3 rad/(m/s²), like the Golfs.
+    peakAngleRear: 0.095,
     loadSensitivity: 0.08,
     rollingRes: 0.009,
     relaxLength: 0.35,
@@ -112,7 +116,8 @@ export const MODEL3_LR_AWD: PhysicsSpec = {
     responseS: 0.03,
     regenDecel: 1.96, // ≈ 0.2 g lift-off
     regenMaxPowerW: 110000,
-    regenFrontShare: 0.45,
+    // v1.4.2 P2-10: regen front share follows the motor powers (175 / 410 kW ≈ 0.43) and each
+    // axle's regen is held inside that axle's friction circle (see Vehicle.computeEvDrive)
     batteryKWh: 75,
     startSoc: 0.8,
     efficiency: 0.92,

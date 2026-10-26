@@ -66,6 +66,8 @@ export class VehicleSim {
   readonly pz: number[];
   private readonly spec: PhysicsSpec;
   private readonly fzNominal: number;
+  /** Rear-axle tyre (v1.4.2: own peak slip angle when the spec gives one). */
+  private readonly tireRear: PhysicsSpec['tire'];
   private readonly bump = [0, 0, 0, 0];
   private readonly tmp: TireOut = { fx: 0, fy: 0, slip: 0, kLong: 0, limit: 0 };
 
@@ -77,6 +79,7 @@ export class VehicleSim {
     this.px = [c.trackFront / 2, -c.trackFront / 2, c.trackRear / 2, -c.trackRear / 2];
     this.pz = [a, a, -b, -b];
     this.fzNominal = (c.mass * G) / 4;
+    this.tireRear = spec.tire.peakAngleRear !== undefined ? { ...spec.tire, peakAngle: spec.tire.peakAngleRear } : spec.tire;
     this.wheels = [0, 1, 2, 3].map(() => ({ omega: 0, tanAlpha: 0, kappa: 0, fz: this.fzNominal, fx: 0, fy: 0, slip: 0, vLong: 0 }));
   }
 
@@ -151,7 +154,7 @@ export class VehicleSim {
       w.tanAlpha += (tanSS - w.tanAlpha) * relax;
       w.kappa = (w.omega * rad - vLong) / vDen;
       const dual = i >= 2 && c.rearDualTyres === true;
-      const f = tireForces(t, dual ? w.fz / 2 : w.fz, this.fzNominal, w.kappa, w.tanAlpha, inp.mu, inp.mu, this.tmp);
+      const f = tireForces(i >= 2 ? this.tireRear : t, dual ? w.fz / 2 : w.fz, this.fzNominal, w.kappa, w.tanAlpha, inp.mu, inp.mu, this.tmp);
       if (dual) {
         f.fx *= 2;
         f.fy *= 2;

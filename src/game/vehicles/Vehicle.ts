@@ -5,7 +5,7 @@ import { Transmission, type TransmissionMode } from './Transmission';
 import { MAX_FRAME_DT, MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
-import { Assists } from '../physics/Assists';
+import { Assists, understeerGradient } from '../physics/Assists';
 import { Powertrain } from '../physics/Powertrain';
 import { EvDrive } from '../physics/Motor';
 import { VehicleSim } from '../physics/VehicleSim';
@@ -70,6 +70,16 @@ export interface VehicleSpec {
   /** Soft regen when coasting off-throttle (hybrid). */
   coastRegen: number;
 }
+
+/**
+ * v1.4.2 P2-9: a held steering key asks for this share of the grip-limited lateral acceleration
+ * (linear bicycle model with the car's understeer gradient), plus this share of the tyre's peak
+ * slip angle scaled by the low-speed factor. Full key = a firm corner, not the rear's limit.
+ */
+const KB_LAT_SHARE = 0.8;
+const KB_SLIP_ROOM = 0.2;
+/** v1.4.2: share of the tyre's peak slip angle a full gamepad stick keeps at high speed. */
+const PAD_SLIP_ROOM_FAST = 0.4;
 
 const GOLF_BASE = {
   class: 'golf' as const,
@@ -364,6 +374,13 @@ export class Vehicle {
   private prevStepHeading = 0;
   /** v1.4.0 M1: driver inputs after keyboard ramps / pad smoothing. */
   private steerIn = 0;
+  /** v1.4.2 countersteer helper state: last sideslip, its filtered rate, applied helper angle. */
+  private csBeta = 0;
+  private csBetaRate = 0;
+  private csAmt = 0;
+  /** Surface grip of the current step (for the EV regen friction-circle limit). */
+  private gripNow = 1;
+  private kUs = 0;
   private throttleIn = 0;
   private brakeIn = 0;
 
@@ -376,6 +393,7 @@ export class Vehicle {
     // EVs have one fixed reduction: no clutch, no gears, always the auto selector (P R N D)
     if (this.ev) transmissionMode = 'auto';
     this.assists = new Assists(this.phys);
+    this.kUs = understeerGradient(this.phys);
     this.drivenIdx = this.phys.drive === 'fwd' ? [0, 1] : this.phys.drive === 'rwd' ? [2, 3] : [0, 1, 2, 3];
     this.engineRpmActual = this.phys.engine.idleRpm;
     this.mesh = mesh;
@@ -464,6 +482,9 @@ export class Vehicle {
     this.ev?.reset();
     this.assists.reset();
     this.steerAngle = 0;
+    this.csBeta = 0;
+    this.csBetaRate = 0;
+    this.csAmt = 0;
     this.speed = 0;
     this.throttleLoad = 0;
     this.stepAcc = 0;
@@ -548,9 +569,10 @@ export class Vehicle {
         ? THREE.MathUtils.clamp(surface.grip, 0.1, 1.2)
         : weather.gripMul * THREE.MathUtils.clamp(surface.roadFactor, 0.25, 1.0);
     const noise = THREE.MathUtils.clamp(surface.noise ?? 0, 0, 1);
+    this.gripNow = surfaceGrip;
 
     // --- steering (road-wheel angle) ---
-    this.steerAngle = approach(this.steerAngle, this.steeringTarget(surfaceGrip), p.steering.maxAngle * 6 * dt);
+    this.steerAngle = approach(this.steerAngle, this.steeringTarget(surfaceGrip, dt), p.steering.maxAngle * 6 * dt);
 
     // --- transmission ---
     this.transmission.update(dt, this.vz, this.throttleIn, {
@@ -656,36 +678,65 @@ export class Vehicle {
    * Road-wheel angle the driver is asking for. Keyboard and pad have no force feedback, so:
    *  - lock shrinks with speed to about what the front tyres can use (full stick = near the limit,
    *    not 3x past it), with extra room on a pad
-   *  - on the keyboard, a countersteer helper points the front wheels along the slide when the
-   *    rear steps out, the way a real wheel self-aligns in your hands
+   *  - v1.4.2: a held key asks for a firm corner (~0.8 g of the grip, linear-model steer with the
+   *    car's own understeer gradient), not for the limit plus slip room: a 1 s key at 125 km/h no
+   *    longer drags the rear past its peak, so nothing is left to "catch" on release
+   *  - on the keyboard, a countersteer helper points the front wheels along a genuine slide (yaw
+   *    faster than the driver's steer asks for, rear tyres past their peak and more saturated than
+   *    the fronts, sideslip growing tail-out). It ramps in and out instead of stepping, and with no
+   *    genuine oversteer the output is exactly the driver's request.
    */
-  private steeringTarget(surfaceGrip: number): number {
+  private steeringTarget(surfaceGrip: number, dt: number): number {
     const p = this.phys;
     const u = Math.abs(this.sim.u);
     const g = 9.81;
     const ayLimit = p.tire.mu * Math.max(0.3, surfaceGrip) * g;
-    // v1.4.1 P2-10: a key is all-or-nothing, so its slip-angle allowance on top of the geometric
-    // lock shrinks with speed (0.6 x peak when parking, ~0.35 x at 100 km/h): a full-key flick at
-    // speed asks for about what the fronts can give instead of a yaw spike past the rear's grip.
+    // v1.4.1 P2-10: a key is all-or-nothing, so its slip-angle allowance shrinks with speed.
+    // v1.4.2: a full stick's allowance shrinks with speed too (full peak angle when parking, ~0.7 x
+    // at 110 km/h): a full-stick pendulum flick no longer stacks the fronts' whole peak angle on top
+    // of the geometric lock at speed.
     const speedK = 1 / (1 + u / p.steering.halfLockSpeed);
-    const slipRoom = this.analogInput ? 1.0 : 0.2 + 0.4 * speedK;
+    const slipRoom = this.analogInput ? PAD_SLIP_ROOM_FAST + (1 - PAD_SLIP_ROOM_FAST) * speedK : 0.2 + 0.4 * speedK;
     const gripLock = (p.chassis.wheelbase * ayLimit) / Math.max(1, u * u) + p.tire.peakAngle * slipRoom;
-    const maxNow = Math.min(p.steering.maxAngle, gripLock);
-    let target = this.steerIn * maxNow;
-    // v1.4.1 P2-9: the countersteer helper (keyboard only) acts on a real slide: rears at their peak
-    // and more saturated than the fronts (oversteer, not understeer), with the tail out (sideslip
-    // against the yaw). A plain key release in a fast corner no longer kicks the wheel the other way.
+    let maxNow = Math.min(p.steering.maxAngle, gripLock);
+    if (!this.analogInput) {
+      const kbLock =
+        ((p.chassis.wheelbase + this.kUs * u * u) * KB_LAT_SHARE * ayLimit) / Math.max(1, u * u) + p.tire.peakAngle * KB_SLIP_ROOM * speedK;
+      maxNow = Math.min(maxNow, kbLock);
+    }
+    const driver = this.steerIn * maxNow;
+
+    // --- keyboard countersteer helper (v1.4.2 P2-9) ---
+    const beta = u > 1 ? Math.atan2(this.sim.v, u) : 0;
+    const rate = dt > 0 ? (beta - this.csBeta) / dt : 0;
+    this.csBeta = beta;
+    this.csBetaRate += (rate - this.csBetaRate) * Math.min(1, dt / 0.06);
+    let want = 0;
     if (!this.analogInput && u > 4) {
       const w = this.sim.wheels;
-      const rearSlip = Math.max(w[2].slip, w[3].slip);
-      const frontSlip = Math.max(w[0].slip, w[1].slip);
-      const beta = Math.atan2(this.sim.v, u);
-      const tailOut = beta * this.sim.r < 0 ? Math.abs(beta) : 0;
-      const excess = tailOut - 0.04;
-      if (rearSlip > 0.9 && rearSlip > frontSlip && excess > 0) {
-        target += Math.sign(beta) * excess * 1.6 * (1 - 0.5 * Math.abs(this.steerIn));
+      // axle slip weighted by load: a nearly unloaded inside wheel's big slip number says nothing
+      const axleSlip = (i: number, j: number) => (w[i].slip * w[i].fz + w[j].slip * w[j].fz) / Math.max(1, w[i].fz + w[j].fz);
+      const rearSlip = axleSlip(2, 3);
+      const frontSlip = axleSlip(0, 1);
+      const r = this.sim.r;
+      const tailOut = beta * r < 0 ? Math.abs(beta) : 0;
+      // yaw the driver's steer asks for (bicycle model, capped by grip) vs what the car is doing
+      const rAsk = THREE.MathUtils.clamp((u * driver) / (p.chassis.wheelbase + this.kUs * u * u), -ayLimit / u, ayLimit / u);
+      const yawExcess = r * rAsk >= 0 ? Math.abs(r) - Math.abs(rAsk) : Math.abs(r);
+      // sideslip growing away from the yaw (tail swinging further out), rad/s
+      const growing = -Math.sign(r) * this.csBetaRate;
+      if (rearSlip > 1 && rearSlip > frontSlip && tailOut > 0.05 && yawExcess > 0.08 && growing > 0.1) {
+        want = Math.sign(beta) * Math.min(p.steering.maxAngle, (tailOut - 0.03) * 1.6);
+      } else if (this.csAmt !== 0 && tailOut > 0.03 && Math.sign(this.csAmt) === Math.sign(beta) && growing > -0.05) {
+        // a slide being held: keep what is applied (don't snap back mid-catch)
+        want = Math.sign(this.csAmt) * Math.min(Math.abs(this.csAmt), (tailOut - 0.03) * 1.6);
       }
     }
+    // ramp: wind on at ~2.5 x lock/s, release at ~4 x lock/s (smooth, no step)
+    const up = Math.abs(want) > Math.abs(this.csAmt) && Math.sign(want) === Math.sign(this.csAmt || want);
+    this.csAmt = approach(this.csAmt, want, p.steering.maxAngle * (up ? 2.5 : 4) * dt);
+    if (Math.abs(this.csAmt) < 1e-5) this.csAmt = 0;
+    const target = driver + this.csAmt * (1 - 0.5 * Math.abs(this.steerIn));
     return THREE.MathUtils.clamp(target, -p.steering.maxAngle, p.steering.maxAngle);
   }
 
@@ -725,6 +776,24 @@ export class Vehicle {
     this.engineRpm = THREE.MathUtils.clamp((rpm - e.idleRpm * 0.9) / (e.redlineRpm - e.idleRpm * 0.9), 0, 1);
     this.boost = this.powertrain.boost;
   }
+  /**
+   * v1.4.2 P2-10: braking force each axle can still take for regen [front, rear] (N): half of what
+   * is left of its tyres' friction circle after the cornering force they carry, so lifting off in a
+   * fast corner never pushes either axle (the rear in particular) past its grip.
+   */
+  private regenAxleCaps(): [number, number] {
+    const w = this.sim.wheels;
+    const mu = this.phys.tire.mu * Math.max(0.3, this.gripNow);
+    const room = (i: number) => {
+      const lim = mu * w[i].fz;
+      return Math.sqrt(Math.max(0, lim * lim - w[i].fy * w[i].fy));
+    };
+    this.regenCaps[0] = 0.5 * (room(0) + room(1));
+    this.regenCaps[1] = 0.5 * (room(2) + room(3));
+    return this.regenCaps;
+  }
+  private readonly regenCaps: [number, number] = [0, 0];
+
   /** v1.4.0 M7: front and rear motors straight to their axles (open diffs, equal split). */
   private computeEvDrive(dt: number, throttle: number, direction: number): void {
     const ev = this.ev!;
@@ -737,6 +806,7 @@ export class Vehicle {
       mass: this.phys.chassis.mass,
       wheelRadius: this.phys.tire.radius,
       regenScale: THREE.MathUtils.clamp(1 - (Math.max(...this.sim.wheels.map((w) => w.slip)) - 0.5) / 0.4, 0, 1),
+      regenAxleCapN: this.regenAxleCaps(),
     });
     this.driveTorque[0] = this.driveTorque[1] = out.front / 2;
     this.driveTorque[2] = this.driveTorque[3] = out.rear / 2;

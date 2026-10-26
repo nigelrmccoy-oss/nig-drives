@@ -189,6 +189,10 @@ export class Powertrain {
     const eff = this.spec.gearbox.efficiency;
     const out = this.out;
     const idle = (e.idleRpm * Math.PI) / 30;
+    // v1.4.2: an unlocked converter couples no engine inertia to the wheels (the old value was left
+    // over from the last lock-up)
+    out.wheelTorque = 0;
+    out.wheelInertia = 0;
     if (!inGear || inp.clutchPedal) {
       this.locked = false;
       this.tcShaft = shaftOmega;

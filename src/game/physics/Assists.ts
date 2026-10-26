@@ -28,13 +28,13 @@ const G = 9.81;
 export function understeerGradient(s: PhysicsSpec): number {
   const t = s.tire;
   const B = shapeB(t.C);
-  const axle = (share: number, tyresPerHub = 1): number => {
+  const axle = (share: number, tyresPerHub = 1, peakAngle = t.peakAngle): number => {
     const ratio = Math.min(2, Math.max(0.3, (share * 2) / tyresPerHub)); // tyre load / nominal (fzNominal = m·g/4)
     const mu = t.mu * Math.max(0.6, 1 - t.loadSensitivity * (ratio - 1));
-    return (mu * t.C * B) / (Math.tan(t.peakAngle) * Math.sqrt(ratio));
+    return (mu * t.C * B) / (Math.tan(peakAngle) * Math.sqrt(ratio));
   };
   const fw = s.chassis.frontWeight;
-  return Math.max(0, (1 / axle(fw) - 1 / axle(1 - fw, s.chassis.rearDualTyres ? 2 : 1)) / G);
+  return Math.max(0, (1 / axle(fw) - 1 / axle(1 - fw, s.chassis.rearDualTyres ? 2 : 1, t.peakAngleRear ?? t.peakAngle)) / G);
 }
 
 export class Assists {

@@ -86,6 +86,12 @@ export interface TireSpec {
   peakSlip: number;
   /** Slip angle at peak lateral force (rad). */
   peakAngle: number;
+  /**
+   * v1.4.2: rear-axle peak slip angle when it differs from the front (rad). Rear toe-in, compliance
+   * steer and a stiffer rear tyre setup make the rear axle "stiffer" in cornering, which is how a
+   * rear-heavy car is given stable, mildly understeering handling. Defaults to peakAngle.
+   */
+  peakAngleRear?: number;
   /** Grip loss per unit of load above nominal (μ = mu × (1 − k × (Fz/Fz0 − 1))). */
   loadSensitivity: number;
   /** Rolling resistance coefficient. */
@@ -170,8 +176,11 @@ export interface EvSpec {
   regenDecel: number;
   /** Regen power limit (W). */
   regenMaxPowerW: number;
-  /** Share of regen taken on the front axle (AWD). */
-  regenFrontShare: number;
+  /**
+   * Share of regen taken on the front axle (AWD). v1.4.2: when omitted it follows the motors' rated
+   * power split (front motor power / total), the way the drive units actually share it.
+   */
+  regenFrontShare?: number;
   /** Usable battery energy (kWh) and the state of charge you start with (0–1). */
   batteryKWh: number;
   startSoc: number;

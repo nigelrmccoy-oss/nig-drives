@@ -29,6 +29,11 @@ export interface EvInput {
   wheelRadius: number;
   /** 0–1: the inverter backs regen off when a tyre is sliding (like the real car). */
   regenScale: number;
+  /**
+   * v1.4.2: most braking force (N) regen may put through each axle [front, rear]: what is left of
+   * the axle's friction circle after the cornering force it is carrying. Omitted = no limit.
+   */
+  regenAxleCapN?: readonly [number, number];
 }
 
 export class EvDrive {
@@ -105,16 +110,21 @@ export class EvDrive {
       const fade = Math.min(1, Math.max(0, (inp.speed - 1) / 1.5));
       let force = inp.mass * s.regenDecel * fade * inp.regenScale;
       force = Math.min(force, s.regenMaxPowerW / Math.max(1, inp.speed));
-      const wheelT = force * inp.wheelRadius;
       const hasFront = s.motors.some((m) => m.axle === 'front');
       const hasRear = s.motors.some((m) => m.axle === 'rear');
-      const fShare = hasFront && hasRear ? s.regenFrontShare : hasFront ? 1 : 0;
+      const powerOn = (axle: 'front' | 'rear') => s.motors.filter((m) => m.axle === axle).reduce((a, m) => a + m.maxPowerW, 0);
+      const fShare = hasFront && hasRear ? (s.regenFrontShare ?? powerOn('front') / (powerOn('front') + powerOn('rear'))) : hasFront ? 1 : 0;
+      const cap = inp.regenAxleCapN;
+      const axleForce = {
+        front: Math.min(force * fShare, cap ? cap[0] : Infinity),
+        rear: Math.min(force * (1 - fShare), cap ? cap[1] : Infinity),
+      };
       for (let i = 0; i < s.motors.length; i++) {
         const m = s.motors[i];
-        const share = m.axle === 'front' ? fShare : 1 - fShare;
         const nSame = s.motors.filter((x) => x.axle === m.axle).length;
-        targets[i] = (-(wheelT * share) / nSame) * (s.efficiency / s.reduction);
+        targets[i] = (-(axleForce[m.axle] * inp.wheelRadius) / nSame) * (s.efficiency / s.reduction);
       }
+      force = axleForce.front + axleForce.rear;
       this.regenPowerW = force * inp.speed;
     }
 
