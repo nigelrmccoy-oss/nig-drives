@@ -1,7 +1,7 @@
 {
   "name": "nig-drives",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.5.0-a",
   "description": "Nig Drives — OSM 3D driving game (Vite + Three.js + Electron)",
   "author": "Nigel McCoy",
   "type": "module",

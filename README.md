@@ -9,6 +9,26 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ## Changelog
 
+### v1.5.0a (package 1.5.0-a) — accurate terrain and roads
+
+- **Highest-resolution terrain.** Toronto, Hamilton/Lake Shore and Kitchener-Waterloo now use the
+  NRCan HRDEM 1 m DTM (CanElevation, Open Government Licence - Canada), baked to ~1.7 m/px Web
+  Mercator tiles by `scripts/bake-dem.py` into the gitignored `public/dem/`. Everywhere else, and
+  wherever the pack has gaps (lakes, no-data), it falls back to Terrarium z14 as before.
+- **Roads sit on the terrain.** The ground is carved to a flat platform under each road, then
+  battered out to the real DEM (cut/fill slopes), so roads neither float nor bury. Physics and the
+  drawn mesh share the same cross-section, so what you see is what you drive on.
+- **True road widths** from OSM `width`, `lanes`, parking and cycle-lane tags, with class defaults.
+- **Kerbs, sidewalks and shoulders** (flush shoulder on rural roads), interrupted at junctions.
+- **Barriers.** OSM guard rails, jersey barriers, walls and cable barriers are drawn and solid;
+  overpass barriers do not stop cars underneath.
+- **Off-road grip.** Kerb and sidewalk behave as concrete, shoulders per `shoulder:surface`, rural
+  verges as gravel, farmland/forest as dirt, everything else as grass, with ~0.6 m transitions.
+- Near terrain ring is finer (about 3 m cells). Overpass cache key bumped to `v150:`.
+- Known limits: the hi-res pack is fetched with `fetch`, so it needs http (dev server), not
+  Electron `file://` (falls back to Terrarium); US cities have no HRDEM; Cesium World Terrain
+  fallback is not wired in yet.
+
 ### v1.4.2 (package 1.4.2) — Code Critic's v1.4.1 findings
 
 - **No kick when you let go of a key.** Keyboard steering at speed now asks for about 0.8 of the
