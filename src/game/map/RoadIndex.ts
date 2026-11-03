@@ -48,7 +48,7 @@ export class RoadIndex {
         const a = pts[i];
         const b = pts[i + 1];
         if (!Number.isFinite(a.x + a.z + b.x + b.z)) continue;
-        const pad = (line.width ?? 6) * 0.5;
+        const pad = (line.width ?? 6) * 0.5 + (line.spec ? Math.max(line.spec.extent[0], line.spec.extent[1]) : 0);
         const minX = Math.floor((Math.min(a.x, b.x) - pad) / CELL);
         const maxX = Math.floor((Math.max(a.x, b.x) + pad) / CELL);
         const minZ = Math.floor((Math.min(a.z, b.z) - pad) / CELL);
@@ -123,6 +123,8 @@ export class RoadIndex {
     radius: number,
     filter?: (line: RoadCenterline) => boolean,
     preferY?: number,
+    /** v1.5.0a: rank by distance past the road edge, so a point on a wide road isn't claimed by a nearer-centred narrow one. */
+    byEdge = false,
   ): NearestSeg | null {
     let best: NearestSeg | null = null;
     let bestScore = Infinity;
@@ -143,6 +145,11 @@ export class RoadIndex {
       if (d2 > r2) return;
       const y = a.y + (b.y - a.y) * t;
       let score = d2;
+      if (byEdge) {
+        const hw = (ref.line.width ?? 6) * 0.5;
+        const e = Math.sqrt(d2) - hw;
+        score = e < 0 ? -1e4 + (Math.sqrt(d2) / hw) * 100 : e * e;
+      }
       if (preferY !== undefined && Number.isFinite(preferY)) {
         const dy = Math.abs(y - preferY);
         if (dy > 2.5) score += (dy - 2.5) * (dy - 2.5) * 40 + 400;
