@@ -101,14 +101,14 @@ export class HUD {
         <div class="controls-hint">
           W/↑ accel · S/↓ brake/reverse · A/D steer · Space brake · C camera<br/>
           G auto P-R-N-D · Q/E shift · 1–6/N/B H-pattern · Shift clutch<br/>
-          R weather · T time · P pause clock · F1 assists on/off · F2 Telemetry+<br/>
+          R weather · T time · P pause clock · I satellite ground (needs key) · F1 assists on/off · F2 Telemetry+<br/>
           Gamepad: stick steer · RT/LT throttle/brake · LB/RB shift · B reverse · X clutch · Y camera
         </div>
         <div class="status-toast" id="hud-status">Loading map…</div>
       </div>
       <div class="pause-banner" id="hud-paused" hidden>PAUSED</div>
       <div class="fps-counter" id="hud-fps">— FPS</div>
-      <div class="osm-badge">© OpenStreetMap · Overpass · NRCan HRDEM (OGL-Canada) · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG · v1.5.0a</div>
+      <div class="osm-badge">© OpenStreetMap · Overpass · NRCan HRDEM (OGL-Canada) · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG<span id="hud-sat-attr"></span> · v1.5.0b</div>
     `;
     parent.appendChild(this.root);
     this.speedEl = this.root.querySelector('#hud-speed')!;
@@ -214,6 +214,12 @@ export class HUD {
     const v = Number.isFinite(fps) ? Math.round(fps) : 0;
     this.fpsEl.textContent = `${v} FPS · ${qualityLabel}`;
     this.fpsEl.classList.toggle('low', v < 45);
+  }
+
+  /** v1.5.0b: imagery credit shown while the satellite ground is on (empty hides it). */
+  setImageryAttribution(text: string): void {
+    const el = this.root.querySelector('#hud-sat-attr');
+    if (el) el.textContent = text ? ' · ' + text : '';
   }
 
   setStatus(msg: string): void {

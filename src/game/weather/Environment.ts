@@ -42,6 +42,8 @@ void main() {
 
 export class Environment {
   weather: WeatherPreset = 'clear';
+  /** v1.5.0b: fog-distance scale from the quality preset. */
+  private drawDistance = 1;
   /** 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset */
   timeOfDay = 0.35;
   timePaused = false;
@@ -269,6 +271,11 @@ export class Environment {
     return 0.15 + (1 - this._night) * 0.4;
   }
 
+  /** v1.5.0b: draw distance scale (fog near/far) from the quality preset. */
+  setDrawDistance(s: number): void {
+    this.drawDistance = Math.max(0.3, Math.min(1, s));
+  }
+
   /** v1.3.2 quality presets. */
   setShadowMapSize(size: number): void {
     if (this.sun.shadow.mapSize.x === size) return;
@@ -339,8 +346,11 @@ export class Environment {
     } else if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.color.copy(horizon);
       // v1.3.2: pushed out so the next hill and the distant skyline read (was 180→980 m)
-      this.scene.fog.near = this.weather === 'snow' ? 90 : this.weather === 'rain' ? 150 : 350;
-      this.scene.fog.far = this.weather === 'snow' ? 900 : this.weather === 'rain' ? 1600 : 7000;
+      // v1.5.0b: clear air reaches the far ring edge (8 km) so crests and skyline read at full distance;
+      // the preset's draw distance only scales clear weather (rain / snow stay short for mood).
+      const dd = this.weather === 'clear' ? this.drawDistance : 1;
+      this.scene.fog.near = this.weather === 'snow' ? 90 : this.weather === 'rain' ? 150 : 450 * dd;
+      this.scene.fog.far = this.weather === 'snow' ? 900 : this.weather === 'rain' ? 1600 : 8200 * dd;
     }
 
     // v1.3.2: lower ambient so photo textures keep their contrast; sun carries the scene

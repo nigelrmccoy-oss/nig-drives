@@ -9,6 +9,23 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ## Changelog
 
+### v1.5.0b (package 1.5.0-b) — sight lines
+
+- **Draw distance.** Clear-air fog now runs 450 m to 8.2 km, so the 16 km far terrain ring and skyline
+  read at full distance; each graphics preset scales it (Low 55 %, Medium 80 %, High 100 %). Rain and
+  snow keep their short fog.
+- **Hill-crest culling.** Tiles two or more away whose centre and four quadrant points all sit behind
+  terrain from the driver's eye are hidden (re-checked every 0.4 s), so the GPU skips roads and
+  buildings you cannot see. Nothing visible changes; the depth buffer already hid them.
+- **Chase camera and walls.** The chase lens slides toward the car instead of sitting inside a building.
+- **Cockpit camera (C).** Wider 74 degree view and a close near plane inside the car; chase stays at 58 degrees.
+- **Optional satellite ground (I).** With `VITE_CESIUM_ION_TOKEN` in `.env.local`, press I to drape
+  Bing Aerial imagery (no labels; labelled styles are refused) over the near terrain via Cesium ion.
+  Credit is shown in the footer badge while it is on. Without a key nothing changes: the ground keeps
+  its procedural photo textures. Roads and kerbs are still drawn from OSM on top of the imagery.
+- Known limits: imagery licence follows Cesium ion / Bing terms (off by default; personal use); the
+  imagery window is z17 (~0.9 m/px) and rebuilds when you drive 350 m off centre.
+
 ### v1.5.0a (package 1.5.0-a) — accurate terrain and roads
 
 - **Highest-resolution terrain.** Toronto, Hamilton/Lake Shore and Kitchener-Waterloo now use the

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SatelliteImagery } from './map/SatelliteImagery';
 import { ChaseCamera } from './camera/ChaseCamera';
 import { getCityById, nearestPlace } from './cities';
 import { Input } from './input/Input';
@@ -85,7 +86,7 @@ export class Game {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87b5e5);
-    this.scene.fog = new THREE.Fog(0x87b5e5, 350, 7000);
+    this.scene.fog = new THREE.Fog(0x87b5e5, 450, 8200);
 
     // v1.3.2: far plane covers the ±8 km far terrain ring (near 0.4 keeps depth precision OK)
     this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.4, 12000);
@@ -161,6 +162,7 @@ export class Game {
     this.post.setSize(window.innerWidth, window.innerHeight, pr);
     this.post.setBloomEnabled(q.bloom);
     this.env.setShadowMapSize(q.shadowMapSize);
+    this.env.setDrawDistance(q.drawDistance);
     this.textures?.setQuality(q);
   }
 
@@ -210,6 +212,7 @@ export class Game {
       this.hud.setStatus(info.message);
     });
     this.chase.setGroundSampler((x, z) => this.tiles!.getHeight(x, z));
+    this.chase.setBlocker((x, z) => this.tiles?.insideBuilding(x, z) ?? false);
     this.chase.reset();
     this.tiles.setTileSwapListener((info) => this.onTileSwap(info));
 
@@ -410,6 +413,7 @@ export class Game {
 
   private clearWorld(): void {
     this.chase.setGroundSampler(null);
+    this.chase.setBlocker(null);
     this.minimap.setVisible(false);
     if (this.vehicle) {
       this.scene.remove(this.vehicle.mesh);
@@ -455,6 +459,16 @@ export class Game {
     if (this.input.consumeCameraToggle()) {
       this.chase.toggle();
       this.hud.setCameraMode(this.chase.mode);
+    }
+    if (this.input.consumeImageryToggle()) {
+      const sat = this.tiles.sat;
+      if (!sat.available) {
+        this.hud.setStatus(SatelliteImagery.token() ? 'Satellite imagery unavailable (offline or key rejected)' : 'Satellite imagery needs VITE_CESIUM_ION_TOKEN in .env.local');
+      } else {
+        sat.setEnabled(!sat.enabled);
+        this.hud.setImageryAttribution(sat.enabled ? sat.attribution : '');
+        this.hud.setStatus(sat.enabled ? 'Satellite ground on (Bing Aerial, no labels)' : 'Satellite ground off');
+      }
     }
     if (this.input.consumeWeatherCycle()) this.cycleWeather();
     if (this.input.consumeTimeCycle()) this.cycleTime();

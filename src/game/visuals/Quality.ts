@@ -23,6 +23,8 @@ export interface QualitySettings {
   /** Second, rotated, larger-scale sample per layer (anti-tiling). */
   antiTile: boolean;
   anisotropy: number;
+  /** v1.5.0b: scales how far the fog lets you see (1 = full 8 km far ring). */
+  drawDistance: number;
   /** Bloom pass (headlight/window glow). SMAA stays on at every level. */
   bloom: boolean;
 }
@@ -40,6 +42,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     arm: false,
     antiTile: false,
     anisotropy: 2,
+    drawDistance: 0.55,
     bloom: false,
   },
   medium: {
@@ -54,6 +57,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     arm: false,
     antiTile: true,
     anisotropy: 4,
+    drawDistance: 0.8,
     bloom: true,
   },
   high: {
@@ -68,6 +72,7 @@ export const QUALITY: Record<QualityLevel, QualitySettings> = {
     arm: true,
     antiTile: true,
     anisotropy: 8,
+    drawDistance: 1,
     bloom: true,
   },
 };

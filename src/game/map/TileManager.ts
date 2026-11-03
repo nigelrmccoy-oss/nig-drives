@@ -26,9 +26,12 @@ import { inGap } from './RoadStrips';
 import type { ProfileEnv } from './RoadProfile';
 import { TerrainRing, WaterPlane, type RingConfig, type RingSample } from './Terrain';
 import { createTerrainMaterial, type TerrainMaterialHandle } from '../visuals/TerrainMaterial';
+import { SatelliteImagery } from './SatelliteImagery';
 import type { TextureLibrary } from '../visuals/TextureLibrary';
 import { QUALITY, type QualitySettings } from '../visuals/Quality';
 
+/** v1.5.0b: tile-local (u, v) probe points for hill-crest culling (centre + quadrant centres). */
+const CULL_PROBES: Array<[number, number]> = [[0.5, 0.5], [0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]];
 const LOAD_RADIUS = 2;
 const UNLOAD_RADIUS = 4;
 /** Car height blends from road centreline to ground within this distance of a road. */
@@ -190,6 +193,8 @@ export class TileManager {
   private junctionRegistry = new Map<string, { y: number; provisional: boolean }>();
   private rings: TerrainRing[] = [];
   private ringMats: TerrainMaterialHandle[] = [];
+  /** v1.5.0b: optional satellite imagery on the near ring (off unless a Cesium ion token is set and it is switched on). */
+  readonly sat = new SatelliteImagery();
   private water = new WaterPlane();
   /** Relative height of the sea / Great Lake surface (water plane). */
   private seaRel = -1e6;
@@ -285,6 +290,7 @@ export class TileManager {
         polygonOffsetFactor: 2 + i * 3,
         name: `terrain-${cfg.name}`,
         variant: i === 0 ? 'near' : 'far',
+        sat: i === 0 ? this.sat.uniforms : undefined,
       });
       this.ringMats.push(handle);
       const ringCfg = i === 0 ? { ...cfg, res: quality.nearRingRes } : cfg;
@@ -776,6 +782,7 @@ export class TileManager {
       if (this.disposed) return;
     }
 
+    void this.sat.init(this.origin); // v1.5.0b: no token / failure leaves it off
     const { tx, ty } = latLonToTile(this.origin.lat, this.origin.lon);
     this.emitStatus(
       this.forceOffline
@@ -902,8 +909,82 @@ export class TileManager {
     this.water.setTime(this.waterTime);
     this.waterMap.evict(playerX, playerZ);
     this.updateTerrain(playerX, playerZ);
+    this.updateSightCulling(playerX, playerZ, tx, ty);
+    this.sat.update(playerX, playerZ);
     this.water.mesh.position.x = playerX;
     this.water.mesh.position.z = playerZ;
+  }
+
+  /** v1.5.0b: tile groups hidden because a hill crest sits between the eye and the whole tile. */
+  private cullClock = 0;
+  culledTiles = 0;
+  /** Set false to turn the hill-crest culling off (benchmarks, debugging). */
+  sightCulling = true;
+
+  /**
+   * v1.5.0b hill-crest occlusion. Tiles at least 2 away whose centre and four quadrant points all sit
+   * behind terrain (ray from the eye to a point 35 m above the local ground clears the terrain by less
+   * than -2 m somewhere along the way) are hidden: roads, buildings and labels there cannot be seen,
+   * so the GPU skips them. The depth buffer already hides them visually, so this is pure savings.
+   * Re-checked every ~0.4 s; a tile re-appears as soon as any probe has a clear line.
+   */
+  private updateSightCulling(px: number, pz: number, tx: number, ty: number): void {
+    const now = performance.now();
+    if (now - this.cullClock < 400) return;
+    this.cullClock = now;
+    const eyeY = this.groundHeight(px, pz) + 2.5;
+    let culled = 0;
+    for (const e of this.tiles.values()) {
+      if (e.key === 'fallback' || e.loading) continue;
+      const far = Math.max(Math.abs(e.tx - tx), Math.abs(e.ty - ty)) >= 2;
+      let hide = false;
+      if (far && this.sightCulling) {
+        const b = tileBounds(e.tx, e.ty);
+        hide = true;
+        for (const [fu, fv] of CULL_PROBES) {
+          const c = this.origin.toLocal(b.south + (b.north - b.south) * fv, b.west + (b.east - b.west) * fu);
+          const ty0 = this.groundHeight(c.x, c.z) + 35;
+          let clear = true;
+          for (let s = 1; s <= 10; s++) {
+            const f = s / 11;
+            const x = px + (c.x - px) * f;
+            const z = pz + (c.z - pz) * f;
+            if (this.groundHeight(x, z) > eyeY + (ty0 - eyeY) * f + 2) {
+              clear = false;
+              break;
+            }
+          }
+          if (clear) {
+            hide = false;
+            break;
+          }
+        }
+      }
+      if (e.group.visible === hide) e.group.visible = !hide;
+      if (hide) culled++;
+    }
+    this.culledTiles = culled;
+  }
+
+  /** v1.5.0b: is (x, z) inside a solid building footprint? (chase-camera wall check) */
+  insideBuilding(x: number, z: number): boolean {
+    const ll = this.origin.toLatLon(x, z);
+    const { tx, ty } = latLonToTile(ll.lat, ll.lon);
+    for (const e of this.tiles.values()) {
+      if (!e.footprints || (e.key !== 'fallback' && Math.max(Math.abs(e.tx - tx), Math.abs(e.ty - ty)) > 1)) continue;
+      for (const f of e.footprints) {
+        if (f.y !== undefined || x < f.minX || x > f.maxX || z < f.minZ || z > f.maxZ) continue;
+        const pts = f.pts;
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const a = pts[j];
+          const c = pts[i];
+          if (a.z > z !== c.z > z && x < ((c.x - a.x) * (z - a.z)) / (c.z - a.z) + a.x) inside = !inside;
+        }
+        if (inside) return true;
+      }
+    }
+    return false;
   }
 
   private unloadTile(key: string, entry: TileEntry): void {
@@ -2085,6 +2166,7 @@ export class TileManager {
       ring.dispose();
     }
     this.rings = [];
+    this.sat.dispose();
     this.unsubTextures?.();
     this.unsubTextures = null;
     for (const m of this.ringMats) m.material.dispose();

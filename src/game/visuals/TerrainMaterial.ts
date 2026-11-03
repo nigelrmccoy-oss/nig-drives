@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { QualitySettings } from './Quality';
 import type { TerrainArrays } from './TextureLibrary';
+import type { SatUniforms } from './../map/SatelliteImagery';
 import { NIG_NOISE_GLSL, WATER_RIPPLE_GLSL } from './ShaderChunks';
 
 /**
@@ -31,6 +32,8 @@ export function createTerrainMaterial(opts: {
   polygonOffsetFactor: number;
   name: string;
   variant: TerrainVariant;
+  /** v1.5.0b: optional satellite imagery uniforms (near ring only). */
+  sat?: SatUniforms;
 }): TerrainMaterialHandle {
   const inner = new THREE.Vector4(0, 0, 0, 0);
   const uniforms = {
@@ -42,6 +45,7 @@ export function createTerrainMaterial(opts: {
     uSnow: { value: 0 },
     uWet: { value: 0 },
     uTime: { value: 0 },
+    ...(opts.sat ?? {}),
   };
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -100,6 +104,11 @@ uniform vec4 uTile;
 uniform float uSnow;
 uniform float uWet;
 uniform float uTime;
+#ifdef NIG_SAT
+uniform sampler2D uSat;
+uniform vec4 uSatA;
+uniform float uSatMix;
+#endif
 varying vec3 vNigWPos;
 varying vec3 vNigWNormal;
 varying vec4 vNigSplat;
@@ -176,6 +185,15 @@ float nWat = smoothstep(0.42, 0.56, vNigSplat.z);
 float nShore = smoothstep(0.15, 0.45, vNigSplat.z) * (1.0 - nWat);
 nAlbedo = mix(nAlbedo, nAlbedo * vec3(0.6, 0.58, 0.52), nShore);
 nAlbedo = mix(nAlbedo, vec3(0.045, 0.085, 0.10), nWat);
+#ifdef NIG_SAT
+if (uSatMix > 0.0) {
+  vec2 suv = vec2(uSatA.x + uSatA.y * nWp.x, uSatA.z + uSatA.w * nWp.z);
+  vec2 se = min(suv, 1.0 - suv);
+  float sEdge = smoothstep(0.0, 0.06, min(se.x, se.y));
+  vec3 sCol = texture2D(uSat, suv).rgb;
+  nAlbedo = mix(nAlbedo, sCol * mix(0.92, 1.08, nMacro), uSatMix * sEdge * (1.0 - nWat));
+}
+#endif
 diffuseColor.rgb *= nAlbedo;
 `,
       )
@@ -242,6 +260,7 @@ roughnessFactor = mix(roughnessFactor, mix(0.05, 0.2, smoothstep(120.0, 700.0, l
         uniforms.uArm.value = arrays.arm;
         defs.NIG_SPLAT = '';
         if (opts.variant === 'near') {
+          if (opts.sat) defs.NIG_SAT = '';
           if (q.antiTile) defs.NIG_ANTITILE = '';
           if (q.triplanar) defs.NIG_TRIPLANAR = '';
           if (q.normals) defs.NIG_NORMALS = '';

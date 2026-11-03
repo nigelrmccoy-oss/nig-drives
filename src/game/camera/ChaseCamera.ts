@@ -18,6 +18,17 @@ export class ChaseCamera {
     this.camera = camera;
   }
 
+  /** v1.5.0b: true when a point is inside a solid building footprint (the lens must not sit in a wall). */
+  private blocked: ((x: number, z: number) => boolean) | null = null;
+  /** v1.5.0b: chase fov / cockpit fov (a wider view inside the car, like a real driver's field of view). */
+  static readonly FOV_CHASE = 58;
+  static readonly FOV_COCKPIT = 74;
+  private fov = ChaseCamera.FOV_CHASE;
+
+  setBlocker(fn: ((x: number, z: number) => boolean) | null): void {
+    this.blocked = fn;
+  }
+
   setGroundSampler(fn: ((x: number, z: number) => number) | null): void {
     this.groundAt = fn;
   }
@@ -54,6 +65,22 @@ export class ChaseCamera {
         .addScaledVector(forward, eyeForward)
         .add(new THREE.Vector3(0, eyeHeight, 0));
       desiredLook = desiredPos.clone().addScaledVector(forward, 20);
+    }
+
+    // v1.5.0b: the chase lens slides toward the car until it is out of any building it would sit in
+    if (this.mode === 'chase' && this.blocked && this.blocked(desiredPos.x, desiredPos.z)) {
+      const fx = vehicle.position.x;
+      const fy = vehicle.position.y + spec.cameraHeight * 0.6;
+      const fz = vehicle.position.z;
+      for (let s = 0.85; s >= 0.2; s -= 0.15) {
+        const px = fx + (desiredPos.x - fx) * s;
+        const pz = fz + (desiredPos.z - fz) * s;
+        if (!this.blocked(px, pz)) {
+          desiredPos.set(px, fy + (desiredPos.y - fy) * s, pz);
+          break;
+        }
+        if (s < 0.3) desiredPos.set(px, fy + (desiredPos.y - fy) * s, pz);
+      }
     }
 
     // Keep camera from clipping into hills / ground
@@ -108,6 +135,14 @@ export class ChaseCamera {
 
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentLook);
+    // v1.5.0b: cockpit uses a wider fov and a closer near plane (dash / windscreen are centimetres away)
+    const wantFov = this.mode === 'first' ? ChaseCamera.FOV_COCKPIT : ChaseCamera.FOV_CHASE;
+    if (Math.abs(this.fov - wantFov) > 0.01) {
+      this.fov += (wantFov - this.fov) * (1 - Math.exp(-dt * 8));
+      this.camera.fov = this.fov;
+      this.camera.near = this.mode === 'first' ? 0.12 : 0.4;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   reset(): void {

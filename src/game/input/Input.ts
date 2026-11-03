@@ -54,6 +54,7 @@ export class Input implements DriverInput {
   private hGearQueued: number | null = null; // 0=N, -1=R, 1..6
   private assistToggleQueued = false;
   private telemetryPlusQueued = false;
+  private imageryQueued = false;
 
   constructor() {
     window.addEventListener('keydown', this.onKeyDown);
@@ -89,6 +90,7 @@ export class Input implements DriverInput {
       if (k === 'KeyG') this.autoSelectorQueued = true;
       if (k === 'F1') this.assistToggleQueued = true;
       if (k === 'F2') this.telemetryPlusQueued = true;
+      if (k === 'KeyI') this.imageryQueued = true;
       // H-pattern: digits 1–6, KeyN = N, KeyB = reverse (R conflicts with weather)
       if (k === 'Digit1' || k === 'Numpad1') this.hGearQueued = 1;
       if (k === 'Digit2' || k === 'Numpad2') this.hGearQueued = 2;
@@ -199,6 +201,13 @@ export class Input implements DriverInput {
   consumeTelemetryPlus(): boolean {
     const v = this.telemetryPlusQueued;
     this.telemetryPlusQueued = false;
+    return v;
+  }
+
+  /** v1.5.0b: I = satellite imagery on the ground (needs a Cesium ion key). */
+  consumeImageryToggle(): boolean {
+    const v = this.imageryQueued;
+    this.imageryQueued = false;
     return v;
   }
 
