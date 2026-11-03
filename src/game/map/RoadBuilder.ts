@@ -13,6 +13,8 @@ import { profileWays, type ProfileEnv, type ProfiledWay, type RoadStructure } fr
 import { makeEdgeLineTexture, makeLaneTexture, makeRoadMaps, type SurfaceMaps } from '../visuals/Textures';
 import type { RoadSetName, TextureLibrary } from '../visuals/TextureLibrary';
 import { NIG_NOISE_GLSL } from '../visuals/ShaderChunks';
+import { KERB_RAMP, resolveRoadSpec, type RoadSpec } from './RoadSpec';
+import { buildStrip, type RoadGap } from './RoadStrips';
 
 /** Photo texture set + tint + metres-per-repeat for each OSM surface kind. */
 const PHOTO_BY_KIND: Partial<Record<SurfaceKind, { set: RoadSetName; tint: number }>> = {
@@ -47,6 +49,11 @@ const MAX_WAY_VERTS = 400;
 /** Yield to event loop every N ways when building large tiles. */
 const YIELD_EVERY = 24;
 
+interface BatchCtx {
+  specs: Map<OsmWay, RoadSpec>;
+  gapsByWay: Map<OsmWay, RoadGap[]>;
+}
+
 export interface RoadCenterPoint {
   x: number;
   y: number;
@@ -65,33 +72,10 @@ export interface RoadCenterline {
   /** v1.3.2: OSM bridge / tunnel runs are level-interpolated and not carved into terrain. */
   structure: RoadStructure;
   layer: number;
-}
-
-/**
- * Total carriageway widths (meters). Aimed at ~3.0–3.5 m lanes so a ~1.8 m Golf
- * sits naturally (was visually oversized vs the hatch).
- */
-const WIDTH_BY_HIGHWAY: Record<string, number> = {
-  motorway: 13.5, // ~4 × 3.4 m
-  trunk: 10.5, // ~3 × 3.5 m
-  primary: 7.2, // 2 × 3.5 m + margin
-  secondary: 7.0,
-  tertiary: 6.6,
-  unclassified: 6.2,
-  residential: 6.4, // 2 × ~3.2 m
-  living_street: 5.4,
-  service: 3.8,
-  track: 3.2,
-  motorway_link: 5.5,
-  trunk_link: 5.2,
-  primary_link: 5.0,
-  secondary_link: 4.8,
-  tertiary_link: 4.6,
-};
-
-function roadWidth(highway: string | undefined): number {
-  if (!highway) return 6;
-  return WIDTH_BY_HIGHWAY[highway] ?? 6;
+  /** v1.5.0a: real cross-section (width from lanes/width tags, kerb, shoulder, sidewalk). */
+  spec: RoadSpec;
+  /** v1.5.0a: junction mouths where kerbs / sidewalks are interrupted (local metres). */
+  gaps?: RoadGap[];
 }
 
 function finiteY(y: number): number {
@@ -530,11 +514,12 @@ roughnessFactor = mix(roughnessFactor, 0.08, nigPuddle);`,
     env: ProfileEnv,
   ): Promise<{ group: THREE.Group; centerlines: RoadCenterline[] }> {
     const profiled = profileWays(ways, env);
+    const ctx = this.prepare(ways, env);
     const acc = this.newAccumulator();
     let processed = 0;
     for (const pw of profiled) {
       if (this.disposed) break;
-      this.addWay(pw, acc);
+      this.addWay(pw, acc, ctx);
       processed++;
       if (processed % YIELD_EVERY === 0) await yieldFrame();
     }
@@ -547,9 +532,58 @@ roughnessFactor = mix(roughnessFactor, 0.08, nigPuddle);`,
       w.tags.surface ? w : { ...w, tags: { ...w.tags, surface: 'asphalt' } },
     );
     const profiled = profileWays(fixed, env);
+    const ctx = this.prepare(fixed, env);
     const acc = this.newAccumulator();
-    for (const pw of profiled) this.addWay(pw, acc);
+    for (const pw of profiled) this.addWay(pw, acc, ctx);
     return this.finish(acc);
+  }
+
+  /** v1.5.0a: per-way cross-section specs + junction gaps for this batch. */
+  private prepare(ways: OsmWay[], env: ProfileEnv): BatchCtx {
+    const specs = new Map<OsmWay, RoadSpec>();
+    const gapsByWay = new Map<OsmWay, RoadGap[]>();
+    const inc = new Map<string, { n: number; r: number }>();
+    const ownKeys = new Map<OsmWay, string[]>();
+    for (const w of ways) {
+      const sp = resolveRoadSpec(w.tags);
+      specs.set(w, sp);
+      if (w.tags.highway === undefined) continue;
+      const r = sp.width * 0.5 + Math.max(sp.extent[0], sp.extent[1]) + 1.0;
+      const keys: string[] = [];
+      const g = w.geometry;
+      const seen = new Set<string>();
+      for (let i = 0; i < g.length; i++) {
+        const k = `${Math.round(g[i].lat * 1e6)},${Math.round(g[i].lon * 1e6)}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        // an interior node is passed through (counts 2), an end counts 1
+        const add = i === 0 || i === g.length - 1 ? 1 : 2;
+        const e = inc.get(k);
+        if (e) {
+          e.n += add;
+          e.r = Math.max(e.r, r);
+        } else inc.set(k, { n: add, r });
+        keys.push(k);
+      }
+      ownKeys.set(w, keys);
+    }
+    for (const w of ways) {
+      const keys = ownKeys.get(w);
+      if (!keys) continue;
+      const sp = specs.get(w)!;
+      if (!sp.kerb) continue;
+      const list: RoadGap[] = [];
+      const g = w.geometry;
+      for (let i = 0; i < g.length; i++) {
+        const k = `${Math.round(g[i].lat * 1e6)},${Math.round(g[i].lon * 1e6)}`;
+        const e = inc.get(k);
+        if (!e || e.n < 3) continue;
+        const p = env.origin.toLocal(g[i].lat, g[i].lon);
+        list.push({ x: p.x, z: p.z, r2: e.r * e.r });
+      }
+      if (list.length) gapsByWay.set(w, list);
+    }
+    return { specs, gapsByWay };
   }
 
   private newAccumulator(): RoadAccumulator {
@@ -563,14 +597,16 @@ roughnessFactor = mix(roughnessFactor, 0.08, nigPuddle);`,
     };
   }
 
-  private addWay(pw: ProfiledWay, acc: RoadAccumulator): void {
+  private addWay(pw: ProfiledWay, acc: RoadAccumulator, ctx: BatchCtx): void {
     const way = pw.way;
     const highway = way.tags.highway ?? 'residential';
     const profile = resolveSurfaceProfile(way.tags);
     if (!way.tags.surface && !way.tags.highway) Object.assign(profile, defaultAsphaltProfile());
     this.ensureMat(profile.kind);
 
-    const width = roadWidth(highway);
+    const spec = ctx.specs.get(way) ?? resolveRoadSpec(way.tags);
+    const width = spec.width;
+    const gaps = ctx.gapsByWay.get(way);
     const pts: THREE.Vector3[] = [];
     const clPoints: RoadCenterPoint[] = [];
     for (const p of pw.points) {
@@ -589,6 +625,8 @@ roughnessFactor = mix(roughnessFactor, 0.08, nigPuddle);`,
         width,
         structure: pw.structure,
         layer: pw.layer,
+        spec,
+        gaps,
       });
     }
     // Tunnels: keep the centreline for driving/minimap, but no ribbon over the hill
@@ -611,14 +649,30 @@ roughnessFactor = mix(roughnessFactor, 0.08, nigPuddle);`,
     }
 
     const paved = profile.kind === 'asphalt' || profile.kind === 'concrete' || profile.kind === 'unknown';
-    // Visible curbs along paved road edges (raised edge strips)
-    if (paved && width >= 4.2) {
+    // v1.5.0a cross-section: flush shoulders (rural) or raised kerb + sidewalk (urban),
+    // on ground roads only; the same numbers drive the terrain carve and the wheels.
+    if (pw.structure === 'ground') {
       const half = width / 2;
-      const curbW = 0.28;
-      const left = buildOffsetRibbonGeometry(cleaned, -(half + curbW * 0.35), curbW, ROAD_Y_BIAS + 0.04, 0.06, true);
-      const right = buildOffsetRibbonGeometry(cleaned, half + curbW * 0.35, curbW, ROAD_Y_BIAS + 0.04, 0.06, true);
-      if (left) acc.curbGeos.push(left);
-      if (right) acc.curbGeos.push(right);
+      for (const side of [0, 1] as const) {
+        if (spec.kerb) {
+          const face = buildStrip(cleaned, side, half, half + KERB_RAMP, 0, spec.kerbH, ROAD_Y_BIAS, gaps);
+          if (face) acc.curbGeos.push(face);
+          const top = buildStrip(cleaned, side, half + KERB_RAMP, half + spec.extent[side], spec.kerbH, spec.kerbH, ROAD_Y_BIAS, gaps);
+          if (top) acc.curbGeos.push(top);
+        } else if (spec.shoulder[side] > 0.1) {
+          const sh = buildStrip(cleaned, side, half, half + spec.shoulder[side], 0, 0, ROAD_Y_BIAS, undefined);
+          if (sh) {
+            const k: SurfaceKind = spec.shoulderKind === 'gravel' ? 'gravel' : spec.shoulderKind === 'grass' ? 'grass' : profile.kind;
+            this.ensureMat(k);
+            let l = acc.geosByKind.get(k);
+            if (!l) {
+              l = [];
+              acc.geosByKind.set(k, l);
+            }
+            l.push(sh);
+          }
+        }
+      }
     }
 
     const asphalt = buildRibbonGeometry(cleaned, width, ROAD_Y_BIAS, true);
