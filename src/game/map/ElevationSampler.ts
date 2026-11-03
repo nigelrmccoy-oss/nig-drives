@@ -10,6 +10,11 @@
  *         "last known height" plateaus), Float32 height cache with numeric
  *         keys, configurable zoom, and a tile-loaded listener so roads and
  *         buildings can be re-heighted when late tiles arrive.
+ * v1.5.0a: optional high-res layer (`hires`): baked Canada HRDEM 1 m LiDAR DTM
+ *         tiles (z16, ~1.7 m/px, Terrarium-encoded, scripts/bake-dem.py) on top
+ *         of the Terrarium tiles. Where a baked tile or pixel does not exist
+ *         (outside the baked areas, lakes, no LiDAR, no files at all) the
+ *         sample falls back to Terrarium, so a missing pack changes nothing.
  */
 
 const TILE_URL =
@@ -50,6 +55,25 @@ function decodeTerrarium(r: number, g: number, b: number): number {
 
 export type DemTileListener = (zoom: number, tx: number, ty: number) => void;
 
+export interface HiResOptions {
+  zoom: number;
+  maxTiles: number;
+  /** Tile URL template, {z}/{x}/{y}. Default `<BASE_URL>dem/{z}/{x}/{y}.png`. */
+  urlTemplate?: string;
+  /** Coverage index written by scripts/bake-dem.py. Default `<BASE_URL>dem/index.json`. */
+  indexUrl?: string;
+}
+
+/** y -> sorted [x0, x1] runs of baked tiles. */
+type DemCoverage = Map<number, Array<[number, number]>>;
+
+/** "No data here" (as opposed to null = "not loaded yet"). */
+const NODATA = Number.NaN;
+
+function baseUrl(): string {
+  return (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? './';
+}
+
 export class ElevationSampler {
   readonly zoom: number;
   private readonly maxTiles: number;
@@ -59,10 +83,83 @@ export class ElevationSampler {
   private ctx: CanvasRenderingContext2D | null = null;
   private listeners = new Set<DemTileListener>();
   private disposed = false;
+  /** v1.5.0a: baked high-res layer (only on the near sampler). */
+  private hr: ElevationSampler | null = null;
+  /** v1.5.0a: set on a baked layer itself: its URL template (R=G=B=0 pixels are no-data). */
+  private readonly bakedUrl: string | null;
+  private coverage: DemCoverage | null = null;
+  private coverageKnown = true;
+  private coverageReady: Promise<void> = Promise.resolve();
+  /** Samples answered from the baked layer / from Terrarium (QA: demInfo()). */
+  private hrHits = 0;
+  private baseHits = 0;
 
-  constructor(zoom = 12, maxTiles = 64) {
+  constructor(zoom = 12, maxTiles = 64, hires?: HiResOptions, bakedUrl?: string) {
     this.zoom = zoom;
     this.maxTiles = maxTiles;
+    this.bakedUrl = bakedUrl ?? null;
+    if (hires) {
+      const layer = new ElevationSampler(
+        hires.zoom,
+        hires.maxTiles,
+        undefined,
+        hires.urlTemplate ?? `${baseUrl()}dem/{z}/{x}/{y}.png`,
+      );
+      layer.coverageKnown = false;
+      layer.coverageReady = layer.loadCoverage(hires.indexUrl ?? `${baseUrl()}dem/index.json`);
+      layer.onTileLoaded((z, x, y) => {
+        for (const fn of this.listeners) fn(z, x, y);
+      });
+      this.hr = layer;
+    }
+  }
+
+  /** Fetch the baked-tile index. Any failure (no pack, file://) = no baked coverage. */
+  private async loadCoverage(url: string): Promise<void> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4_000);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`index ${res.status}`);
+      const j = (await res.json()) as { zoom?: number; rows?: Record<string, Array<[number, number]>> };
+      if (j.zoom !== this.zoom || !j.rows) throw new Error('index zoom mismatch');
+      const cov: DemCoverage = new Map();
+      for (const [y, runs] of Object.entries(j.rows)) cov.set(Number(y), runs);
+      this.coverage = cov;
+    } catch {
+      this.coverage = new Map();
+    } finally {
+      clearTimeout(timer);
+      this.coverageKnown = true;
+      if (!this.disposed) for (const fn of this.listeners) fn(this.zoom, -1, -1);
+    }
+  }
+
+  private hasBaked(tx: number, ty: number): boolean {
+    const runs = this.coverage?.get(ty);
+    if (!runs) return false;
+    for (const [a, b] of runs) {
+      if (tx >= a && tx <= b) return true;
+      if (tx < a) return false;
+    }
+    return false;
+  }
+
+  /** True when a baked tile pack was found (QA / debug HUD). */
+  hasHiRes(): boolean {
+    return !!this.hr && (this.hr.coverage?.size ?? 0) > 0;
+  }
+
+  /** Which source answered how many samples (QA). */
+  demInfo(): { hiRes: boolean; zoomHiRes: number | null; hrSamples: number; baseSamples: number; hrTiles: number; baseTiles: number } {
+    return {
+      hiRes: this.hasHiRes(),
+      zoomHiRes: this.hr ? this.hr.zoom : null,
+      hrSamples: this.hrHits,
+      baseSamples: this.baseHits,
+      hrTiles: this.hr?.loadedTileCount() ?? 0,
+      baseTiles: this.loadedTileCount(),
+    };
   }
 
   private key(tx: number, ty: number): number {
@@ -95,6 +192,15 @@ export class ElevationSampler {
    */
   sampleAbsolute(lat: number, lon: number): number | null {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (this.hr) {
+      const hi = this.hr.sampleAbsolute(lat, lon);
+      if (hi === null) return null; // baked tile still loading: same "not yet" as a Terrarium tile
+      if (!Number.isNaN(hi)) {
+        this.hrHits++;
+        return hi;
+      }
+      this.baseHits++;
+    }
     const { x, y } = lonLatToTileFrac(lon, lat, this.zoom);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     // Global pixel coordinates; pixel (i, j) covers [i, i+1) so its centre is i + 0.5
@@ -110,6 +216,7 @@ export class ElevationSampler {
     const h01 = this.pixel(px, py + 1);
     const h11 = this.pixel(px + 1, py + 1);
     if (h00 === null || h10 === null || h01 === null || h11 === null) return null;
+    if (h00 !== h00 || h10 !== h10 || h01 !== h01 || h11 !== h11) return NODATA;
 
     const h0 = h00 * (1 - dx) + h10 * dx;
     const h1 = h01 * (1 - dx) + h11 * dx;
@@ -121,9 +228,15 @@ export class ElevationSampler {
   private pixel(gpx: number, gpy: number): number | null {
     const tx = Math.floor(gpx / SIZE);
     const ty = Math.floor(gpy / SIZE);
+    if (this.bakedUrl !== null) {
+      if (!this.coverageKnown) return null;
+      if (!this.hasBaked(tx, ty)) return NODATA;
+    }
     const tile = this.tiles.get(this.key(tx, ty));
     if (!tile || !tile.heights) {
       void this.ensureTile(tx, ty);
+      // a baked tile that failed to load is "no data" (Terrarium answers) until a retry lands
+      if (this.bakedUrl !== null && tile?.failedAt !== undefined && !tile.loading) return NODATA;
       return null;
     }
     tile.lastAccess = performance.now();
@@ -153,9 +266,18 @@ export class ElevationSampler {
 
   /** True when every DEM tile covering the bbox is loaded. */
   isAreaLoaded(south: number, west: number, north: number, east: number): boolean {
+    if (this.hr && !this.hr.isAreaLoaded(south, west, north, east)) return false;
     const r = this.tileRange(south, west, north, east, 0);
     for (let ty = r.minTy; ty <= r.maxTy; ty++) {
       for (let tx = r.minTx; tx <= r.maxTx; tx++) {
+        if (this.bakedUrl !== null) {
+          if (!this.coverageKnown) return false;
+          const t = this.tiles.get(this.key(tx, ty));
+          // not baked, or baked but failed: nothing to wait for
+          if (!this.hasBaked(tx, ty) || (t?.failedAt !== undefined && !t.loading && !t.heights)) continue;
+          if (!t?.heights) return false;
+          continue;
+        }
         if (!this.tiles.get(this.key(tx, ty))?.heights) return false;
       }
     }
@@ -172,8 +294,14 @@ export class ElevationSampler {
   ): Promise<boolean> {
     const r = this.tileRange(south, west, north, east, 0);
     const jobs: Promise<void>[] = [];
+    if (this.hr) jobs.push(this.hr.preloadArea(south, west, north, east, budgetMs).then(() => undefined));
+    if (this.bakedUrl !== null) {
+      await this.coverageReady;
+      if (this.disposed) return true;
+    }
     for (let ty = r.minTy; ty <= r.maxTy; ty++) {
       for (let tx = r.minTx; tx <= r.maxTx; tx++) {
+        if (this.bakedUrl !== null && !this.hasBaked(tx, ty)) continue;
         jobs.push(this.ensureTile(tx, ty, true));
       }
     }
@@ -205,6 +333,10 @@ export class ElevationSampler {
   }
 
   loadedTileCount(): number {
+    return this.countTiles();
+  }
+
+  private countTiles(): number {
     let n = 0;
     for (const t of this.tiles.values()) if (t.heights) n++;
     return n;
@@ -246,7 +378,7 @@ export class ElevationSampler {
     this.tiles.set(key, tile);
     const t = tile;
 
-    const url = TILE_URL.replace('{z}', String(this.zoom))
+    const url = (this.bakedUrl ?? TILE_URL).replace('{z}', String(this.zoom))
       .replace('{x}', String(tx))
       .replace('{y}', String(ty));
 
@@ -274,8 +406,18 @@ export class ElevationSampler {
         bitmap.close();
         const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
         const heights = new Float32Array(SIZE * SIZE);
-        for (let i = 0, j = 0; i < heights.length; i++, j += 4) {
-          heights[i] = decodeTerrarium(data[j], data[j + 1], data[j + 2]);
+        if (this.bakedUrl !== null) {
+          // baked layer: R=G=B=0 marks "no LiDAR DTM here" (water, gaps)
+          for (let i = 0, j = 0; i < heights.length; i++, j += 4) {
+            heights[i] =
+              data[j] === 0 && data[j + 1] === 0 && data[j + 2] === 0
+                ? NODATA
+                : decodeTerrarium(data[j], data[j + 1], data[j + 2]);
+          }
+        } else {
+          for (let i = 0, j = 0; i < heights.length; i++, j += 4) {
+            heights[i] = decodeTerrarium(data[j], data[j + 1], data[j + 2]);
+          }
         }
         t.heights = heights;
         t.failedAt = undefined;
@@ -283,7 +425,7 @@ export class ElevationSampler {
         this.trimCache();
         for (const fn of this.listeners) fn(this.zoom, tx, ty);
       } catch (err) {
-        console.warn('Terrarium tile failed/timeout', this.zoom, tx, ty, err);
+        if (this.bakedUrl === null) console.warn('Terrarium tile failed/timeout', this.zoom, tx, ty, err);
         t.failedAt = performance.now();
       } finally {
         clearTimeout(abortTimer);
@@ -308,6 +450,8 @@ export class ElevationSampler {
   /** Drop cached DEM tiles (call on TileManager dispose). */
   dispose(): void {
     this.disposed = true;
+    this.hr?.dispose();
+    this.hr = null;
     this.tiles.clear();
     this.listeners.clear();
     this.originElev = null;

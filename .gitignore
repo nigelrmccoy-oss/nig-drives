@@ -30,3 +30,6 @@ release
 *.blockmap
 *.AppImage
 .wine-*
+
+# v1.5.0a baked DEM tiles (scripts/bake-dem.py)
+public/dem/

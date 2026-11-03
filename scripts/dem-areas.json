@@ -1,0 +1,9 @@
+{
+  "_note": "Map areas baked to high-res DEM tiles by scripts/bake-dem.py. bbox = [south, west, north, east].",
+  "zoom": 16,
+  "areas": [
+    { "id": "toronto", "bbox": [43.585, -79.520, 43.725, -79.300], "source": "hrdem" },
+    { "id": "lake-shore-west", "bbox": [43.225, -79.900, 43.335, -79.760], "source": "hrdem" },
+    { "id": "kw", "bbox": [43.405, -80.585, 43.510, -80.440], "source": "hrdem" }
+  ]
+}
