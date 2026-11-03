@@ -323,7 +323,7 @@ export class Game {
     if (x < info.minX - m || x > info.maxX + m || z < info.minZ - m || z > info.maxZ + m) return;
     this.lastDry = null;
     const s = tiles.sampleSurface(x, z, v.position.y);
-    const boxed = tiles.pushOutOfBuildings(x, z, CAR_COLLIDE_R, s.roadFactor > 0.5);
+    const boxed = tiles.pushOutOfBuildings(x, z, CAR_COLLIDE_R, s.roadFactor > 0.5, v.position.y);
     const p = tiles.findNearestRoadPoint(x, z);
     const slow = Math.abs(v.speed) < 4;
     if (p && (s.kind === 'water' || boxed || (slow && s.roadFactor <= 0.5))) {
@@ -494,7 +494,7 @@ export class Game {
     this.vehicle.mesh.position.y = h;
     this.updateWater(dt, surface.kind, surface.roadFactor);
     // v1.3.4 P2: push the car out of building walls
-    const push = this.tiles.pushOutOfBuildings(v.position.x, v.position.z, CAR_COLLIDE_R, surface.roadFactor > 0.5);
+    const push = this.tiles.pushOutOfBuildings(v.position.x, v.position.z, CAR_COLLIDE_R, surface.roadFactor > 0.5, v.position.y);
     if (push) {
       v.position.x += push.dx;
       v.position.z += push.dz;

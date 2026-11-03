@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OverpassClient, overpassStats, type OverpassResult } from './OverpassClient';
 import { RoadBuilder, type RoadCenterline } from './RoadBuilder';
 import { BuildingBuilder, type Footprint } from './BuildingBuilder';
+import { buildBarriers } from './BarrierBuilder';
 import { ShoreMask, SHORE_HALF_M, type ShoreClass, type ShoreLines } from './ShoreMask';
 import { loadBundledShore, bundledCovers, bundledShoreLines, bundledInlandNear, type BundledShore } from './BundledShore';
 import type { OsmNode } from './OverpassClient';
@@ -9,11 +10,7 @@ import { WaterMap, assembleRings, type AreaClass, type AreaSample } from './Wate
 import { isWaterTags, type OsmArea } from './OverpassClient';
 import { StreetLabels } from './StreetLabels';
 import { ElevationSampler } from './ElevationSampler';
-import {
-  defaultAsphaltProfile,
-  effectiveGrip,
-  type SurfaceProfile,
-} from './RoadSurface';
+import { effectiveGrip, profileForKind, type SurfaceKind, type SurfaceProfile } from './RoadSurface';
 import {
   GeoOrigin,
   latLonToTile,
@@ -24,6 +21,8 @@ import type { OsmWay } from './OverpassClient';
 import type { WeatherPreset } from '../weather/Environment';
 import { makeTerrainTexture } from '../visuals/Textures';
 import { RoadIndex } from './RoadIndex';
+import { crossSectionDy, stripAt, KERB_RAMP, type RoadSpec } from './RoadSpec';
+import { inGap } from './RoadStrips';
 import type { ProfileEnv } from './RoadProfile';
 import { TerrainRing, WaterPlane, type RingConfig, type RingSample } from './Terrain';
 import { createTerrainMaterial, type TerrainMaterialHandle } from '../visuals/TerrainMaterial';
@@ -35,15 +34,17 @@ const UNLOAD_RADIUS = 4;
 /** Car height blends from road centreline to ground within this distance of a road. */
 const ROAD_HEIGHT_RADIUS = 14;
 /** Terrain under the asphalt sits this far below the road surface (replaces the blanket −0.62 m sink). */
-const CARVE_UNDER_ROAD = 0.14;
+const CARVE_UNDER_ROAD = 0.16;
 /** Flatten this far beyond each road edge (+ ~0.6 grid cell so coarse triangles can't poke through). */
 const CARVE_FLAT_EXTRA = 1.0;
-/** Then blend back to the DEM over this shoulder. */
-const CARVE_SHOULDER = 7;
+/** v1.5.0a: ground rejoins the DEM along a cut/fill batter, reaching at most this far past the platform. */
+const CARVE_BATTER_REACH = 22;
+/** Physics height eases from the road platform to the ground over this distance (m). */
+const EDGE_EASE = 0.6;
 /** Re-carve the near ring at most this often (ms) as new road tiles stream in. */
 const CARVE_REBUILD_MS = 2500;
 
-const NEAR_RING: RingConfig = { name: 'near', size: 1200, res: 192, recenter: 160, skirt: 12, carve: true };
+const NEAR_RING: RingConfig = { name: 'near', size: 1000, res: 336, recenter: 130, skirt: 12, carve: true };
 const MID_RING: RingConfig = { name: 'mid', size: 4800, res: 160, recenter: 700, skirt: 40, carve: false };
 const FAR_RING: RingConfig = { name: 'far', size: 16000, res: 128, recenter: 2600, skirt: 120, carve: false };
 const SPAWN_DEADLINE_MS = 14_000;
@@ -106,6 +107,8 @@ interface TileEntry {
   /** Source data kept so the tile can be re-heighted when late DEM tiles land. */
   ways: OsmWay[];
   buildings: OsmWay[];
+  /** v1.5.0a: guard rails / walls streamed with the tile. */
+  barriers?: OsmWay[];
   /** Built with at least one height that wasn't from the fine DEM. */
   provisional: boolean;
   rebuilding: boolean;
@@ -172,8 +175,11 @@ function dataBounds(
 
 export class TileManager {
   readonly origin: GeoOrigin;
-  /** v1.3.2: z14 (~9 m/px) for roads, buildings and the near terrain ring. */
-  readonly elevation = new ElevationSampler(14, 128);
+  /**
+   * v1.3.2: z14 (~9 m/px) for roads, buildings and the near terrain ring.
+   * v1.5.0a: plus the baked HRDEM 1 m LiDAR DTM layer (z16, ~1.7 m/px) where a pack exists.
+   */
+  readonly elevation = new ElevationSampler(14, 128, { zoom: 16, maxTiles: 192 });
   /** z12 for the mid ring (and a provisional stand-in for z14). */
   readonly midElevation = new ElevationSampler(12, 24);
   /** Low-zoom DEM: far ring + last-resort provisional heights while fine tiles stream. */
@@ -262,7 +268,7 @@ export class TileManager {
     this.buildings.skipAt = (x, z) => this.isWaterLocal(x, z) || this.underPlane(x, z);
     this.buildings.roadAt = (x, z) => {
       const hit = this.roadIndex.nearest(x, z, 16);
-      return !!hit && Math.sqrt(hit.distSq) < (hit.line.width ?? 6) * 0.5 + 1.5;
+      return !!hit && Math.sqrt(hit.distSq) < (hit.line.width ?? 6) * 0.5 + 1.5 + (hit.line.spec ? Math.max(...hit.line.spec.extent) : 0);
     };
 
     const terrainTex = makeTerrainTexture();
@@ -392,7 +398,7 @@ export class TileManager {
   private onGroundRoad(x: number, z: number): boolean {
     const n = this.roadIndex.nearest(x, z, 14, (l) => l.structure === 'ground');
     if (!n) return false;
-    const half = (n.line.width ?? 6) * 0.5 + 0.5;
+    const half = (n.line.width ?? 6) * 0.5 + 0.5 + (n.line.spec ? Math.max(...n.line.spec.extent) : 0);
     return n.distSq <= half * half;
   }
 
@@ -600,10 +606,9 @@ export class TileManager {
    */
   carveAt(x: number, z: number, dem: number, cell = 6.25): RingSample {
     const flatPad = CARVE_FLAT_EXTRA + cell * 0.6;
-    const radius = 7 + flatPad + CARVE_SHOULDER;
-    let bestW = 0;
+    const radius = 7 + flatPad + CARVE_BATTER_REACH;
+    let bestOff = Infinity;
     let bestY = dem;
-    let bestD = Infinity;
     let verge = 0;
     this.roadIndex.forEachNear(x, z, radius, (ref) => {
       const line = ref.line;
@@ -616,27 +621,36 @@ export class TileManager {
       const len = abx * abx + abz * abz;
       let t = len < 1e-8 ? 0 : ((x - a.x) * abx + (z - a.z) * abz) / len;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const d = Math.hypot(x - (a.x + abx * t), z - (a.z + abz * t));
-      const half = (line.width ?? 6) * 0.5;
-      const flat = half + flatPad;
-      let w: number;
-      if (d <= flat) w = 1;
-      else if (d >= flat + CARVE_SHOULDER) w = 0;
-      else {
-        const u = 1 - (d - flat) / CARVE_SHOULDER;
-        w = u * u * (3 - 2 * u);
+      const qx = a.x + abx * t;
+      const qz = a.z + abz * t;
+      const d = Math.hypot(x - qx, z - qz);
+      const spec = line.spec;
+      const half = spec ? spec.width * 0.5 : (line.width ?? 6) * 0.5;
+      const ext = spec ? Math.max(spec.extent[0], spec.extent[1]) : 0;
+      const flatEnd = half + ext + flatPad;
+      // road platform height at this offset (kerb face / sidewalk), flush in junction mouths
+      let dy = 0;
+      if (spec && spec.kerb && !inGap(line.gaps, x, z)) {
+        const o = d - half;
+        dy = o <= 0 ? 0 : o <= KERB_RAMP ? (o / KERB_RAMP) * spec.kerbH : spec.kerbH;
       }
-      if (w <= 0) return;
-      // Verge (gravel/dirt strip) just beyond the edge
-      const vd = d - half;
+      const roadG = a.y + (b.y - a.y) * t + dy - CARVE_UNDER_ROAD;
+      const off = d - flatEnd;
+      let y: number;
+      if (off <= 0) y = roadG;
+      else {
+        const slope = (spec?.batter ?? 0.6) * off;
+        y = dem < roadG - slope ? roadG - slope : dem > roadG + slope ? roadG + slope : dem;
+        if (off > CARVE_BATTER_REACH) return;
+      }
+      const vd = d - (half + ext);
       if (vd > -0.5 && vd < 3.5) verge = Math.max(verge, 1 - Math.max(0, vd - 1.5) / 2);
-      if (w > bestW || (w === bestW && d < bestD)) {
-        bestW = w;
-        bestD = d;
-        bestY = a.y + (b.y - a.y) * t - CARVE_UNDER_ROAD;
+      if (off < bestOff) {
+        bestOff = off;
+        bestY = y;
       }
     });
-    return { y: dem + (bestY - dem) * bestW, verge };
+    return { y: bestY, verge };
   }
 
   /**
@@ -923,14 +937,22 @@ export class TileManager {
    */
   sampleSurface(x: number, z: number, preferY?: number): SurfaceSample {
     const groundY = this.visibleGround(x, z, this.groundHeight(x, z));
-    const offRoad: SurfaceSample = {
-      roadFactor: 0.35,
-      height: groundY,
-      grip: effectiveGrip(defaultAsphaltProfile(), 0.35, this.weather) * 0.85,
-      noise: 0.2,
-      label: 'Off-road',
-      kind: 'dirt',
+    // v1.5.0a: off-road surface from the land use under the car (areaTmp was
+    // filled by groundHeight): farm / forest floor = dirt, else grass.
+    const a = this.areaTmp;
+    const landKind: SurfaceKind = a.farm > 0.5 || a.forest > 0.5 ? 'dirt' : 'grass';
+    const offSample = (kind: SurfaceKind, label?: string): SurfaceSample => {
+      const p = profileForKind(kind);
+      return {
+        roadFactor: 0.35,
+        height: groundY,
+        grip: effectiveGrip(p, 1, this.weather),
+        noise: p.noise * 1.2,
+        label: label ?? p.label,
+        kind,
+      };
     };
+    const offRoad = offSample(landKind);
     if (!Number.isFinite(x) || !Number.isFinite(z)) return offRoad;
     // v1.3.4: lake / sea / river → 'Water': almost no traction, the car wades
     // (Game adds drag, a splash and a reset to the last dry road point).
@@ -940,7 +962,7 @@ export class TileManager {
       return { roadFactor: 0, height: wi.y, grip: 0.1, noise: 0.05, label: 'Water', kind: 'water' };
     };
 
-    const near = this.roadIndex.nearest(x, z, ROAD_HEIGHT_RADIUS + 8, undefined, preferY);
+    const near = this.roadIndex.nearest(x, z, ROAD_HEIGHT_RADIUS + 8, undefined, preferY, true);
     if (!near) return wet();
     const line = near.line;
     // A tunnel only counts once you're actually down at its level (through the portal)
@@ -948,44 +970,68 @@ export class TileManager {
       return wet();
     }
     const dist = Math.sqrt(near.distSq);
-    const half = Math.max(1.5, (line.width ?? 6.4) * 0.5);
-    const onRoad = half + 0.4;
-    const soft = half + 3.5;
-    const roadFactor =
-      dist < onRoad
-        ? 1
-        : dist < soft
-          ? THREE.MathUtils.clamp(1 - (dist - onRoad) / (soft - onRoad), 0.35, 1)
-          : 0.35;
+    const spec: RoadSpec | undefined = line.spec;
+    const half = Math.max(1.4, (spec ? spec.width : line.width ?? 6.4) * 0.5);
+    const pts = line.points;
+    const sa = pts[near.i];
+    const sb = pts[near.i + 1];
+    const side: 0 | 1 = (x - near.x) * -(sb.z - sa.z) + (z - near.z) * (sb.x - sa.x) >= 0 ? 0 : 1;
+    const deck = line.structure !== 'ground';
+    const flushMouth = !!spec && spec.kerb && inGap(line.gaps, x, z);
+    // platform (carriageway + shoulder / kerb + sidewalk) outer edge from the centreline
+    const outer = deck || !spec ? half : half + spec.extent[side];
+    const dyPlat = deck || !spec ? 0 : flushMouth ? 0 : crossSectionDy(spec, side, Math.min(dist, outer));
+    // v1.5.0a: grip eases road → off-road over ~0.6 m at the platform edge (was ~4 m)
+    const f = deck ? (dist < half + 0.4 ? 1 : 0) : THREE.MathUtils.clamp(1 - (dist - (outer + 0.1)) / EDGE_EASE, 0, 1);
+    const roadFactor = 0.35 + 0.65 * f;
 
     let height: number;
-    if (line.structure !== 'ground') {
+    if (deck) {
       // Decks/tunnels: no blending to the ground below/above
       height = dist <= half + 1.5 ? near.y : groundY;
-    } else if (dist <= onRoad) {
-      height = near.y;
-    } else if (dist <= ROAD_HEIGHT_RADIUS) {
-      const w = THREE.MathUtils.clamp(1 - (dist - onRoad) / (ROAD_HEIGHT_RADIUS - onRoad), 0, 1);
-      height = near.y * w + groundY * (1 - w);
+    } else if (dist <= outer) {
+      height = near.y + (flushMouth && !spec!.kerb ? 0 : dyPlat);
     } else {
-      height = groundY;
+      // ease from the platform onto the (carved) ground — same surface the terrain mesh draws
+      const w = THREE.MathUtils.clamp(1 - (dist - outer) / EDGE_EASE, 0, 1);
+      const sw = w * w * (3 - 2 * w);
+      height = (near.y + dyPlat) * sw + groundY * (1 - sw);
     }
     if (!Number.isFinite(height)) height = groundY;
 
-    // Off the asphalt (and not on a bridge deck): water wins over dirt
-    if (roadFactor <= 0.5 && !(line.structure !== 'ground' && dist <= half + 1.5)) {
+    // Off the platform (and not on a bridge deck): water wins over the verge
+    if (roadFactor <= 0.5 && !(deck && dist <= half + 1.5)) {
       const w = wet();
       if (w.kind === 'water') return w;
     }
     const profile: SurfaceProfile = line.surface;
-    const grip = effectiveGrip(profile, roadFactor, this.weather);
+    // what the car is on, by strip
+    let strip = deck ? 'road' : spec ? stripAt(spec, side, Math.min(dist, outer + 1)) : 'road';
+    if (flushMouth && (strip === 'kerb' || strip === 'walk')) strip = 'road';
+    let onProfile: SurfaceProfile = profile;
+    let onLabel = profile.label;
+    if (strip === 'walk' || strip === 'kerb') {
+      onProfile = profileForKind('concrete');
+      onLabel = strip === 'walk' ? 'Sidewalk' : 'Kerb';
+    } else if (strip === 'shoulder') {
+      if (spec && spec.shoulderKind === 'gravel') onProfile = profileForKind('gravel');
+      else if (spec && spec.shoulderKind === 'grass') onProfile = profileForKind('grass');
+      onLabel = 'Shoulder';
+    }
+    const gripRoad = effectiveGrip(onProfile, 1, this.weather);
+    // beyond the platform: gravel verge next to rural roads, boulevard grass in town
+    const nearEdge = dist - outer < 2.5;
+    const offKind: SurfaceKind = nearEdge && spec && !spec.kerb ? 'gravel' : landKind;
+    const off = offSample(offKind);
+    const grip = gripRoad * f + off.grip * (1 - f);
+    const onRoadNow = f > 0.5;
     return {
       roadFactor,
       height,
       grip,
-      noise: profile.noise * (roadFactor > 0.5 ? 1 : 1.4),
-      label: roadFactor > 0.5 ? profile.label : 'Off-road',
-      kind: roadFactor > 0.5 ? profile.kind : 'dirt',
+      noise: onRoadNow ? onProfile.noise : off.noise,
+      label: onRoadNow ? onLabel : off.label,
+      kind: onRoadNow ? onProfile.kind : off.kind,
     };
   }
 
@@ -1176,6 +1222,7 @@ export class TileManager {
     entry.buildingIds = [...newB];
     entry.ways = freshWays;
     entry.buildings = freshBuildings;
+    entry.barriers = result.barriers ?? [];
     // Ways extend past the tile bbox: make sure their DEM is in too
     const db = dataBounds([...freshWays, ...freshBuildings], b);
     await this.elevation.preloadArea(db.south, db.west, db.north, db.east, 6_000);
@@ -1593,6 +1640,11 @@ export class TileManager {
     }
   }
 
+  /** v1.5.0a: which DEM answered (`__nig.game.tiles.demInfo()`). */
+  demInfo(): ReturnType<ElevationSampler['demInfo']> {
+    return this.elevation.demInfo();
+  }
+
   /** Overpass request stats for QA (`__nig.game.tiles.overpassStats()`). */
   overpassStats(): typeof overpassStats {
     return { ...overpassStats, bySource: { ...overpassStats.bySource } };
@@ -1728,7 +1780,7 @@ export class TileManager {
    * footprint, or null. OSM buildings only collide off-road (some OSM
    * footprints overlap carriageways); procedural fillers always do.
    */
-  pushOutOfBuildings(x: number, z: number, r: number, onRoad: boolean): { dx: number; dz: number; nx: number; nz: number } | null {
+  pushOutOfBuildings(x: number, z: number, r: number, onRoad: boolean, carY?: number): { dx: number; dz: number; nx: number; nz: number } | null {
     const ll = this.origin.toLatLon(x, z);
     const { tx, ty } = latLonToTile(ll.lat, ll.lon);
     let best: { dx: number; dz: number; nx: number; nz: number; d: number } | null = null;
@@ -1738,6 +1790,7 @@ export class TileManager {
       for (const f of e.footprints) {
         if (x < f.minX - r || x > f.maxX + r || z < f.minZ - r || z > f.maxZ + r) continue;
         if (onRoad && !f.always) continue;
+        if (f.y !== undefined && carY !== undefined && Math.abs(carY - f.y) > 2.2) continue;
         const pts = f.pts;
         let inside = false;
         let qd = Infinity;
@@ -1837,6 +1890,19 @@ export class TileManager {
     }
     const heightAt = this.groundAtFn();
     let buildingCount = 0;
+    if (entry.barriers?.length) {
+      const bg = buildBarriers(entry.barriers, this.origin, (x, z) => {
+        // posts sit on the road platform when a road runs beside them, else on the ground
+        const n = this.roadIndex.nearest(x, z, 12, (l) => l.structure === 'ground');
+        if (n) {
+          const sp = n.line.spec;
+          const lim = (sp ? sp.width * 0.5 + Math.max(sp.extent[0], sp.extent[1]) : (n.line.width ?? 6) * 0.5) + 0.6;
+          if (Math.sqrt(n.distSq) <= lim) return n.y;
+        }
+        return this.groundHeight(x, z);
+      });
+      if (bg) group.add(bg);
+    }
     if (entry.buildings.length) {
       const bldg = await this.buildings.buildAsync(
         entry.buildings,
