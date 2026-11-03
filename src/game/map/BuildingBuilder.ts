@@ -36,6 +36,8 @@ export interface Footprint {
   maxZ: number;
   /** Procedural fillers are never on a road, so they always collide; OSM ones only off-road. */
   always: boolean;
+  /** v1.5.0a: base height of a barrier footprint, so overpass barriers don't stop cars below. */
+  y?: number;
 }
 /** OSM building types that are roofs over open ground — never solid. */
 const NON_SOLID = new Set(['roof', 'carport', 'canopy', 'no', 'construction', 'ruins', 'bridge']);

@@ -1,4 +1,5 @@
 import { cacheGet, cachePut } from './OverpassCache';
+import { BARRIER_KINDS } from './BarrierBuilder';
 
 export interface OsmNode {
   lat: number;
@@ -23,6 +24,8 @@ export interface OsmArea {
 interface ParsedTile {
   ways: OsmWay[];
   buildings: OsmWay[];
+  /** v1.5.0a: guard rails / jersey barriers / walls (absent in pre-1.5 cache entries). */
+  barriers?: OsmWay[];
   areas: OsmArea[];
   /** Water multipolygons touching the tile, small enough to fetch in full. */
   relationIds: number[];
@@ -70,7 +73,7 @@ const MAX_CONCURRENT = 2;
 /** Soft cap on memory cache entries. */
 const MAX_CACHE = 96;
 /** IndexedDB key prefix (v1.3.6 entries carry a `partial` flag). */
-const CACHE_PREFIX = 'v136:';
+const CACHE_PREFIX = 'v150:';
 
 /**
  * Identification. Mirrors reject anonymous clients (overpass-api.de → 406,
@@ -93,6 +96,7 @@ function buildQuery(south: number, west: number, north: number, east: number): s
 (
   way["highway"~"^(${HIGHWAY_FILTER})$"](${s},${w},${n},${e});
   way["building"](${s},${w},${n},${e});
+  way["barrier"~"^(${BARRIER_KINDS})$"](${s},${w},${n},${e});
   way["natural"="water"](${s},${w},${n},${e});
   way["waterway"="riverbank"](${s},${w},${n},${e});
   way["landuse"~"^(reservoir|basin)$"](${s},${w},${n},${e});
@@ -669,6 +673,7 @@ function cleanGeom(g: Array<OsmNode | null> | undefined): OsmNode[] {
 function parseTile(data: OverpassJson): ParsedTile {
   const ways: OsmWay[] = [];
   const buildings: OsmWay[] = [];
+  const barriers: OsmWay[] = [];
   const areas: OsmArea[] = [];
   const relationIds: number[] = [];
   for (const el of data.elements ?? []) {
@@ -685,6 +690,7 @@ function parseTile(data: OverpassJson): ParsedTile {
     if (geom.length < 2) continue;
     if (tags.highway) ways.push({ id: el.id, tags, geometry: geom });
     else if (tags.building) buildings.push({ id: el.id, tags, geometry: geom });
+    else if (tags.barrier) barriers.push({ id: el.id, tags, geometry: geom });
     else if (geom.length >= 4) areas.push({ key: `w${el.id}`, tags, parts: [geom] });
   }
   // Prefer larger footprints when capping (better street fill / FPS tradeoff)
@@ -692,7 +698,7 @@ function parseTile(data: OverpassJson): ParsedTile {
     buildings.sort((a, b) => footprintScore(b) - footprintScore(a));
     buildings.length = 520;
   }
-  return { ways, buildings, areas, relationIds };
+  return { ways, buildings, barriers, areas, relationIds };
 }
 
 export interface ShoreWays {
