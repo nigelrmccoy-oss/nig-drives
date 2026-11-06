@@ -1,0 +1,65 @@
+{
+  "make": "Honda",
+  "model": "Beat",
+  "year": 1991,
+  "trim": "PP1",
+  "body_type": "2-door roadster",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "inline-3",
+    "displacement_cc": 656,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 47,
+  "peak_power_rpm": 8100,
+  "peak_torque_nm": 60,
+  "peak_torque_rpm": 7000,
+  "redline_rpm": 8500,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.428,
+    2.166,
+    1.576,
+    1.172,
+    0.941
+  ],
+  "final_drive": 5.714,
+  "curb_mass_kg": 760,
+  "length_mm": 3295,
+  "width_mm": 1395,
+  "height_mm": 1175,
+  "wheelbase_mm": 2280,
+  "track_front_mm": 1210,
+  "track_rear_mm": 1210,
+  "tyre_sizes": [
+    "155/65 R13",
+    "165/60 R14"
+  ],
+  "torque_curve": [
+    [
+      1700,
+      49.7
+    ],
+    [
+      4200,
+      57.1
+    ],
+    [
+      7000,
+      60.0
+    ],
+    [
+      7600,
+      57.5
+    ],
+    [
+      8100,
+      55.4
+    ],
+    [
+      8500,
+      48.8
+    ]
+  ],
+  "redline_provenance": "http://hondabeat.nl/beat-facts/"
+}

@@ -2,6 +2,8 @@ import type { VehicleSpec } from '../vehicles/Vehicle';
 import { peakPower, type PhysicsSpec, type TorquePoint } from './PhysicsSpec';
 import { GOLF_19TDI } from './specs/golf19tdi';
 import { MODEL3_LR_AWD } from './specs/model3LrAwd';
+import { CATALOG_CARS } from '../../data/cars';
+import { physicsSpecFromCatalog } from '../vehicles/catalogFromJson';
 
 const G = 9.81;
 const RHO = 1.225;
@@ -13,7 +15,10 @@ const HAND_SPECS: Record<string, PhysicsSpec> = {
 };
 
 export function physicsSpecFor(spec: VehicleSpec): PhysicsSpec {
-  return HAND_SPECS[spec.id] ?? derivePhysicsSpec(spec);
+  if (HAND_SPECS[spec.id]) return HAND_SPECS[spec.id];
+  const catalog = CATALOG_CARS[spec.id];
+  if (catalog) return physicsSpecFromCatalog(spec.id, catalog);
+  return derivePhysicsSpec(spec);
 }
 
 /**

@@ -1,0 +1,62 @@
+{
+  "make": "Honda",
+  "model": "Civic Type R (EK9)",
+  "year": 1997,
+  "trim": "Type R",
+  "body_type": "coup\u00e9",
+  "drivetrain": "FF",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1595,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 136,
+  "peak_power_rpm": 8200,
+  "peak_torque_nm": 160,
+  "peak_torque_rpm": 7500,
+  "redline_rpm": 8400,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.23,
+    2.105,
+    1.458,
+    1.107,
+    0.848
+  ],
+  "final_drive": 4.4,
+  "curb_mass_kg": 1070,
+  "length_mm": 4185,
+  "width_mm": 1695,
+  "height_mm": 1360,
+  "wheelbase_mm": 2620,
+  "track_front_mm": 1480,
+  "track_rear_mm": 1480,
+  "tyre_sizes": [
+    "195/55 R15"
+  ],
+  "torque_curve": [
+    [
+      1700,
+      131.3
+    ],
+    [
+      4500,
+      152.3
+    ],
+    [
+      7500,
+      160.0
+    ],
+    [
+      8200,
+      158.4
+    ],
+    [
+      8400,
+      139.4
+    ]
+  ],
+  "top_speed_kmh": 234,
+  "zero_to_100_s": 6.7,
+  "redline_provenance": "http://jonhope.co.uk/index.php?page=ek9&section=genspec"
+}

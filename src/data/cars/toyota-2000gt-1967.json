@@ -1,0 +1,71 @@
+{
+  "make": "Toyota",
+  "model": "2000GT",
+  "year": 1967,
+  "trim": "MF10",
+  "body_type": "2-door fastback coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-6",
+    "displacement_cc": 1988,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 110,
+  "peak_power_rpm": 6600,
+  "peak_torque_nm": 176,
+  "peak_torque_rpm": 5000,
+  "redline_rpm": 7400,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.143,
+    1.636,
+    1.179,
+    1.0,
+    0.844
+  ],
+  "final_drive": 4.375,
+  "curb_mass_kg": 1120,
+  "weight_dist_front_pct": 50.4,
+  "length_mm": 4175,
+  "width_mm": 1600,
+  "height_mm": 1160,
+  "wheelbase_mm": 2330,
+  "track_front_mm": 1300,
+  "track_rear_mm": 1300,
+  "tyre_sizes": [
+    "165 HR15"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      150.1
+    ],
+    [
+      3000,
+      167.6
+    ],
+    [
+      5000,
+      176.0
+    ],
+    [
+      5800,
+      167.6
+    ],
+    [
+      6600,
+      159.2
+    ],
+    [
+      7000,
+      149.6
+    ],
+    [
+      7400,
+      140.1
+    ]
+  ],
+  "top_speed_kmh": 220,
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: 3M peaks at 6600; high-rev 1960s DOHC six \u2014 7400 sits under the 9000 tach scale and above power peak"
+}

@@ -1,0 +1,70 @@
+{
+  "make": "Toyota",
+  "model": "Supra (A80)",
+  "year": 1997,
+  "trim": "RZ",
+  "body_type": "coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-6",
+    "displacement_cc": 2997,
+    "aspiration": "twin-turbocharged"
+  },
+  "peak_power_kw": 206,
+  "peak_power_rpm": 5600,
+  "peak_torque_nm": 451,
+  "peak_torque_rpm": 3600,
+  "redline_rpm": 6800,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.724,
+    2.246,
+    1.541,
+    1.205,
+    1.0,
+    0.818
+  ],
+  "final_drive": 3.266,
+  "curb_mass_kg": 1510,
+  "length_mm": 4520,
+  "width_mm": 1810,
+  "height_mm": 1275,
+  "wheelbase_mm": 2550,
+  "track_front_mm": 1520,
+  "track_rear_mm": 1525,
+  "tyre_sizes": [
+    "235/45",
+    "255/40"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      306.3
+    ],
+    [
+      2200,
+      387.3
+    ],
+    [
+      3600,
+      451.0
+    ],
+    [
+      4600,
+      401.1
+    ],
+    [
+      5600,
+      351.3
+    ],
+    [
+      6200,
+      316.1
+    ],
+    [
+      6800,
+      281.0
+    ]
+  ],
+  "redline_provenance": "https://www.mkivsupra.net/topic/194136-rev-limit-stock-2jz-gte-j-spec/"
+}

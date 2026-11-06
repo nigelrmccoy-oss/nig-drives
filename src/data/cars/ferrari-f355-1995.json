@@ -1,0 +1,68 @@
+{
+  "make": "Ferrari",
+  "model": "F355",
+  "year": 1995,
+  "trim": "Berlinetta",
+  "body_type": "coup\u00e9",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "V-8",
+    "displacement_cc": 3495,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 279,
+  "peak_power_rpm": 8200,
+  "peak_torque_nm": 360,
+  "peak_torque_rpm": 5800,
+  "redline_rpm": 8500,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.066,
+    2.157,
+    1.608,
+    1.269,
+    1.034,
+    0.837
+  ],
+  "final_drive": 3.562,
+  "curb_mass_kg": 1440,
+  "length_mm": 4250,
+  "width_mm": 1900,
+  "height_mm": 1170,
+  "wheelbase_mm": 2450,
+  "track_front_mm": 1515,
+  "track_rear_mm": 1615,
+  "tyre_sizes": [
+    "225/40 ZR18",
+    "265/40 ZR18"
+  ],
+  "torque_curve": [
+    [
+      1700,
+      324.0
+    ],
+    [
+      3500,
+      348.7
+    ],
+    [
+      5800,
+      360.0
+    ],
+    [
+      7000,
+      342.4
+    ],
+    [
+      8200,
+      324.9
+    ],
+    [
+      8500,
+      276.2
+    ]
+  ],
+  "top_speed_kmh": 295,
+  "zero_to_100_s": 4.7,
+  "redline_provenance": "http://www.ferrari-data.cz/ferrari_f355.html"
+}

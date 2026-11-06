@@ -1,0 +1,70 @@
+{
+  "make": "Nissan",
+  "model": "Silvia (S15)",
+  "year": 1999,
+  "trim": "Spec-R",
+  "body_type": "coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1998,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 184,
+  "peak_power_rpm": 6400,
+  "peak_torque_nm": 275,
+  "peak_torque_rpm": 4800,
+  "redline_rpm": 7500,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.626,
+    2.2,
+    1.541,
+    1.213,
+    1.0,
+    0.767
+  ],
+  "final_drive": 3.692,
+  "curb_mass_kg": 1240,
+  "length_mm": 4445,
+  "width_mm": 1695,
+  "height_mm": 1285,
+  "wheelbase_mm": 2525,
+  "track_front_mm": 1470,
+  "track_rear_mm": 1460,
+  "tyre_sizes": [
+    "205/55 R16"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      167.4
+    ],
+    [
+      2900,
+      234.9
+    ],
+    [
+      4800,
+      275.0
+    ],
+    [
+      5600,
+      274.8
+    ],
+    [
+      6400,
+      274.5
+    ],
+    [
+      7000,
+      244.6
+    ],
+    [
+      7500,
+      219.6
+    ]
+  ],
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: SR20DET Spec-R peaks at 6400; conflicting 7500\u20138000 \u2014 pick 7500 as conservative tach/fuel-cut mid of that band"
+}

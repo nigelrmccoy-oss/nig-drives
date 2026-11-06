@@ -1,0 +1,71 @@
+{
+  "make": "Audi",
+  "model": "RS 2 Avant",
+  "year": 1994,
+  "trim": "RS 2",
+  "body_type": "5-door estate car",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "inline-5",
+    "displacement_cc": 2226,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 232,
+  "peak_power_rpm": 6500,
+  "peak_torque_nm": 410,
+  "peak_torque_rpm": 3000,
+  "redline_rpm": 7500,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.5,
+    1.889,
+    1.32,
+    1.034,
+    0.857,
+    0.711
+  ],
+  "final_drive": 4.111,
+  "curb_mass_kg": 1595,
+  "length_mm": 4510,
+  "width_mm": 1695,
+  "height_mm": 1386,
+  "wheelbase_mm": 2597,
+  "track_front_mm": 1448,
+  "track_rear_mm": 1474,
+  "tyre_sizes": [
+    "245/40 ZR17"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      317.8
+    ],
+    [
+      1800,
+      349.0
+    ],
+    [
+      3000,
+      410.0
+    ],
+    [
+      4800,
+      374.4
+    ],
+    [
+      6500,
+      340.8
+    ],
+    [
+      7000,
+      306.7
+    ],
+    [
+      7500,
+      272.7
+    ]
+  ],
+  "top_speed_kmh": 262,
+  "zero_to_100_s": 4.8,
+  "redline_provenance": "https://en.wikipedia.org/wiki/Audi_RS_2_Avant"
+}

@@ -1,0 +1,71 @@
+{
+  "make": "Volvo",
+  "model": "240 Estate",
+  "year": 1985,
+  "trim": "GL",
+  "body_type": "wagon",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 2316,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 85,
+  "peak_power_rpm": 5400,
+  "peak_torque_nm": 185,
+  "peak_torque_rpm": 2750,
+  "redline_rpm": 6000,
+  "gearbox_type": "4-speed manual + overdrive (M46)",
+  "gear_ratios": [
+    3.711,
+    2.161,
+    1.37,
+    1.0,
+    0.797
+  ],
+  "final_drive": 3.31,
+  "curb_mass_kg": 1297,
+  "length_mm": 4522,
+  "width_mm": 1770,
+  "height_mm": 1457,
+  "wheelbase_mm": 2640,
+  "track_front_mm": 1430,
+  "track_rear_mm": 1360,
+  "tyre_sizes": [
+    "185 SR14"
+  ],
+  "torque_curve": [
+    [
+      1200,
+      167.4
+    ],
+    [
+      1600,
+      175.3
+    ],
+    [
+      2750,
+      185.0
+    ],
+    [
+      4100,
+      167.3
+    ],
+    [
+      5400,
+      150.3
+    ],
+    [
+      5700,
+      141.3
+    ],
+    [
+      6000,
+      132.3
+    ]
+  ],
+  "top_speed_kmh": 173,
+  "zero_to_100_s": 12.5,
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: B230F peaks at 5400; era SOHC redline typically ~6000 (forum limiters ~6100\u20136200)"
+}

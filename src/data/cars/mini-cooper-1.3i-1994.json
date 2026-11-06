@@ -1,0 +1,68 @@
+{
+  "make": "Mini",
+  "model": "Cooper 1.3i",
+  "year": 1994,
+  "trim": "Cooper 1.3i MPi",
+  "body_type": "saloon",
+  "drivetrain": "FF",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1271,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 46,
+  "peak_power_rpm": 5700,
+  "peak_torque_nm": 94,
+  "peak_torque_rpm": 3900,
+  "redline_rpm": 6500,
+  "gearbox_type": "4-speed manual",
+  "gear_ratios": [
+    3.647,
+    2.185,
+    1.425,
+    1.0
+  ],
+  "final_drive": 3.12,
+  "curb_mass_kg": 710,
+  "length_mm": 3075,
+  "width_mm": 1440,
+  "height_mm": 1330,
+  "wheelbase_mm": 2035,
+  "track_front_mm": 1235,
+  "track_rear_mm": 1200,
+  "tyre_sizes": [
+    "145/70"
+  ],
+  "torque_curve": [
+    [
+      1300,
+      81.5
+    ],
+    [
+      2300,
+      89.3
+    ],
+    [
+      3900,
+      94.0
+    ],
+    [
+      4800,
+      85.5
+    ],
+    [
+      5700,
+      77.1
+    ],
+    [
+      6100,
+      72.4
+    ],
+    [
+      6500,
+      67.8
+    ]
+  ],
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: A+ 1275 peaks at 5700; SPI Cooper tachs commonly enter red ~6500 (above power peak, below race limits)"
+}

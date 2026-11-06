@@ -93,6 +93,19 @@ canvas.game-canvas {
   grid-template-columns: 1fr 1fr;
 }
 
+.choice-row.variants.pack-list {
+  max-height: min(42vh, 420px);
+  overflow-y: auto;
+  grid-template-columns: 1fr 1fr;
+  padding-right: 4px;
+}
+@media (min-width: 720px) {
+  .choice-row.variants.pack-list {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+
 @media (min-width: 720px) {
   .choice-row.variants {
     grid-template-columns: 1fr 1fr 1fr 1fr;

@@ -1,0 +1,68 @@
+{
+  "make": "Mitsubishi",
+  "model": "Lancer Evolution VI",
+  "year": 1999,
+  "trim": "GSR",
+  "body_type": "sedan",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1997,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 206,
+  "peak_power_rpm": 6500,
+  "peak_torque_nm": 373,
+  "peak_torque_rpm": 3000,
+  "redline_rpm": 7000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    2.785,
+    1.95,
+    1.407,
+    1.031,
+    0.761
+  ],
+  "final_drive": 4.529,
+  "curb_mass_kg": 1360,
+  "length_mm": 4350,
+  "width_mm": 1770,
+  "height_mm": 1415,
+  "wheelbase_mm": 2510,
+  "track_front_mm": 1510,
+  "track_rear_mm": 1505,
+  "tyre_sizes": [
+    "225/45 ZR17"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      278.7
+    ],
+    [
+      1800,
+      317.5
+    ],
+    [
+      3000,
+      373.0
+    ],
+    [
+      4800,
+      336.8
+    ],
+    [
+      6500,
+      302.6
+    ],
+    [
+      6800,
+      266.3
+    ],
+    [
+      7000,
+      242.1
+    ]
+  ],
+  "redline_provenance": "https://www.caranddriver.com/reviews/a15140122/mitsubishi-lancer-evolution-vi-specialty-file/"
+}

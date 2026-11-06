@@ -1,0 +1,67 @@
+{
+  "make": "Chevrolet",
+  "model": "Chevelle SS 454",
+  "year": 1970,
+  "trim": "SS 454 LS6",
+  "body_type": "coupe",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "V-8",
+    "displacement_cc": 7440,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 336,
+  "peak_power_rpm": 5600,
+  "peak_torque_nm": 678,
+  "peak_torque_rpm": 3600,
+  "redline_rpm": 6500,
+  "gearbox_type": "4-speed manual (Muncie M22)",
+  "gear_ratios": [
+    2.2,
+    1.64,
+    1.27,
+    1.0
+  ],
+  "final_drive": 4.11,
+  "curb_mass_kg": 1705,
+  "length_mm": 5009,
+  "width_mm": 1915,
+  "height_mm": 1336,
+  "wheelbase_mm": 2845,
+  "track_front_mm": 1524,
+  "track_rear_mm": 1519,
+  "tyre_sizes": [
+    "F70-14"
+  ],
+  "torque_curve": [
+    [
+      1300,
+      622.7
+    ],
+    [
+      2200,
+      657.5
+    ],
+    [
+      3600,
+      678.0
+    ],
+    [
+      4600,
+      625.5
+    ],
+    [
+      5600,
+      572.9
+    ],
+    [
+      6000,
+      534.7
+    ],
+    [
+      6500,
+      487.0
+    ]
+  ],
+  "redline_provenance": "https://chevellestuff.net/1970/misc/tach_codes.htm"
+}

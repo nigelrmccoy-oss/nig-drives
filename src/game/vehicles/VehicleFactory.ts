@@ -711,10 +711,61 @@ function buildNewFlyerBus(hybrid: boolean): THREE.Group {
   return g;
 }
 
+/** Generic generated body scaled to a catalog car's real length/width/height (no ripped meshes). */
+function buildPackCar(spec: { length: number; width: number; height: number; name: string }, color = 0x2a3344): THREE.Group {
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.35, roughness: 0.45 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111418, metalness: 0.4, roughness: 0.55 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x9ec9e8,
+    metalness: 0.1,
+    roughness: 0.15,
+    transparent: true,
+    opacity: 0.45,
+  });
+  const L = spec.length, W = spec.width, H = spec.height;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W * 0.92, H * 0.45, L * 0.92), bodyMat);
+  body.position.y = H * 0.28;
+  body.castShadow = true;
+  g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(W * 0.78, H * 0.38, L * 0.45), glass);
+  cabin.position.set(0, H * 0.58, -L * 0.05);
+  cabin.castShadow = true;
+  g.add(cabin);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(W * 0.88, H * 0.08, L * 0.28), bodyMat);
+  hood.position.set(0, H * 0.42, L * 0.28);
+  g.add(hood);
+  // Wheels (visual only; physics owns contact)
+  const wr = Math.min(0.34, H * 0.28);
+  const ww = Math.min(0.24, W * 0.14);
+  for (const z of [L * 0.32, -L * 0.3]) {
+    for (const x of [-W * 0.42, W * 0.42]) {
+      const wh = new THREE.Mesh(new THREE.CylinderGeometry(wr, wr, ww, 16), dark);
+      wh.rotation.z = Math.PI / 2;
+      wh.position.set(x, wr, z);
+      wh.castShadow = true;
+      g.add(wh);
+    }
+  }
+  g.name = spec.name;
+  return g;
+}
+
+const PACK_COLORS = [0x2a3344, 0x7a1f1f, 0x1f4a7a, 0x2f5a2f, 0x5a4a1f, 0x3a3a3a, 0x6a2a4a, 0x1a5a5a];
+
 export function createVehicle(id: VehicleId, transmission: TransmissionMode = 'auto'): Vehicle {
   const spec = VEHICLE_SPECS[id];
+  if (!spec) throw new Error(`Unknown vehicle id: ${id}`);
   const cls = vehicleClassOf(id);
-  const mesh = cls === 'golf' ? buildGolf() : cls === 'ev' ? buildModel3() : buildNewFlyerBus(id === 'bus_hybrid');
+  let mesh: THREE.Group;
+  if (cls === 'golf') mesh = buildGolf();
+  else if (cls === 'ev') mesh = buildModel3();
+  else if (cls === 'bus') mesh = buildNewFlyerBus(id === 'bus_hybrid');
+  else {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+    mesh = buildPackCar(spec, PACK_COLORS[Math.abs(h) % PACK_COLORS.length]);
+  }
   mesh.name = spec.name;
   return new Vehicle(spec, mesh, transmission);
 }

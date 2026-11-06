@@ -1,0 +1,71 @@
+{
+  "make": "Peugeot",
+  "model": "205 GTI",
+  "year": 1986,
+  "trim": "1.9",
+  "body_type": "hatchback",
+  "drivetrain": "FF",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1905,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 96,
+  "peak_power_rpm": 6000,
+  "peak_torque_nm": 161,
+  "peak_torque_rpm": 4750,
+  "redline_rpm": 6800,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    2.923,
+    1.85,
+    1.36,
+    1.069,
+    0.865
+  ],
+  "final_drive": 3.688,
+  "curb_mass_kg": 910,
+  "length_mm": 3705,
+  "width_mm": 1590,
+  "height_mm": 1380,
+  "wheelbase_mm": 2420,
+  "track_front_mm": 1395,
+  "track_rear_mm": 1330,
+  "tyre_sizes": [
+    "185/55 R15"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      137.0
+    ],
+    [
+      2800,
+      152.9
+    ],
+    [
+      4750,
+      161.0
+    ],
+    [
+      5400,
+      156.7
+    ],
+    [
+      6000,
+      152.8
+    ],
+    [
+      6400,
+      143.6
+    ],
+    [
+      6800,
+      134.4
+    ]
+  ],
+  "top_speed_kmh": 206,
+  "zero_to_100_s": 8.0,
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: XU9JA peaks at 6000; stock 8v GTI tach/limiter commonly ~6500\u20137000 \u2014 6800 mid of that band (not the TT-conversion 7000 claim)"
+}

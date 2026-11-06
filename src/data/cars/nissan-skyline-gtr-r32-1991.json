@@ -1,0 +1,68 @@
+{
+  "make": "Nissan",
+  "model": "Skyline GT-R (R32)",
+  "year": 1991,
+  "trim": "BNR32",
+  "body_type": "sports car",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "inline-6",
+    "displacement_cc": 2568,
+    "aspiration": "twin-turbocharged"
+  },
+  "peak_power_kw": 206,
+  "peak_power_rpm": 6800,
+  "peak_torque_nm": 353,
+  "peak_torque_rpm": 4400,
+  "redline_rpm": 8000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.214,
+    1.925,
+    1.302,
+    1.0,
+    0.752
+  ],
+  "final_drive": 4.111,
+  "curb_mass_kg": 1480,
+  "length_mm": 4545,
+  "width_mm": 1755,
+  "height_mm": 1340,
+  "wheelbase_mm": 2615,
+  "track_front_mm": 1480,
+  "track_rear_mm": 1480,
+  "tyre_sizes": [
+    "225/50 R16"
+  ],
+  "torque_curve": [
+    [
+      1600,
+      231.6
+    ],
+    [
+      2600,
+      298.2
+    ],
+    [
+      4400,
+      353.0
+    ],
+    [
+      5600,
+      321.1
+    ],
+    [
+      6800,
+      289.3
+    ],
+    [
+      7400,
+      260.4
+    ],
+    [
+      8000,
+      231.4
+    ]
+  ],
+  "redline_provenance": "https://www.hemmings.com/stories/godzilla/"
+}

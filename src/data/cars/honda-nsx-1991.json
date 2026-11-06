@@ -1,0 +1,72 @@
+{
+  "make": "Honda",
+  "model": "NSX",
+  "year": 1991,
+  "trim": "NA1",
+  "body_type": "coupe",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "V-6",
+    "displacement_cc": 2977,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 201,
+  "peak_power_rpm": 7100,
+  "peak_torque_nm": 284,
+  "peak_torque_rpm": 5300,
+  "redline_rpm": 8000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.071,
+    1.727,
+    1.23,
+    0.967,
+    0.771
+  ],
+  "final_drive": 4.062,
+  "curb_mass_kg": 1365,
+  "weight_dist_front_pct": 42,
+  "length_mm": 4405,
+  "width_mm": 1810,
+  "height_mm": 1170,
+  "wheelbase_mm": 2530,
+  "track_front_mm": 1510,
+  "track_rear_mm": 1530,
+  "tyre_sizes": [
+    "205/50 ZR15",
+    "225/50 ZR16"
+  ],
+  "torque_curve": [
+    [
+      1600,
+      242.5
+    ],
+    [
+      3200,
+      270.6
+    ],
+    [
+      5300,
+      284.0
+    ],
+    [
+      6200,
+      277.2
+    ],
+    [
+      7100,
+      270.3
+    ],
+    [
+      7600,
+      252.3
+    ],
+    [
+      8000,
+      237.9
+    ]
+  ],
+  "top_speed_kmh": 270,
+  "zero_to_100_s": 5.9,
+  "redline_provenance": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications"
+}

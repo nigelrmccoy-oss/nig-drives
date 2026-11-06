@@ -3,10 +3,12 @@ import {
   BUS_VARIANT_IDS,
   EV_VARIANT_IDS,
   GOLF_ENGINE_IDS,
+  PACK_VEHICLE_IDS,
   VEHICLE_SPECS,
   type VehicleId,
   type VehicleClass,
 } from '../vehicles/Vehicle';
+import { CATALOG_CARS } from '../../data/cars';
 import type { TransmissionMode } from '../vehicles/Transmission';
 import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel } from '../visuals/Quality';
 import { ASSIST_LABELS, loadAssistPrefs, saveAssistPrefs, type AssistPrefs } from './assistPrefs';
@@ -26,6 +28,11 @@ const CLASS_VARIANTS: Record<VehicleClass, { ids: VehicleId[]; label: string; fi
   golf: { ids: GOLF_ENGINE_IDS, label: 'Engine', first: 'golf_20aba' },
   ev: { ids: EV_VARIANT_IDS, label: 'Motor', first: 'model3_lr_awd' },
   bus: { ids: BUS_VARIANT_IDS, label: 'Powertrain', first: 'bus_diesel' },
+  pack: {
+    ids: PACK_VEHICLE_IDS,
+    label: 'Car (make · year)',
+    first: PACK_VEHICLE_IDS[0] ?? 'dodge-viper-gts-1996',
+  },
 };
 
 export class StartMenu {
@@ -54,7 +61,7 @@ export class StartMenu {
     this.root.innerHTML = `
       <div class="menu-card">
         <h1>Nig Drives <span class="ver">v1.5.0b</span></h1>
-        <p class="tagline">v1.5.0b: sight lines · accurate terrain &amp; roads · real tyre &amp; drivetrain physics · Tesla Model 3 · assists you can switch off (F1) · Telemetry+ (F2) · Dyno.</p>
+        <p class="tagline">v1.5.0b: sight lines · 41-car checked pack in the picker · accurate terrain &amp; roads · real tyre &amp; drivetrain physics · Tesla Model 3 · assists (F1) · Telemetry+ (F2) · Dyno.</p>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">
@@ -70,10 +77,14 @@ export class StartMenu {
             <strong>City Bus</strong>
             <span>New Flyer style · diesel or hybrid</span>
           </button>
+          <button type="button" class="choice ${this.vehicleClass === 'pack' ? 'selected' : ''}" data-class="pack">
+            <strong>Car pack</strong>
+            <span>41 checked cars · real gears / redline · sorted make · year</span>
+          </button>
         </div>
 
         <div class="section-label">${variantLabel}</div>
-        <div class="choice-row variants" id="variant-choices">
+        <div class="choice-row variants ${this.vehicleClass === 'pack' ? 'pack-list' : ''}" id="variant-choices">
           ${variantIds
             .map((id) => {
               const s = VEHICLE_SPECS[id];
@@ -157,7 +168,7 @@ export class StartMenu {
         <p class="attribution">
           Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (Overpass).
           Elevation: AWS Open Data Terrarium DEM. Not affiliated with Google — no Google Maps/Earth road data.
-          Vehicles are stylized; not affiliated with Volkswagen, Tesla, New Flyer, or Grand River Transit.
+          Vehicles are stylized generated bodies; not affiliated with the makers named in the pack, Volkswagen, Tesla, New Flyer, or Grand River Transit.
         </p>
       </div>
     `;
@@ -255,8 +266,12 @@ function variantHint(id: VehicleId): string {
       return 'Lighter · regen brake · roof pack';
     case 'model3_lr_awd':
       return `${Math.round(MODEL3_LR_AWD.ev!.systemPowerW / 1000)} kW · front + rear motors · one-pedal regen`; // v1.4.1: from the sim spec
-    default:
-      return '';
+    default: {
+      const car = CATALOG_CARS[id];
+      if (!car) return '';
+      const est = car.redline_estimated ? ' · redline estimated' : '';
+      return `${car.make} ${car.model} · ${Math.round(car.peak_power_kw)} kW · ${car.redline_rpm} rpm${est}`;
+    }
   }
 }
 

@@ -9,7 +9,9 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ## Changelog
 
-### v1.5.0b (package 1.5.0-b) — sight lines
+### v1.5.0b (package 1.5.0-b) — sight lines + 41-car pack
+
+- Start menu **Car pack** lists all 41 checked cars (make · year), driven from `src/data/cars/*.json` with real gear ratios, final drive, redline, and torque curves. Generated body scaled to length/width/height — no ripped meshes. Nine redlines are labeled estimated.
 
 - **Draw distance.** Clear-air fog now runs 450 m to 8.2 km, so the 16 km far terrain ring and skyline
   read at full distance; each graphics preset scales it (Low 55 %, Medium 80 %, High 100 %). Rain and

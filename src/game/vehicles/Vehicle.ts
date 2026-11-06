@@ -9,9 +9,12 @@ import { Assists, understeerGradient } from '../physics/Assists';
 import { Powertrain } from '../physics/Powertrain';
 import { EvDrive } from '../physics/Motor';
 import { VehicleSim } from '../physics/VehicleSim';
+import { CATALOG_CARS, CATALOG_SLUGS } from '../../data/cars';
+import { vehicleSpecFromCatalog } from './catalogFromJson';
 
 /** Selectable drivetrains / transit variants (v1.2). */
-export type VehicleId =
+/** Stock drivetrains that ship with hand / derived arcade specs. */
+export type StockVehicleId =
   | 'golf_18carb'
   | 'golf_20aba'
   | 'golf_19tdi'
@@ -20,10 +23,25 @@ export type VehicleId =
   | 'bus_hybrid'
   | 'model3_lr_awd';
 
-export type VehicleClass = 'golf' | 'bus' | 'ev';
+/** Catalog slug from src/data/cars (e.g. dodge-viper-gts-1996). */
+export type CatalogVehicleId = string;
+
+export type VehicleId = StockVehicleId | CatalogVehicleId;
+
+export type VehicleClass = 'golf' | 'bus' | 'ev' | 'pack';
 
 export function vehicleClassOf(id: VehicleId): VehicleClass {
-  return id.startsWith('bus') ? 'bus' : id.startsWith('model3') ? 'ev' : 'golf';
+  if (id.startsWith('bus')) return 'bus';
+  if (id.startsWith('model3')) return 'ev';
+  if (
+    id === 'golf_18carb' ||
+    id === 'golf_20aba' ||
+    id === 'golf_19tdi' ||
+    id === 'golf_28vr6'
+  ) {
+    return 'golf';
+  }
+  return 'pack';
 }
 
 export interface VehicleSpec {
@@ -115,7 +133,7 @@ const BUS_BASE = {
   height: 3.2,
 };
 
-export const VEHICLE_SPECS: Record<VehicleId, VehicleSpec> = {
+export const VEHICLE_SPECS: Record<string, VehicleSpec> = {
   golf_18carb: {
     ...GOLF_BASE,
     id: 'golf_18carb',
@@ -252,6 +270,14 @@ export const BUS_VARIANT_IDS: VehicleId[] = ['bus_diesel', 'bus_hybrid'];
 
 /** v1.4.0: battery-electric cars. */
 export const EV_VARIANT_IDS: VehicleId[] = ['model3_lr_awd'];
+
+/** v1.5.0b: 41-car checked pack (sorted make/year in the menu). */
+export const PACK_VEHICLE_IDS: VehicleId[] = CATALOG_SLUGS;
+
+for (const slug of CATALOG_SLUGS) {
+  VEHICLE_SPECS[slug] = vehicleSpecFromCatalog(slug, CATALOG_CARS[slug]);
+}
+
 
 export interface SurfaceInfo {
   roadFactor: number;

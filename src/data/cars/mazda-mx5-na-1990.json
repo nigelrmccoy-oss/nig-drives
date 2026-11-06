@@ -1,0 +1,68 @@
+{
+  "make": "Mazda",
+  "model": "MX-5 (NA)",
+  "year": 1990,
+  "trim": "1.6",
+  "body_type": "roadster",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1597,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 88,
+  "peak_power_rpm": 6500,
+  "peak_torque_nm": 137,
+  "peak_torque_rpm": 5500,
+  "redline_rpm": 7000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.136,
+    1.888,
+    1.33,
+    1.0,
+    0.814
+  ],
+  "final_drive": 4.3,
+  "curb_mass_kg": 940,
+  "length_mm": 3970,
+  "width_mm": 1675,
+  "height_mm": 1235,
+  "wheelbase_mm": 2265,
+  "track_front_mm": 1405,
+  "track_rear_mm": 1420,
+  "tyre_sizes": [
+    "185/60 R14"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      114.2
+    ],
+    [
+      3300,
+      130.4
+    ],
+    [
+      5500,
+      137.0
+    ],
+    [
+      6000,
+      133.1
+    ],
+    [
+      6500,
+      129.3
+    ],
+    [
+      6800,
+      120.0
+    ],
+    [
+      7000,
+      113.8
+    ]
+  ],
+  "redline_provenance": "https://www.caranddriver.com/features/a38015568/buy-1990-1997-mazda-mx-5-miata/"
+}

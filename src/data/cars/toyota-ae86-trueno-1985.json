@@ -1,0 +1,68 @@
+{
+  "make": "Toyota",
+  "model": "Sprinter Trueno (AE86)",
+  "year": 1985,
+  "trim": "GT-Apex",
+  "body_type": "coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1587,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 96,
+  "peak_power_rpm": 6600,
+  "peak_torque_nm": 149,
+  "peak_torque_rpm": 5200,
+  "redline_rpm": 7600,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.587,
+    2.022,
+    1.384,
+    1.0,
+    0.861
+  ],
+  "final_drive": 4.3,
+  "curb_mass_kg": 940,
+  "length_mm": 4205,
+  "width_mm": 1625,
+  "height_mm": 1335,
+  "wheelbase_mm": 2400,
+  "track_front_mm": 1355,
+  "track_rear_mm": 1345,
+  "tyre_sizes": [
+    "185/60 R14"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      126.4
+    ],
+    [
+      3100,
+      141.7
+    ],
+    [
+      5200,
+      149.0
+    ],
+    [
+      5900,
+      143.9
+    ],
+    [
+      6600,
+      138.9
+    ],
+    [
+      7100,
+      130.6
+    ],
+    [
+      7600,
+      122.2
+    ]
+  ],
+  "redline_provenance": "https://ja.wikipedia.org/wiki/%E3%83%88%E3%83%A8%E3%82%BF%E3%83%BBAE86"
+}
