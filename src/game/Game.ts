@@ -15,6 +15,9 @@ import type { VehicleId } from './vehicles/Vehicle';
 import type { TransmissionMode } from './vehicles/Transmission';
 import type { CarBuild } from './tuning/CarBuild';
 import { stockBuild } from './tuning/CarBuild';
+import { piBadge, ratePi } from './tuning/piRating';
+import { COMPOUNDS } from './tuning/compounds';
+import { loadSettings } from './save/settings';
 import { Environment, WEATHER_LABELS } from './weather/Environment';
 import { PostFX } from './visuals/PostFX';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -54,6 +57,7 @@ export class Game {
   private tiles: TileManager | null = null;
   private engineSound = new EngineSound();
   private running = false;
+  private paused = false;
   private lastT = 0;
   private cityName = '';
   private region = '';
@@ -252,6 +256,7 @@ export class Game {
     }
 
     this.hud.setVehicleName(this.vehicle.spec.name);
+    this.hud.setPiBadge(piBadge(ratePi(this.vehicle.phys)));
     this.hud.setPlace(this.cityName, this.region);
     this.hud.setCameraMode('chase');
     this.hud.setWeather(this.env.weather);
@@ -460,6 +465,13 @@ export class Game {
     }
 
     this.input.poll(); // v1.4.0: gamepad (analog steer / pedals) once per frame
+    if (this.input.consumePause()) {
+      this.onPauseRequest?.();
+    }
+    if (this.paused) {
+      this.raf = requestAnimationFrame(this.frame);
+      return;
+    }
     if (this.input.consumeCameraToggle()) {
       this.chase.toggle();
       this.hud.setCameraMode(this.chase.mode);
@@ -561,6 +573,7 @@ export class Game {
 
     this.hud.setSpeed(this.vehicle.getSpeedKmh());
     this.hud.setAssists(this.vehicle.getAssistFlags());
+    this.hud.setTyreTemps(v.sim.wheels.map((w) => w.tempC), COMPOUNDS[v.compoundId as keyof typeof COMPOUNDS]?.label ?? v.compoundId, loadSettings().units.temp);
     this.hud.setSurface(surface.label, surface.grip);
     this.hud.setTime(this.env.getTimeLabel(), this.env.timePaused, this.env.getDayLengthMinutes());
     const showBoost =
@@ -652,11 +665,27 @@ export class Game {
     this.post.setSize(window.innerWidth, window.innerHeight, this.renderer.getPixelRatio());
   };
 
+  onPauseRequest: (() => void) | null = null;
+
+  reloadInputBindings(): void {
+    this.input.reloadBindings();
+  }
+
+  setPaused(p: boolean): void {
+    this.paused = p;
+    this.hud.setPaused(p);
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
   /**
    * Leave free roam and tear down the world so the start menu can show again.
    * Keeps the renderer / audio context alive.
    */
   returnToMenu(): void {
+    this.paused = false;
     this.stopLoop();
     this.hud.hide();
     this.minimap.setVisible(false);

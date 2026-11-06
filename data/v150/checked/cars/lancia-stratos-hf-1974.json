@@ -1,0 +1,125 @@
+{
+ "make": "Lancia",
+ "model": "Stratos HF Stradale",
+ "year": 1974,
+ "trim": "Stradale",
+ "body_type": "coupé",
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "V-6",
+  "displacement_cc": 2418,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 140,
+ "peak_power_rpm": 7000,
+ "peak_torque_nm": 225,
+ "peak_torque_rpm": 4000,
+ "torque_curve": [
+  [
+   1500,
+   198.6
+  ],
+  [
+   2400,
+   214.2
+  ],
+  [
+   4000,
+   225.0
+  ],
+  [
+   5500,
+   208.0
+  ],
+  [
+   7000,
+   191.0
+  ],
+  [
+   7500,
+   168.1
+  ]
+ ],
+ "redline_rpm": 7500,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.554,
+  2.459,
+  1.781,
+  1.32,
+  0.986
+ ],
+ "final_drive": 3.824,
+ "curb_mass_kg": 980,
+ "weight_dist_front_pct": null,
+ "length_mm": 3710,
+ "width_mm": 1750,
+ "height_mm": 1114,
+ "wheelbase_mm": 2180,
+ "track_front_mm": 1433,
+ "track_rear_mm": 1457,
+ "tyre_sizes": [
+  "205/70 ZR14"
+ ],
+ "zero_to_100_s": 6.8,
+ "top_speed_kmh": 230,
+ "msrp": {
+  "amount": 8496000,
+  "currency": "ITL",
+  "year": 1973,
+  "market": "Italy",
+  "source": "https://nosweb.jp/nostalgichero/articles/detail/2024"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Lancia_Stratos",
+  "https://www.ultimatespecs.com/car-specs/Lancia/18585/Lancia-Stratos-HF-Stradale.html"
+ ],
+ "confidence": "high",
+ "notes": "18/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Lancia-Stratos-HF-Stradale.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 225,
+  "required_CdA_m2_for_top_speed": 0.7
+ },
+ "provenance": {
+  "engine.displacement_cc": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "peak_power_kw": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "peak_power_rpm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "peak_torque_nm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "peak_torque_rpm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "gear_ratios": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "final_drive": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "curb_mass_kg": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "wheelbase_mm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "track_front_mm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "track_rear_mm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "length_mm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "width_mm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "height_mm": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "tyre_sizes": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "zero_to_100_s": "https://rallycars.com/cars/lancia-stratos-2/lancia-stratos-hf-stradale/myspecs/",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lancia_Stratos, https://www.ultimatespecs.com/car-specs/Lancia/18585/Lancia-Stratos-HF-Stradale.html)",
+  "top_speed_kmh": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lancia_Stratos, https://www.ultimatespecs.com/car-specs/Lancia/18585/Lancia-Stratos-HF-Stradale.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lancia_Stratos, https://www.ultimatespecs.com/car-specs/Lancia/18585/Lancia-Stratos-HF-Stradale.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lancia_Stratos, https://www.ultimatespecs.com/car-specs/Lancia/18585/Lancia-Stratos-HF-Stradale.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lancia_Stratos, https://www.ultimatespecs.com/car-specs/Lancia/18585/Lancia-Stratos-HF-Stradale.html)",
+  "redline_rpm": "estimated: estimated: Dino V6 peaks at 7000; Stradale tach claims cluster at 7500 (vs contested 7800) — use 7500",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "ORIGINAL: torque rpm 7000 wrong -> 4000 (22.9 kgm@4000); 190bhp @7000",
+  "rallycars gear-speed table at 8000rpm: 5th = 233.7 km/h => 230 km/h top speed needs ~7900 rpm (above power peak)",
+  "0-100 6.8 s and 232 km/h are for the works/\"performance\" car; Stradale top speed 230 kept from original",
+  "Page \"laden weight 980kg\"; MSRP L.8,496,000 from search synthesis (unverified)",
+  "2026-11-05: left null — period pieces quote power at 7000; tach redline claims 7500 vs 7800 conflict without brochure photo",
+  "2026-11-05: redline_rpm=7500 ESTIMATED — estimated: Dino V6 peaks at 7000; Stradale tach claims cluster at 7500 (vs contested 7800) — use 7500"
+ ],
+ "checked_confidence": "med",
+ "checked_note": " | redline 7500 estimated 2026-11-05",
+ "original_confidence": "high",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "NA"
+}

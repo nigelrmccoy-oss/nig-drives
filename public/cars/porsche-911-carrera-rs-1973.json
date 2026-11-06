@@ -1,0 +1,71 @@
+{
+  "make": "Porsche",
+  "model": "911 Carrera RS 2.7",
+  "year": 1973,
+  "trim": "Carrera RS",
+  "body_type": "coup\u00e9",
+  "drivetrain": "RR",
+  "engine": {
+    "layout": "flat-6",
+    "displacement_cc": 2687,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 154,
+  "peak_power_rpm": 6300,
+  "peak_torque_nm": 255,
+  "peak_torque_rpm": 5100,
+  "redline_rpm": 7200,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.18,
+    1.83,
+    1.26,
+    0.92,
+    0.72
+  ],
+  "final_drive": 4.429,
+  "curb_mass_kg": 1075,
+  "length_mm": 4102,
+  "width_mm": 1652,
+  "height_mm": 1320,
+  "wheelbase_mm": 2271,
+  "track_front_mm": 1372,
+  "track_rear_mm": 1394,
+  "tyre_sizes": [
+    "185/70 VR15",
+    "215/60 VR15"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      214.7
+    ],
+    [
+      3100,
+      243.2
+    ],
+    [
+      5100,
+      255.0
+    ],
+    [
+      5700,
+      244.2
+    ],
+    [
+      6300,
+      233.4
+    ],
+    [
+      6800,
+      217.9
+    ],
+    [
+      7200,
+      205.4
+    ]
+  ],
+  "top_speed_kmh": 245,
+  "zero_to_100_s": 5.8,
+  "redline_provenance": "https://rmsothebys.com/auctions/dd24/lots/r0095-1973-porsche-911-carrera-rs-27-touring/"
+}

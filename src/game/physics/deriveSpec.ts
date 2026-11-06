@@ -4,6 +4,7 @@ import { GOLF_19TDI } from './specs/golf19tdi';
 import { MODEL3_LR_AWD } from './specs/model3LrAwd';
 import { CATALOG_CARS } from '../../data/cars';
 import { physicsSpecFromCatalog } from '../vehicles/catalogFromJson';
+import { suspensionFromMass } from './suspensionDefaults';
 
 const G = 9.81;
 const RHO = 1.225;
@@ -100,6 +101,7 @@ export function derivePhysicsSpec(spec: VehicleSpec): PhysicsSpec {
       bodyDamping: bus ? 0.5 : 0.45,
       rearDualTyres: bus,
     },
+    suspension: suspensionFromMass(spec.mass, spec.wheelbase, spec.frontBias, 'estimated'),
     tire: {
       radius,
       widthM: bus ? 0.3 : 0.195,

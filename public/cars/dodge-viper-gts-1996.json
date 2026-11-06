@@ -1,0 +1,72 @@
+{
+  "make": "Dodge",
+  "model": "Viper GTS",
+  "year": 1996,
+  "trim": "GTS",
+  "body_type": "sedan",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "V-10",
+    "displacement_cc": 7990,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 335,
+  "peak_power_rpm": 5200,
+  "peak_torque_nm": 664,
+  "peak_torque_rpm": 3700,
+  "redline_rpm": 6000,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    2.66,
+    1.78,
+    1.3,
+    1.0,
+    0.74,
+    0.5
+  ],
+  "final_drive": 3.07,
+  "curb_mass_kg": 1535,
+  "weight_dist_front_pct": 46,
+  "length_mm": 4488,
+  "width_mm": 1924,
+  "height_mm": 1195,
+  "wheelbase_mm": 2444,
+  "track_front_mm": 1514,
+  "track_rear_mm": 1538,
+  "tyre_sizes": [
+    "275/40 ZR17",
+    "335/35 ZR17"
+  ],
+  "torque_curve": [
+    [
+      1200,
+      603.4
+    ],
+    [
+      2200,
+      642.2
+    ],
+    [
+      3700,
+      664.0
+    ],
+    [
+      4400,
+      641.2
+    ],
+    [
+      5200,
+      615.2
+    ],
+    [
+      5600,
+      569.0
+    ],
+    [
+      6000,
+      522.9
+    ]
+  ],
+  "top_speed_kmh": 304,
+  "redline_provenance": "http://www.vipercentral.com/specifications/1996.html"
+}

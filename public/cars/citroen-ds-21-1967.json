@@ -1,0 +1,68 @@
+{
+  "make": "Citro\u00ebn",
+  "model": "DS 21",
+  "year": 1967,
+  "trim": "DS 21",
+  "body_type": "4-door saloon",
+  "drivetrain": "FF",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 2175,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 74,
+  "peak_power_rpm": 5500,
+  "peak_torque_nm": 164,
+  "peak_torque_rpm": 3000,
+  "redline_rpm": 6000,
+  "gearbox_type": "4-speed manual (hydraulic clutch/gear selection)",
+  "gear_ratios": [
+    3.251,
+    1.833,
+    1.207,
+    0.852
+  ],
+  "final_drive": 4.375,
+  "curb_mass_kg": 1295,
+  "length_mm": 4874,
+  "width_mm": 1803,
+  "height_mm": 1470,
+  "wheelbase_mm": 3125,
+  "tyre_sizes": [
+    "180 HR15 front",
+    "155 HR15 rear"
+  ],
+  "torque_curve": [
+    [
+      1200,
+      146.3
+    ],
+    [
+      1800,
+      156.1
+    ],
+    [
+      3000,
+      164.0
+    ],
+    [
+      4200,
+      146.9
+    ],
+    [
+      5500,
+      128.5
+    ],
+    [
+      5800,
+      119.2
+    ],
+    [
+      6000,
+      113.1
+    ]
+  ],
+  "top_speed_kmh": 175,
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: peak power 5500 + ~500 rpm; soft 1960s pushrod I4 (no tach) \u2014 6000 is a conservative fuel-cut stand-in"
+}

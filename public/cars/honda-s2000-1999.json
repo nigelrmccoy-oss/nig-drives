@@ -1,0 +1,69 @@
+{
+  "make": "Honda",
+  "model": "S2000",
+  "year": 1999,
+  "trim": "AP1",
+  "body_type": "roadster",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1997,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 184,
+  "peak_power_rpm": 8300,
+  "peak_torque_nm": 218,
+  "peak_torque_rpm": 7500,
+  "redline_rpm": 9000,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.133,
+    2.045,
+    1.481,
+    1.161,
+    0.97,
+    0.81
+  ],
+  "final_drive": 4.1,
+  "curb_mass_kg": 1250,
+  "weight_dist_front_pct": 49,
+  "length_mm": 4135,
+  "width_mm": 1750,
+  "height_mm": 1285,
+  "wheelbase_mm": 2400,
+  "track_front_mm": 1470,
+  "track_rear_mm": 1510,
+  "tyre_sizes": [
+    "215/45 R17",
+    "245/40 R17"
+  ],
+  "torque_curve": [
+    [
+      1800,
+      180.2
+    ],
+    [
+      4500,
+      207.5
+    ],
+    [
+      7500,
+      218.0
+    ],
+    [
+      8300,
+      211.7
+    ],
+    [
+      8600,
+      200.8
+    ],
+    [
+      9000,
+      186.3
+    ]
+  ],
+  "top_speed_kmh": 240,
+  "zero_to_100_s": 6.2,
+  "redline_provenance": "https://hondanews.com/en-US/honda-automobiles/releases/release-5cf69ff7f30a01d81cc648004c34c870-honda-s2000-powertrain"
+}

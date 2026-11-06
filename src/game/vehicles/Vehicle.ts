@@ -411,6 +411,9 @@ export class Vehicle {
   private kUs = 0;
   private throttleIn = 0;
   private brakeIn = 0;
+  /** Active tyre compound (front) for heat window + HUD. */
+  readonly compoundId: string;
+  readonly build: CarBuild;
 
   constructor(
     spec: VehicleSpec,
@@ -419,8 +422,11 @@ export class Vehicle {
     build: CarBuild = stockBuild(),
   ) {
     this.spec = spec;
+    this.build = build;
+    this.compoundId = build.tyres.front;
     this.phys = compileBuild(physicsSpecFor(spec), build);
     this.sim = new VehicleSim(this.phys);
+    this.sim.setHeatCompound(this.compoundId);
     this.powertrain = new Powertrain(this.phys);
     this.ev = this.phys.ev ? new EvDrive(this.phys.ev) : null;
     // EVs have one fixed reduction: no clutch, no gears, always the auto selector (P R N D)
@@ -677,6 +683,8 @@ export class Vehicle {
       noise,
       gradeSin,
       hold,
+      ambientC: 22,
+      compoundId: this.compoundId,
     });
 
     const c = Math.cos(this.heading);

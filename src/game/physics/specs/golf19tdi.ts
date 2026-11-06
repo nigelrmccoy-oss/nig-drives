@@ -28,6 +28,18 @@ export const GOLF_19TDI: PhysicsSpec = {
     bodyFreqHz: 1.5,
     bodyDamping: 0.45,
   },
+  suspension: {
+    rideHeightMm: 140,
+    springFront: 22000,
+    springRear: 20000,
+    damperBumpFront: 1800,
+    damperBumpRear: 1600,
+    damperReboundFront: 2100,
+    damperReboundRear: 1900,
+    arbFront: 12000,
+    arbRear: 9000,
+    provenance: 'estimated',
+  },
   tire: {
     radius: 0.314, // 205/60 R15
     widthM: 0.205,

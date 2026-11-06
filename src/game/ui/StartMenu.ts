@@ -61,6 +61,9 @@ export class StartMenu {
   private assists: AssistPrefs = loadAssistPrefs();
   private compound: CompoundId = 'all_season';
   private onStart: (sel: StartSelection) => void;
+  onTune: ((id: VehicleId) => void) | null = null;
+  onOptions: (() => void) | null = null;
+  onTutorial: (() => void) | null = null;
 
   constructor(parent: HTMLElement, onStart: (sel: StartSelection) => void) {
     this.onStart = onStart;
@@ -224,6 +227,9 @@ export class StartMenu {
 
         <div class="menu-actions">
           <button type="button" id="start-btn">Start driving</button>
+          <button type="button" id="tune-btn" class="secondary-btn">Tune / upgrades</button>
+          <button type="button" id="options-btn" class="secondary-btn">Options</button>
+          <button type="button" id="tut-btn" class="secondary-btn">Tutorial</button>
           <button type="button" id="dyno-btn" class="secondary-btn">Dyno: ${VEHICLE_SPECS[this.vehicle].variantLabel}</button>
         </div>
 
@@ -299,6 +305,12 @@ export class StartMenu {
     this.root.querySelector('#dyno-btn')!.addEventListener('click', () => {
       openDyno(this.root, this.vehicle);
     });
+    this.root.querySelector('#tune-btn')?.addEventListener('click', () => {
+      this.persistBuildForVehicle(this.vehicle);
+      this.onTune?.(this.vehicle);
+    });
+    this.root.querySelector('#options-btn')?.addEventListener('click', () => this.onOptions?.());
+    this.root.querySelector('#tut-btn')?.addEventListener('click', () => this.onTutorial?.());
 
     this.root.querySelectorAll('[data-trans]').forEach((btn) => {
       btn.addEventListener('click', () => {

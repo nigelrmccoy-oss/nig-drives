@@ -1,0 +1,70 @@
+{
+  "make": "Audi",
+  "model": "Quattro",
+  "year": 1984,
+  "trim": "Quattro 2.1 Turbo 200 PS (WR)",
+  "body_type": "coup\u00e9",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "inline-5",
+    "displacement_cc": 2144,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 147,
+  "peak_power_rpm": 5500,
+  "peak_torque_nm": 285,
+  "peak_torque_rpm": 3500,
+  "redline_rpm": 6750,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.6,
+    2.13,
+    1.36,
+    0.97,
+    0.78
+  ],
+  "final_drive": 3.89,
+  "curb_mass_kg": 1290,
+  "length_mm": 4404,
+  "width_mm": 1723,
+  "height_mm": 1344,
+  "wheelbase_mm": 2524,
+  "track_front_mm": 1416,
+  "track_rear_mm": 1494,
+  "tyre_sizes": [
+    "215/50 HR15"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      196.4
+    ],
+    [
+      2100,
+      242.6
+    ],
+    [
+      3500,
+      285.0
+    ],
+    [
+      4500,
+      270.1
+    ],
+    [
+      5500,
+      255.2
+    ],
+    [
+      6100,
+      230.7
+    ],
+    [
+      6750,
+      204.2
+    ]
+  ],
+  "top_speed_kmh": 221,
+  "zero_to_100_s": 7.3,
+  "redline_provenance": "https://www.motortrend.com/reviews/audiquattro"
+}

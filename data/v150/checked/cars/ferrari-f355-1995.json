@@ -1,0 +1,124 @@
+{
+ "make": "Ferrari",
+ "model": "F355",
+ "year": 1995,
+ "trim": "Berlinetta",
+ "body_type": "coupé",
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "V-8",
+  "displacement_cc": 3495,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 279,
+ "peak_power_rpm": 8200,
+ "peak_torque_nm": 360,
+ "peak_torque_rpm": 5800,
+ "torque_curve": [
+  [
+   1700,
+   324.0
+  ],
+  [
+   3500,
+   348.7
+  ],
+  [
+   5800,
+   360.0
+  ],
+  [
+   7000,
+   342.4
+  ],
+  [
+   8200,
+   324.9
+  ],
+  [
+   8500,
+   276.2
+  ]
+ ],
+ "redline_rpm": 8500,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.066,
+  2.157,
+  1.608,
+  1.269,
+  1.034,
+  0.837
+ ],
+ "final_drive": 3.562,
+ "curb_mass_kg": 1440,
+ "weight_dist_front_pct": null,
+ "length_mm": 4250,
+ "width_mm": 1900,
+ "height_mm": 1170,
+ "wheelbase_mm": 2450,
+ "track_front_mm": 1515,
+ "track_rear_mm": 1615,
+ "tyre_sizes": [
+  "225/40 ZR18",
+  "265/40 ZR18"
+ ],
+ "zero_to_100_s": 4.7,
+ "top_speed_kmh": 295,
+ "msrp": {
+  "amount": 15700000,
+  "currency": "JPY",
+  "year": 1995,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Ferrari_F355",
+  "https://www.ultimatespecs.com/car-specs/Ferrari/1971/Ferrari-F355-Berlinetta.html"
+ ],
+ "confidence": "high",
+ "notes": "18/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Ferrari-F355-Berlinetta.html).",
+ "torque_curve_shape": "V8",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 360,
+  "top_gear_at_peak-power_rpm_kmh": 347,
+  "required_CdA_m2_for_top_speed": 0.66
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "length_mm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "width_mm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "height_mm": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/ferrari/f355/e-f355b/9000358/",
+  "gear_ratios": "https://www.ferrarichat.com/forum/threads/f355-final-drive.3930/",
+  "final_drive": "https://www.ferrarichat.com/forum/threads/f355-final-drive.3930/",
+  "redline_rpm": "http://www.ferrari-data.cz/ferrari_f355.html",
+  "zero_to_100_s": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Ferrari_F355, https://www.ultimatespecs.com/car-specs/Ferrari/1971/Ferrari-F355-Berlinetta.html)",
+  "top_speed_kmh": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Ferrari_F355, https://www.ultimatespecs.com/car-specs/Ferrari/1971/Ferrari-F355-Berlinetta.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Ferrari_F355, https://www.ultimatespecs.com/car-specs/Ferrari/1971/Ferrari-F355-Berlinetta.html)",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "JDM catalog: 380PS (279kW) @8200, 360Nm @5800, 1440kg (orig 1350kg dry); original torque null",
+  "Original tyres 225/40R18,265/40R18 confirmed",
+  "Gear ratios/FD (3.562 = 16:57) from FerrariChat table; redline 8500 per ferrari-data.cz (page also lists 8250 power rpm); JDM catalog 380PS@8200 vs 8250 elsewhere"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true
+}

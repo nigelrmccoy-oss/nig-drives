@@ -1,0 +1,118 @@
+{
+ "make": "BMW",
+ "model": "M3",
+ "year": 1988,
+ "trim": "E30 Euro (S14 2.3, non-cat)",
+ "body_type": "2-door coupe",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 2302,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 147,
+ "peak_power_rpm": 6750,
+ "peak_torque_nm": 240,
+ "peak_torque_rpm": 4750,
+ "redline_rpm": 7250,
+ "gearbox_type": "5-speed manual (Getrag 265/5 dogleg)",
+ "gear_ratios": [
+  3.72,
+  2.4,
+  1.77,
+  1.26,
+  1.0
+ ],
+ "final_drive": 3.25,
+ "curb_mass_kg": 1200,
+ "weight_dist_front_pct": null,
+ "length_mm": 4345,
+ "width_mm": 1680,
+ "height_mm": 1370,
+ "wheelbase_mm": 2562,
+ "track_front_mm": 1412,
+ "track_rear_mm": 1433,
+ "tyre_sizes": [
+  "205/55 VR15"
+ ],
+ "zero_to_100_s": 6.7,
+ "top_speed_kmh": 235,
+ "msrp": {
+  "amount": 59800,
+  "currency": "DEM",
+  "year": 1986,
+  "market": "DE",
+  "source": "https://s14.de/en/models/e30-m3/"
+ },
+ "sources": [
+  "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "https://e30mpower.com/M3-techspec.html",
+  "https://www.e30zone.net/e30wiki/index.php/M3",
+  "https://www.roadandtrack.com/reviews/a37867983/bmw-m3-guide/"
+ ],
+ "confidence": "high",
+ "notes": "Euro-spec non-catalyst S14 200 PS / 240 Nm. Dogleg Getrag close-ratio box and 3.25 final drive (US cars used overdrive box + 4.10). Redline 7250 from factory tach marking / R&T. Launch DE list price DM 58,800–59,800 (1986 intro; kept as 59800 DEM).",
+ "provenance": {
+  "engine.layout": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "engine.displacement_cc": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "engine.aspiration": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "peak_power_kw": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "peak_power_rpm": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "peak_torque_nm": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "peak_torque_rpm": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "redline_rpm": "https://www.roadandtrack.com/reviews/a37867983/bmw-m3-guide/",
+  "gearbox_type": "https://e30mpower.com/M3-techspec.html",
+  "gear_ratios": "https://e30mpower.com/M3-techspec.html",
+  "final_drive": "https://e30mpower.com/M3-techspec.html",
+  "curb_mass_kg": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "length_mm": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "width_mm": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "height_mm": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "wheelbase_mm": "https://e30mpower.com/M3-techspec.html",
+  "track_front_mm": "https://e30mpower.com/M3-techspec.html",
+  "track_rear_mm": "https://e30mpower.com/M3-techspec.html",
+  "tyre_sizes": "https://e30mpower.com/M3-techspec.html",
+  "zero_to_100_s": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "top_speed_kmh": "https://www.m3e30.se/datablad/std_1988-89.pdf",
+  "drivetrain": "https://e30mpower.com/M3-techspec.html",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "Euro tech sheet does not publish F/R split; US Carfolio lists 52.9% but that is US-spec mass"
+ },
+ "checked_flags": [
+  "SWAP IN for plymouth-hemi-cuda-1970: Euro E30 M3 chosen for complete published gearbox, FD, redline, mass and dims from BMW tech sheet / e30mpower",
+  "US-spec cars differ: 143 kW SAE, Getrag 265/6 overdrive ratios, FD 4.10, kerb ~1296 kg — this file is Euro non-cat"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "Added 2026-11-05 swap pass. Prefer Euro dogleg numbers; do not mix with US overdrive set.",
+ "original_confidence": null,
+ "torque_curve": [
+  [
+   1400,
+   204.2
+  ],
+  [
+   2800,
+   227.9
+  ],
+  [
+   4750,
+   240.0
+  ],
+  [
+   5800,
+   223.2
+  ],
+  [
+   6750,
+   208.0
+  ],
+  [
+   7250,
+   183.0
+  ]
+ ],
+ "torque_curve_shape": "NA",
+ "drivable": true
+}

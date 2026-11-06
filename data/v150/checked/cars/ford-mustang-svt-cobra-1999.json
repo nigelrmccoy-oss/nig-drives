@@ -1,0 +1,120 @@
+{
+ "make": "Ford",
+ "model": "Mustang SVT Cobra",
+ "year": 1999,
+ "trim": "SVT Cobra",
+ "body_type": "coupe",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "V-8",
+  "displacement_cc": 4601,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 239,
+ "peak_power_rpm": 6000,
+ "peak_torque_nm": 430,
+ "peak_torque_rpm": 4750,
+ "torque_curve": [
+  [
+   1300,
+   384.6
+  ],
+  [
+   2800,
+   415.5
+  ],
+  [
+   4750,
+   430.0
+  ],
+  [
+   5400,
+   404.2
+  ],
+  [
+   6000,
+   380.4
+  ],
+  [
+   6500,
+   323.3
+  ]
+ ],
+ "redline_rpm": 6500,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.37,
+  1.99,
+  1.33,
+  1.0,
+  0.67
+ ],
+ "final_drive": 3.27,
+ "curb_mass_kg": 1556,
+ "weight_dist_front_pct": null,
+ "length_mm": 4653,
+ "width_mm": 1857,
+ "height_mm": 1349,
+ "wheelbase_mm": 2573,
+ "track_front_mm": 1534,
+ "track_rear_mm": 1539,
+ "tyre_sizes": [
+  "245/45 ZR17"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 27470,
+  "currency": "USD",
+  "year": 1999,
+  "market": "US",
+  "source": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Ford_Mustang_(fourth_generation)"
+ ],
+ "confidence": "med",
+ "notes": "10/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "torque_curve_shape": "V8",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 365,
+  "top_gear_at_peak-power_rpm_kmh": 337
+ },
+ "provenance": {
+  "engine.layout": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "engine.displacement_cc": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "engine.aspiration": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "peak_power_kw": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "peak_power_rpm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "peak_torque_nm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "peak_torque_rpm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "redline_rpm": "https://www.caranddriver.com/reviews/a15140813/1999-ford-mustang-svt-cobra-tested-review/",
+  "gearbox_type": "https://www.moderndriveline.com/tremec-t-45/",
+  "gear_ratios": "https://www.moderndriveline.com/tremec-t-45/",
+  "final_drive": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "curb_mass_kg": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "wheelbase_mm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "length_mm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "width_mm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "height_mm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "track_front_mm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "track_rear_mm": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "tyre_sizes": "https://www.musclecardrive.com/specs/ford/1999-ford-mustang-cobra.php",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Ford_Mustang_(fourth_generation))",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: 3.8L V6 (that is the base Mustang); Cobra is 4.6 DOHC V8 320hp",
+  "Imperial converted; redline 6500 and MSRP $27,470 from search synthesis (C&D/mustangspecs) not verified in page text",
+  "1999 Cobra recalled for 320hp (re-rated 320 hp)"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true
+}

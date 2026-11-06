@@ -1,0 +1,121 @@
+{
+ "make": "Chevrolet",
+ "model": "Chevelle SS 454",
+ "year": 1970,
+ "trim": "SS 454 LS6",
+ "body_type": "coupe",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "V-8",
+  "displacement_cc": 7440,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 336,
+ "peak_power_rpm": 5600,
+ "peak_torque_nm": 678,
+ "peak_torque_rpm": 3600,
+ "torque_curve": [
+  [
+   1300,
+   622.7
+  ],
+  [
+   2200,
+   657.5
+  ],
+  [
+   3600,
+   678.0
+  ],
+  [
+   4600,
+   625.5
+  ],
+  [
+   5600,
+   572.9
+  ],
+  [
+   6000,
+   534.7
+  ],
+  [
+   6500,
+   487.0
+  ]
+ ],
+ "redline_rpm": 6500,
+ "gearbox_type": "4-speed manual (Muncie M22)",
+ "gear_ratios": [
+  2.2,
+  1.64,
+  1.27,
+  1.0
+ ],
+ "final_drive": 4.11,
+ "curb_mass_kg": 1705,
+ "weight_dist_front_pct": null,
+ "length_mm": 5009,
+ "width_mm": 1915,
+ "height_mm": 1336,
+ "wheelbase_mm": 2845,
+ "track_front_mm": 1524,
+ "track_rear_mm": 1519,
+ "tyre_sizes": [
+  "F70-14"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 2809,
+  "currency": "USD",
+  "year": 1970,
+  "market": "US",
+  "source": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Chevrolet_Chevelle"
+ ],
+ "confidence": "low",
+ "notes": "5/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "provenance": {
+  "engine.layout": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "engine.displacement_cc": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "engine.aspiration": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "peak_power_kw": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "peak_power_rpm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "peak_torque_nm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "peak_torque_rpm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "gearbox_type": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "gear_ratios": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "final_drive": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "curb_mass_kg": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "length_mm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "width_mm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "height_mm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "wheelbase_mm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "track_front_mm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "track_rear_mm": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "tyre_sizes": "https://www.motortrend.com/reviews/1601-flashback-road-test-of-a-1970-chevrolet-chevelle-ls6",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Chevrolet_Chevelle)",
+  "redline_rpm": "https://chevellestuff.net/1970/misc/tach_codes.htm",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "MT test table not parsed",
+  "top_speed_kmh": "not sourced"
+ },
+ "checked_flags": [
+  "Original had 1477 kg / 5004 length with null power; replaced: mass is 3759 lb SHIPPING weight (not curb) from MT test spec table",
+  "Rear axle 4.11 is the tested car (3.77/3.31/4.10 options exist); Chevelle SS 454 LS6 base Malibu Sport Coupe price $2,809 (LS6 option +$263 not in base)",
+  "Original tyres F60-15 not stated; test car F70-14",
+  "Gross vs net hp: 450 hp is SAE gross rating",
+  "2026-11-05: 1970 Chevelle tach broadcast code 983 = 6500 rpm redline for L78/LS6 (chevellestuff factory tach codes)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "low",
+ "drivable": true,
+ "torque_curve_shape": "V8"
+}

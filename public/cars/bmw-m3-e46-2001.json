@@ -1,0 +1,62 @@
+{
+  "make": "BMW",
+  "model": "M3 (E46)",
+  "year": 2001,
+  "trim": "M3",
+  "body_type": "sedan",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-6",
+    "displacement_cc": 3246,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 248,
+  "peak_power_rpm": 7900,
+  "peak_torque_nm": 355,
+  "peak_torque_rpm": 4900,
+  "redline_rpm": 8000,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    4.23,
+    2.53,
+    1.67,
+    1.23,
+    1.0,
+    0.83
+  ],
+  "final_drive": 3.62,
+  "curb_mass_kg": 1570,
+  "weight_dist_front_pct": 49,
+  "wheelbase_mm": 2725,
+  "tyre_sizes": [
+    "225/45 ZR18",
+    "255/40 ZR18"
+  ],
+  "torque_curve": [
+    [
+      1600,
+      306.7
+    ],
+    [
+      2900,
+      337.3
+    ],
+    [
+      4900,
+      355.0
+    ],
+    [
+      6400,
+      327.4
+    ],
+    [
+      7900,
+      299.8
+    ],
+    [
+      8000,
+      263.8
+    ]
+  ],
+  "redline_provenance": "https://mye46.com/gear-ratios/"
+}

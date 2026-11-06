@@ -1,0 +1,66 @@
+{
+  "make": "Shelby",
+  "model": "Mustang GT350",
+  "year": 1966,
+  "trim": "GT350",
+  "body_type": "fastback",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "V-8",
+    "displacement_cc": 4727,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 228,
+  "peak_power_rpm": 6000,
+  "peak_torque_nm": 446,
+  "peak_torque_rpm": 4200,
+  "redline_rpm": 6500,
+  "gearbox_type": "4-speed manual",
+  "gear_ratios": [
+    2.36,
+    1.62,
+    1.2,
+    1.0
+  ],
+  "final_drive": 3.89,
+  "curb_mass_kg": 1334,
+  "weight_dist_front_pct": 53,
+  "length_mm": 4613,
+  "width_mm": 1732,
+  "height_mm": 1300,
+  "wheelbase_mm": 2743,
+  "track_front_mm": 1422,
+  "track_rear_mm": 1422,
+  "tyre_sizes": [
+    "7.75-15"
+  ],
+  "torque_curve": [
+    [
+      1300,
+      403.5
+    ],
+    [
+      2500,
+      431.4
+    ],
+    [
+      4200,
+      446.0
+    ],
+    [
+      5100,
+      404.4
+    ],
+    [
+      6000,
+      362.9
+    ],
+    [
+      6500,
+      308.4
+    ]
+  ],
+  "top_speed_kmh": 200,
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: 289 Hi-Po peaks at 6000; period Hi-Po practice and solid-lifter cousins run ~6500 (9000 is tach scale, not redline)"
+}

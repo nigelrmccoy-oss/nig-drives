@@ -1,0 +1,128 @@
+{
+ "make": "Fiat",
+ "model": "500R",
+ "year": 1972,
+ "trim": "R",
+ "body_type": "saloon",
+ "drivetrain": "RR",
+ "engine": {
+  "layout": "inline-2",
+  "displacement_cc": 594,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 13,
+ "peak_power_rpm": 4000,
+ "peak_torque_nm": 36,
+ "peak_torque_rpm": 2800,
+ "torque_curve": [
+  [
+   1000,
+   31.5
+  ],
+  [
+   1700,
+   34.3
+  ],
+  [
+   2800,
+   36.0
+  ],
+  [
+   3400,
+   33.5
+  ],
+  [
+   4000,
+   31.0
+  ],
+  [
+   4400,
+   29.2
+  ],
+  [
+   4800,
+   27.3
+  ]
+ ],
+ "redline_rpm": 4800,
+ "gearbox_type": "4-speed manual",
+ "gear_ratios": [
+  3.25,
+  2.067,
+  1.3,
+  0.872
+ ],
+ "final_drive": 4.875,
+ "curb_mass_kg": 525,
+ "weight_dist_front_pct": null,
+ "length_mm": 2970,
+ "width_mm": 1320,
+ "height_mm": 1325,
+ "wheelbase_mm": 1840,
+ "track_front_mm": 1120,
+ "track_rear_mm": 1137,
+ "tyre_sizes": [
+  "125-12"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": 105,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "launch price not found"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Fiat_500"
+ ],
+ "confidence": "low",
+ "notes": "9/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "torque_curve_shape": "NA",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 109,
+  "top_gear_at_peak-power_rpm_kmh": 90,
+  "required_CdA_m2_for_top_speed": 0.57
+ },
+ "provenance": {
+  "engine.layout": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "engine.displacement_cc": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "engine.aspiration": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "peak_power_kw": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "peak_power_rpm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "peak_torque_nm": "https://webshop.fiat500126.com/en/sites/427",
+  "peak_torque_rpm": "https://webshop.fiat500126.com/en/sites/427",
+  "redline_rpm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "gearbox_type": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "gear_ratios": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "final_drive": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "curb_mass_kg": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "wheelbase_mm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "track_front_mm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "track_rear_mm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "length_mm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "width_mm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "height_mm": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "tyre_sizes": "https://www.500forum.it/forum/viewtopic.php?t=3450",
+  "top_speed_kmh": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Fiat_500)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Fiat_500)",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure (RR layout, rear-biased)",
+  "zero_to_100_s": "no source found"
+ },
+ "checked_flags": [
+  "Orig displacement 479 (that is the 500 Nuova) -> 594 cc (500R)",
+  "Orig mass 499 -> 525 kg (Fiat running-order, official data sheet)",
+  "Power 18 CV (DIN) = 13.2 kW; 18 CV @4000 from Fiat data sheet; torque 36 Nm@2800 only from search synthesis citing 500forum/fiat500126 (not seen in page text)",
+  "Redline 4800 rpm = the rpm Fiat uses for its max-speed-per-gear table (not a tach redline)",
+  "FD = 8/39 crown/pinion = 4.875",
+  "Tyres are cross-ply 125-12",
+  "Orig top speed 105 km/h kept, unverified"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "low",
+ "drivable": true
+}

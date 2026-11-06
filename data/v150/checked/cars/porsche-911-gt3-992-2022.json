@@ -1,0 +1,128 @@
+{
+ "make": "Porsche",
+ "model": "911 GT3 (992)",
+ "year": 2022,
+ "trim": "GT3",
+ "body_type": "2-door coupé",
+ "drivetrain": "RR",
+ "engine": {
+  "layout": "flat-6",
+  "displacement_cc": 3996,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 375,
+ "peak_power_rpm": 8400,
+ "peak_torque_nm": 470,
+ "peak_torque_rpm": 6100,
+ "torque_curve": [
+  [
+   1800,
+   399.9
+  ],
+  [
+   3700,
+   448.2
+  ],
+  [
+   6100,
+   470.0
+  ],
+  [
+   7200,
+   449.1
+  ],
+  [
+   8400,
+   426.3
+  ],
+  [
+   8700,
+   400.7
+  ],
+  [
+   9000,
+   375.1
+  ]
+ ],
+ "redline_rpm": 9000,
+ "gearbox_type": "7-speed PDK",
+ "gear_ratios": [
+  3.75,
+  2.38,
+  1.72,
+  1.34,
+  1.11,
+  0.96,
+  0.84
+ ],
+ "final_drive": 4.54,
+ "curb_mass_kg": 1435,
+ "weight_dist_front_pct": null,
+ "length_mm": 4573,
+ "width_mm": 1852,
+ "height_mm": 1279,
+ "wheelbase_mm": 2457,
+ "track_front_mm": 1601,
+ "track_rear_mm": 1553,
+ "tyre_sizes": [
+  "255/35 ZR20",
+  "315/30 ZR21"
+ ],
+ "zero_to_100_s": 3.4,
+ "top_speed_kmh": 318,
+ "msrp": {
+  "amount": 167518,
+  "currency": "EUR",
+  "year": 2021,
+  "market": "Germany (incl. VAT)",
+  "source": "https://newsroom.porsche.com/dam/jcr:fb50dab0-0b3d-4b2d-b4d7-70e42fc381cf/PAG_992_GT3_EN.pdf"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Porsche_911_(992)"
+ ],
+ "confidence": "med",
+ "notes": "10/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "torque_curve_shape": "NA",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 321,
+  "top_gear_at_peak-power_rpm_kmh": 300,
+  "required_CdA_m2_for_top_speed": 0.72
+ },
+ "provenance": {
+  "engine.layout": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "engine.displacement_cc": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "engine.aspiration": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "peak_power_kw": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "peak_power_rpm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "peak_torque_nm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "peak_torque_rpm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "redline_rpm": "https://newsroom.porsche.com/dam/jcr:fb50dab0-0b3d-4b2d-b4d7-70e42fc381cf/PAG_992_GT3_EN.pdf",
+  "gearbox_type": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "gear_ratios": "https://newsroom.porsche.com/dam/jcr:ca1882c7-1588-4a2e-995c-fe19ef1281fc/pag-911-gt3-pdk-en.pdf",
+  "final_drive": "https://newsroom.porsche.com/dam/jcr:ca1882c7-1588-4a2e-995c-fe19ef1281fc/pag-911-gt3-pdk-en.pdf",
+  "curb_mass_kg": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "wheelbase_mm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "track_front_mm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "track_rear_mm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "length_mm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "width_mm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "height_mm": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "tyre_sizes": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "zero_to_100_s": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "top_speed_kmh": "https://www.carrerafever.net/2022-porsche-911-gt3-pdk-specs/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Porsche_911_(992))",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: twin-turbo, mass 1710, 330 km/h; 992.1 GT3 is 4.0 NA, 1435 kg DIN",
+  "Gear ratios/FD 4.54 from the 992.2 (MY2025) press PDF - 992.1 PDK believed identical but not independently verified; 992.2 tracks 1601/1553 equal carrerafever 992.1 listing",
+  "Press-kit launch price EUR 167,518 incl. VAT"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true
+}

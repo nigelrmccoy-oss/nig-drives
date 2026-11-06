@@ -1,0 +1,65 @@
+{
+  "make": "Datsun",
+  "model": "240Z",
+  "year": 1971,
+  "trim": "240Z",
+  "body_type": "coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-6",
+    "displacement_cc": 2393,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 113,
+  "peak_power_rpm": 5600,
+  "peak_torque_nm": 198,
+  "peak_torque_rpm": 4400,
+  "redline_rpm": 7000,
+  "gearbox_type": "4-speed manual",
+  "gear_ratios": [
+    3.549,
+    2.197,
+    1.42,
+    1.0
+  ],
+  "final_drive": 3.364,
+  "curb_mass_kg": 1066,
+  "length_mm": 4135,
+  "width_mm": 1631,
+  "height_mm": 1283,
+  "wheelbase_mm": 2305,
+  "tyre_sizes": [
+    "175 HR14"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      170.4
+    ],
+    [
+      2600,
+      188.1
+    ],
+    [
+      4400,
+      198.0
+    ],
+    [
+      5000,
+      195.3
+    ],
+    [
+      5600,
+      192.7
+    ],
+    [
+      6300,
+      181.1
+    ],
+    [
+      7000,
+      169.6
+    ]
+  ],
+  "redline_provenance": "https://www.enginemark.com/nissan-datsun-240z/gauges-instrument-cluster"
+}

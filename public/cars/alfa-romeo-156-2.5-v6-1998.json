@@ -1,0 +1,73 @@
+{
+  "make": "Alfa Romeo",
+  "model": "156",
+  "year": 1998,
+  "trim": "2.5 V6 24V",
+  "body_type": "sedan",
+  "drivetrain": "FF",
+  "engine": {
+    "layout": "V-6",
+    "displacement_cc": 2492,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 140,
+  "peak_power_rpm": 6300,
+  "peak_torque_nm": 222,
+  "peak_torque_rpm": 5000,
+  "redline_rpm": 7000,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.5,
+    2.235,
+    1.52,
+    1.156,
+    0.971,
+    0.816
+  ],
+  "final_drive": 3.937,
+  "curb_mass_kg": 1320,
+  "weight_dist_front_pct": 62.9,
+  "length_mm": 4430,
+  "width_mm": 1755,
+  "height_mm": 1415,
+  "wheelbase_mm": 2595,
+  "track_front_mm": 1515,
+  "track_rear_mm": 1505,
+  "tyre_sizes": [
+    "205/60 R15",
+    "205/55 ZR16"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      187.5
+    ],
+    [
+      3000,
+      211.3
+    ],
+    [
+      5000,
+      222.0
+    ],
+    [
+      5600,
+      217.5
+    ],
+    [
+      6300,
+      212.2
+    ],
+    [
+      6600,
+      201.3
+    ],
+    [
+      7000,
+      186.7
+    ]
+  ],
+  "top_speed_kmh": 230,
+  "zero_to_100_s": 7.3,
+  "redline_provenance": "http://www.rsiauto.com/alfa-romeo/1998-156-2.5-v6-24-229.php"
+}

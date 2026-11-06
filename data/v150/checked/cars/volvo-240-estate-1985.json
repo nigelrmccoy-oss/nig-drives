@@ -1,0 +1,129 @@
+{
+ "make": "Volvo",
+ "model": "240 Estate",
+ "year": 1985,
+ "trim": "GL",
+ "body_type": "wagon",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 2316,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 85,
+ "peak_power_rpm": 5400,
+ "peak_torque_nm": 185,
+ "peak_torque_rpm": 2750,
+ "torque_curve": [
+  [
+   1200,
+   167.4
+  ],
+  [
+   1600,
+   175.3
+  ],
+  [
+   2750,
+   185.0
+  ],
+  [
+   4100,
+   167.3
+  ],
+  [
+   5400,
+   150.3
+  ],
+  [
+   5700,
+   141.3
+  ],
+  [
+   6000,
+   132.3
+  ]
+ ],
+ "redline_rpm": 6000,
+ "gearbox_type": "4-speed manual + overdrive (M46)",
+ "gear_ratios": [
+  3.711,
+  2.161,
+  1.37,
+  1.0,
+  0.797
+ ],
+ "final_drive": 3.31,
+ "curb_mass_kg": 1297,
+ "weight_dist_front_pct": null,
+ "length_mm": 4522,
+ "width_mm": 1770,
+ "height_mm": 1457,
+ "wheelbase_mm": 2640,
+ "track_front_mm": 1430,
+ "track_rear_mm": 1360,
+ "tyre_sizes": [
+  "185 SR14"
+ ],
+ "zero_to_100_s": 12.5,
+ "top_speed_kmh": 173,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "not found"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Volvo_240",
+  "https://www.ultimatespecs.com/car-specs/Volvo/8043/Volvo-V50-Kinetic-16D-DRIVe-Start-Stop.html"
+ ],
+ "confidence": "med",
+ "notes": "15/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Volvo-V50-Kinetic-16D-DRIVe-Start-Stop.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 251,
+  "required_CdA_m2_for_top_speed": 0.94
+ },
+ "provenance": {
+  "engine.layout": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/volvo/240/e-ab230/9000785/",
+  "gearbox_type": "https://www.240.se/litteratur/tp30056_2.pdf",
+  "gear_ratios": "https://www.240.se/litteratur/tp30056_2.pdf",
+  "final_drive": "https://240turbo.com/volvorearends.html",
+  "curb_mass_kg": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "wheelbase_mm": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "track_front_mm": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "track_rear_mm": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "tyre_sizes": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "zero_to_100_s": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "top_speed_kmh": "https://cars-data.com/en/volvo/240/1985-wagon/gl-2-3-estate-2386--2386/specs",
+  "length_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Volvo_240, https://www.ultimatespecs.com/car-specs/Volvo/8043/Volvo-V50-Kinetic-16D-DRIVe-Start-Stop.html)",
+  "width_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Volvo_240, https://www.ultimatespecs.com/car-specs/Volvo/8043/Volvo-V50-Kinetic-16D-DRIVe-Start-Stop.html)",
+  "height_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Volvo_240, https://www.ultimatespecs.com/car-specs/Volvo/8043/Volvo-V50-Kinetic-16D-DRIVe-Start-Stop.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Volvo_240, https://www.ultimatespecs.com/car-specs/Volvo/8043/Volvo-V50-Kinetic-16D-DRIVe-Start-Stop.html)",
+  "redline_rpm": "estimated: estimated: B230F peaks at 5400; era SOHC redline typically ~6000 (forum limiters ~6100–6200)",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure (cars-data lists front axle 975 kg of 1930 GVW only)"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: 1560cc turbo 80kW/240Nm is not a 1985 GL; B230F 2.3 NA used",
+  "Power/torque are JDM (nextage) B230 85kW@5400/185Nm@2750; US spec ~114hp",
+  "Gear ratios M46 4-speed+OD: 3.711/2.16/1.37/1.00/0.797 (OCR of Volvo spec sheet); 5th = OD, FD 3.31 for 1985 B230F M46 per 240turbo.com table",
+  "Length/width/height left from original (4522/1770/1457 unverified)",
+  "2026-11-05: left null — B230F limiter figures online (~6100–6200) are owner/forum only; 1985 USA range brochure not stating redline",
+  "2026-11-05: redline_rpm=6000 ESTIMATED — estimated: B230F peaks at 5400; era SOHC redline typically ~6000 (forum limiters ~6100–6200)"
+ ],
+ "checked_confidence": "med",
+ "checked_note": " | redline 6000 estimated 2026-11-05",
+ "original_confidence": "med",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "NA"
+}

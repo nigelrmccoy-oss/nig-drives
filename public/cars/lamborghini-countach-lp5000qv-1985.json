@@ -1,0 +1,68 @@
+{
+  "make": "Lamborghini",
+  "model": "Countach LP5000 QV",
+  "year": 1985,
+  "trim": "LP5000 QV",
+  "body_type": "coupe",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "V-12",
+    "displacement_cc": 5167,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 335,
+  "peak_power_rpm": 7000,
+  "peak_torque_nm": 501,
+  "peak_torque_rpm": 5200,
+  "redline_rpm": 7500,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    2.232,
+    1.625,
+    1.088,
+    0.858,
+    0.707
+  ],
+  "final_drive": 4.091,
+  "curb_mass_kg": 1490,
+  "weight_dist_front_pct": 41,
+  "length_mm": 4140,
+  "width_mm": 2000,
+  "height_mm": 1070,
+  "wheelbase_mm": 2500,
+  "track_front_mm": 1536,
+  "track_rear_mm": 1606,
+  "tyre_sizes": [
+    "225/50 VR15",
+    "345/35 VR15"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      450.3
+    ],
+    [
+      3100,
+      484.7
+    ],
+    [
+      5200,
+      501.0
+    ],
+    [
+      6100,
+      479.0
+    ],
+    [
+      7000,
+      457.0
+    ],
+    [
+      7500,
+      388.4
+    ]
+  ],
+  "top_speed_kmh": 245,
+  "zero_to_100_s": 6.5,
+  "redline_provenance": "https://wobcars.com/product/1989-lamborghini-countach-25th-anniversary/"
+}

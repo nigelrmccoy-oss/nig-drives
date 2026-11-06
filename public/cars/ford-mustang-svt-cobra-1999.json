@@ -1,0 +1,64 @@
+{
+  "make": "Ford",
+  "model": "Mustang SVT Cobra",
+  "year": 1999,
+  "trim": "SVT Cobra",
+  "body_type": "coupe",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "V-8",
+    "displacement_cc": 4601,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 239,
+  "peak_power_rpm": 6000,
+  "peak_torque_nm": 430,
+  "peak_torque_rpm": 4750,
+  "redline_rpm": 6500,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.37,
+    1.99,
+    1.33,
+    1.0,
+    0.67
+  ],
+  "final_drive": 3.27,
+  "curb_mass_kg": 1556,
+  "length_mm": 4653,
+  "width_mm": 1857,
+  "height_mm": 1349,
+  "wheelbase_mm": 2573,
+  "track_front_mm": 1534,
+  "track_rear_mm": 1539,
+  "tyre_sizes": [
+    "245/45 ZR17"
+  ],
+  "torque_curve": [
+    [
+      1300,
+      384.6
+    ],
+    [
+      2800,
+      415.5
+    ],
+    [
+      4750,
+      430.0
+    ],
+    [
+      5400,
+      404.2
+    ],
+    [
+      6000,
+      380.4
+    ],
+    [
+      6500,
+      323.3
+    ]
+  ],
+  "redline_provenance": "https://www.caranddriver.com/reviews/a15140813/1999-ford-mustang-svt-cobra-tested-review/"
+}

@@ -11,6 +11,11 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ### v1.5.0b (package 1.5.0-b) — sight lines + 41-car pack + driver profiles
 
+- **Tyre heat** per wheel (temp → grip window) on HUD + Telemetry+; **per-car suspension** (springs/dampers/ARB/ride height, estimated from mass unless sourced).
+- **Tune / upgrades**: GT-style stages, sourced engine swaps only, setup sheet, D→R PI from compiled physics; prices shown, not charged.
+- **Pause (Esc)**, **Options** (graphics/units/audio/key rebinds, global), skippable **tutorial**.
+- Car data mirrored in-repo under `src/data/cars/`, `public/cars/`, and `data/v150/checked/` (41/41 drivable).
+
 - Start menu **Car pack** lists all 41 checked cars (make · year), driven from `src/data/cars/*.json` with real gear ratios, final drive, redline, and torque curves. Generated body scaled to length/width/height — no ripped meshes. Nine redlines are labeled estimated.
 
 - **Draw distance.** Clear-air fog now runs 450 m to 8.2 km, so the 16 km far terrain ring and skyline

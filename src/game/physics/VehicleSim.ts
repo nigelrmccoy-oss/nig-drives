@@ -1,5 +1,6 @@
 import type { PhysicsSpec } from './PhysicsSpec';
 import { tireForces, type TireOut } from './Tire';
+import { gripFromTemp, heatParamsForCompound, stepTyreTemp, type HeatParams } from './tyreHeat';
 
 /**
  * v1.4.0 chassis model: a rigid body in the ground plane on four tyres.
@@ -30,6 +31,10 @@ export interface WheelState {
   slip: number;
   /** Speed of the ground under the wheel along its heading (m/s). */
   vLong: number;
+  /** Core tyre temperature (°C). */
+  tempC: number;
+  /** Instantaneous grip multiplier from temperature window. */
+  tempGrip: number;
 }
 
 export interface SimInputs {
@@ -49,6 +54,10 @@ export interface SimInputs {
   gradeSin: number;
   /** Brakes / Park holding at a standstill: no creep down the grade. */
   hold: boolean;
+  /** Ambient air temp (°C) for tyre cooling. */
+  ambientC?: number;
+  /** Active compound id (front) for heat window. */
+  compoundId?: string;
 }
 
 export class VehicleSim {
@@ -70,6 +79,7 @@ export class VehicleSim {
   private readonly tireRear: PhysicsSpec['tire'];
   private readonly bump = [0, 0, 0, 0];
   private readonly tmp: TireOut = { fx: 0, fy: 0, slip: 0, kLong: 0, limit: 0 };
+  private heat: HeatParams = heatParamsForCompound('all_season', 22);
 
   constructor(spec: PhysicsSpec) {
     this.spec = spec;
@@ -80,7 +90,12 @@ export class VehicleSim {
     this.pz = [a, a, -b, -b];
     this.fzNominal = (c.mass * G) / 4;
     this.tireRear = spec.tire.peakAngleRear !== undefined ? { ...spec.tire, peakAngle: spec.tire.peakAngleRear } : spec.tire;
-    this.wheels = [0, 1, 2, 3].map(() => ({ omega: 0, tanAlpha: 0, kappa: 0, fz: this.fzNominal, fx: 0, fy: 0, slip: 0, vLong: 0 }));
+    const amb = 22;
+    this.wheels = [0, 1, 2, 3].map(() => ({
+      omega: 0, tanAlpha: 0, kappa: 0, fz: this.fzNominal, fx: 0, fy: 0, slip: 0, vLong: 0,
+      tempC: amb, tempGrip: 1,
+    }));
+    this.heat = heatParamsForCompound('all_season', amb);
   }
 
   reset(): void {
@@ -99,7 +114,13 @@ export class VehicleSim {
       w.fy = 0;
       w.slip = 0;
       w.vLong = 0;
+      w.tempC = this.heat.ambientC;
+      w.tempGrip = 1;
     }
+  }
+
+  setHeatCompound(compoundId: string | undefined, ambientC = 22): void {
+    this.heat = heatParamsForCompound(compoundId, ambientC);
   }
 
   /** Average ω of the given wheels. */
@@ -161,9 +182,17 @@ export class VehicleSim {
         f.kLong *= 2;
         f.limit *= 2;
       }
-      w.fx = f.fx;
-      w.fy = f.fy;
+      // Tyre heat: grip vs temp window, then advance core temp from slip work
+      const amb = inp.ambientC ?? this.heat.ambientC;
+      if (inp.compoundId) this.heat = heatParamsForCompound(inp.compoundId, amb);
+      else this.heat = { ...this.heat, ambientC: amb };
+      const opt = p.tire.optTempC ?? this.heat.optTempC;
+      const win = p.tire.tempWindowC ?? this.heat.windowC;
+      w.tempGrip = gripFromTemp(w.tempC, opt, win);
+      w.fx = f.fx * w.tempGrip;
+      w.fy = f.fy * w.tempGrip;
       w.slip = f.slip;
+      w.tempC = stepTyreTemp(w.tempC, dt, f.slip, vLong, w.fz, this.heat);
 
       // Implicit wheel-spin update (tyre force linearised in ω) so stiff tyres stay stable at 120 Hz.
       const I = t.inertia + inp.extraInertia[i];

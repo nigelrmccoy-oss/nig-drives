@@ -1,0 +1,127 @@
+{
+ "make": "Audi",
+ "model": "Quattro",
+ "year": 1984,
+ "trim": "Quattro 2.1 Turbo 200 PS (WR)",
+ "body_type": "coupé",
+ "drivetrain": "4WD",
+ "engine": {
+  "layout": "inline-5",
+  "displacement_cc": 2144,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 147,
+ "peak_power_rpm": 5500,
+ "peak_torque_nm": 285,
+ "peak_torque_rpm": 3500,
+ "torque_curve": [
+  [
+   1400,
+   196.4
+  ],
+  [
+   2100,
+   242.6
+  ],
+  [
+   3500,
+   285.0
+  ],
+  [
+   4500,
+   270.1
+  ],
+  [
+   5500,
+   255.2
+  ],
+  [
+   6100,
+   230.7
+  ],
+  [
+   6750,
+   204.2
+  ]
+ ],
+ "redline_rpm": 6750,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.6,
+  2.13,
+  1.36,
+  0.97,
+  0.78
+ ],
+ "final_drive": 3.89,
+ "curb_mass_kg": 1290,
+ "weight_dist_front_pct": null,
+ "length_mm": 4404,
+ "width_mm": 1723,
+ "height_mm": 1344,
+ "wheelbase_mm": 2524,
+ "track_front_mm": 1416,
+ "track_rear_mm": 1494,
+ "tyre_sizes": [
+  "215/50 HR15"
+ ],
+ "zero_to_100_s": 7.3,
+ "top_speed_kmh": 221,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "launch DM price not found (autoplenum shows only a converted EUR price)"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Audi_Quattro",
+  "https://www.ultimatespecs.com/car-specs/Audi/222/Audi-Quattro-Sport.html"
+ ],
+ "confidence": "high",
+ "notes": "20/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Audi-Quattro-Sport.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 204,
+  "required_CdA_m2_for_top_speed": 0.81
+ },
+ "provenance": {
+  "trim": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "engine.displacement_cc": "https://www.audiworld.com/model/ur-quattro/84-urq.shtml",
+  "peak_power_kw": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "peak_power_rpm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "peak_torque_nm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "peak_torque_rpm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "gear_ratios": "https://www.audiworld.com/model/ur-quattro/84-urq.shtml",
+  "final_drive": "https://www.audiworld.com/model/ur-quattro/84-urq.shtml",
+  "curb_mass_kg": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "length_mm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "width_mm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "height_mm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "wheelbase_mm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "track_front_mm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "track_rear_mm": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "tyre_sizes": "https://www.audiworld.com/model/ur-quattro/84-urq.shtml",
+  "zero_to_100_s": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "top_speed_kmh": "https://www.auto-data.net/en/audi-quattro-typ-85-2.1-turbo-200hp-4902",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Audi_Quattro, https://www.ultimatespecs.com/car-specs/Audi/222/Audi-Quattro-Sport.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Audi_Quattro, https://www.ultimatespecs.com/car-specs/Audi/222/Audi-Quattro-Sport.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Audi_Quattro, https://www.ultimatespecs.com/car-specs/Audi/222/Audi-Quattro-Sport.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Audi_Quattro, https://www.ultimatespecs.com/car-specs/Audi/222/Audi-Quattro-Sport.html)",
+  "redline_rpm": "https://www.motortrend.com/reviews/audiquattro",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "TRIM CHANGED: original numbers (225kW/350Nm/1273kg/2224mm wb/235/45R15) were the 1984 Sport quattro 20V (short wheelbase), not the base Quattro trim; replaced with the 200 PS road car",
+  "Ratios/FD from audiworld US-spec 1984 table (156hp US engine); assumed identical 5-speed gearbox in EU 200PS (flag)",
+  "Track front 1416 (auto-data) vs 1422 (audiworld)",
+  "2026-11-05: Motor Trend June 1982 Quattro road test: continues to 6750-rpm redline then positive rev limiter. Test car was US-spec WR-family turbo five; Euro 200 PS WR shares the same architecture — used as tach/limiter figure"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

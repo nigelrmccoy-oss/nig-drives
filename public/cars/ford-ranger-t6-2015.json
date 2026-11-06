@@ -1,0 +1,67 @@
+{
+  "make": "Ford",
+  "model": "Ranger (T6)",
+  "year": 2015,
+  "trim": "3.2 TDCi XLT",
+  "body_type": "pickup",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "inline-5",
+    "displacement_cc": 3198,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 147,
+  "peak_power_rpm": 3000,
+  "peak_torque_nm": 470,
+  "peak_torque_rpm": 1750,
+  "redline_rpm": 4900,
+  "gearbox_type": "6-speed automatic (6R80)",
+  "gear_ratios": [
+    4.171,
+    2.342,
+    1.521,
+    1.143,
+    0.867,
+    0.691
+  ],
+  "final_drive": 3.73,
+  "curb_mass_kg": 2113,
+  "length_mm": 5351,
+  "width_mm": 1850,
+  "height_mm": 1815,
+  "wheelbase_mm": 3220,
+  "track_front_mm": 1560,
+  "track_rear_mm": 1560,
+  "tyre_sizes": [
+    "265/65 R17"
+  ],
+  "torque_curve": [
+    [
+      1000,
+      390.4
+    ],
+    [
+      1750,
+      470.0
+    ],
+    [
+      2400,
+      468.9
+    ],
+    [
+      3000,
+      467.9
+    ],
+    [
+      4000,
+      418.6
+    ],
+    [
+      4900,
+      374.3
+    ]
+  ],
+  "top_speed_kmh": 180,
+  "zero_to_100_s": 11.6,
+  "redline_provenance": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015"
+}

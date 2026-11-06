@@ -1,0 +1,121 @@
+{
+ "make": "Toyota",
+ "model": "GR86",
+ "year": 2022,
+ "trim": "ZN8",
+ "body_type": "2-door fastback coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "flat-4",
+  "displacement_cc": 2387,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 173,
+ "peak_power_rpm": 7000,
+ "peak_torque_nm": 250,
+ "peak_torque_rpm": 3700,
+ "torque_curve": [
+  [
+   1500,
+   223.5
+  ],
+  [
+   2200,
+   237.7
+  ],
+  [
+   3700,
+   250.0
+  ],
+  [
+   5400,
+   242.8
+  ],
+  [
+   7000,
+   236.0
+  ],
+  [
+   7400,
+   207.7
+  ]
+ ],
+ "redline_rpm": 7400,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.626,
+  2.189,
+  1.541,
+  1.213,
+  1.0,
+  0.767
+ ],
+ "final_drive": 4.1,
+ "curb_mass_kg": 1280,
+ "weight_dist_front_pct": null,
+ "length_mm": 4265,
+ "width_mm": 1775,
+ "height_mm": 1310,
+ "wheelbase_mm": 2575,
+ "track_front_mm": 1520,
+ "track_rear_mm": 1550,
+ "tyre_sizes": [
+  "215/40 R18"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 3518000,
+  "currency": "JPY",
+  "year": 2022,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Toyota_86"
+ ],
+ "confidence": "med",
+ "notes": "14/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 264
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "length_mm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "width_mm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "height_mm": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "final_drive": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/toyota/gr86/3ba-zn8/10164617/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_86)",
+  "redline_rpm": "https://manual.toyota.jp/86/2408/cv/ja_JP/contents/vhch08se020401.php",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "original value came from a wrong-generation page; no new source",
+  "top_speed_kmh": "original value came from a wrong-generation page; no new source"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG GENERATION: 1998cc 147kW (ZN6 GT86 FA20) for the ZN8 GR86 (FA24 2387cc 173kW/250Nm)",
+  "JDM RZ 6MT (235PS); US/EU 228hp/184 lb-ft",
+  "Original wheelbase null, now 2575; tyres 215/40R18 (RZ); 215/45R17 on SZ",
+  "2026-11-05: tachometer redline 7400 per Toyota GR86 instrument / owner-manual tach range"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

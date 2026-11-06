@@ -1,0 +1,125 @@
+{
+ "make": "Datsun",
+ "model": "240Z",
+ "year": 1971,
+ "trim": "240Z",
+ "body_type": "coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-6",
+  "displacement_cc": 2393,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 113,
+ "peak_power_rpm": 5600,
+ "peak_torque_nm": 198,
+ "peak_torque_rpm": 4400,
+ "torque_curve": [
+  [
+   1400,
+   170.4
+  ],
+  [
+   2600,
+   188.1
+  ],
+  [
+   4400,
+   198.0
+  ],
+  [
+   5000,
+   195.3
+  ],
+  [
+   5600,
+   192.7
+  ],
+  [
+   6300,
+   181.1
+  ],
+  [
+   7000,
+   169.6
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "4-speed manual",
+ "gear_ratios": [
+  3.549,
+  2.197,
+  1.42,
+  1.0
+ ],
+ "final_drive": 3.364,
+ "curb_mass_kg": 1066,
+ "weight_dist_front_pct": null,
+ "length_mm": 4135,
+ "width_mm": 1631,
+ "height_mm": 1283,
+ "wheelbase_mm": 2305,
+ "track_front_mm": null,
+ "track_rear_mm": null,
+ "tyre_sizes": [
+  "175 HR14"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 3526,
+  "currency": "USD",
+  "year": 1970,
+  "market": "US",
+  "source": "https://over-drive-magazine.com/2022/08/16/1971-datsun-240z/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Nissan_S30",
+  "https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html"
+ ],
+ "confidence": "high",
+ "notes": "19/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Datsun-S30-240Z.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 199
+ },
+ "provenance": {
+  "gearbox_type": "https://zhome.com/ZCMnL/tech/GearRatios.html",
+  "gear_ratios": "https://zhome.com/ZCMnL/tech/GearRatios.html",
+  "final_drive": "https://zhome.com/ZCMnL/tech/GearRatios.html",
+  "curb_mass_kg": "https://s30.world/media/pages/brochures-catalogues/0acbbf6c17-1777465088/1971_datsun_240z_usa_english_s30world_sm.pdf",
+  "tyre_sizes": "https://s30.world/media/pages/brochures-catalogues/0acbbf6c17-1777465088/1971_datsun_240z_usa_english_s30world_sm.pdf",
+  "peak_power_kw": "https://s30.world/media/pages/brochures-catalogues/0acbbf6c17-1777465088/1971_datsun_240z_usa_english_s30world_sm.pdf",
+  "peak_power_rpm": "https://s30.world/media/pages/brochures-catalogues/0acbbf6c17-1777465088/1971_datsun_240z_usa_english_s30world_sm.pdf",
+  "peak_torque_nm": "https://s30.world/media/pages/brochures-catalogues/0acbbf6c17-1777465088/1971_datsun_240z_usa_english_s30world_sm.pdf",
+  "peak_torque_rpm": "https://s30.world/media/pages/brochures-catalogues/0acbbf6c17-1777465088/1971_datsun_240z_usa_english_s30world_sm.pdf",
+  "length_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "width_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "height_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "wheelbase_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "engine.displacement_cc": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_S30, https://www.ultimatespecs.com/car-specs/Datsun/17938/Datsun-S30-240Z.html)",
+  "redline_rpm": "https://www.enginemark.com/nissan-datsun-240z/gauges-instrument-cluster",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "track_front_mm": "not found",
+  "track_rear_mm": "not found",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "original 201 unsourced"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: 5-speed (non-US) -> US 4-speed 3.549/2.197/1.420/1.000 with R180 3.364 (zhome table: 70-73 MT 3.364)",
+  "US spec SAE gross 151hp/146lb-ft converted to kW/Nm; mass 2350 lb brochure (orig 1044)",
+  "2.197/1.420 ratios: zhome page shows 3.549/2.197/1.420/1.000 for 4-speed",
+  "Price $3,526 is the 1970 launch US POE; 1971 ~$3,596",
+  "2026-11-05: Factory tach: yellow 6500–7000, red from 7000 to 8000 (EngineMark cluster write-up with period tach photo description)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

@@ -1,0 +1,126 @@
+{
+ "make": "Mercedes-Benz",
+ "model": "190 E 2.3-16",
+ "year": 1988,
+ "trim": "2.3-16",
+ "body_type": "4-door saloon",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 2298,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 136,
+ "peak_power_rpm": 6200,
+ "peak_torque_nm": 235,
+ "peak_torque_rpm": 4500,
+ "torque_curve": [
+  [
+   1400,
+   201.5
+  ],
+  [
+   2700,
+   223.7
+  ],
+  [
+   4500,
+   235.0
+  ],
+  [
+   5400,
+   221.5
+  ],
+  [
+   6200,
+   209.5
+  ],
+  [
+   6600,
+   196.9
+  ],
+  [
+   7000,
+   184.3
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  4.08,
+  2.52,
+  1.77,
+  1.26,
+  1.0
+ ],
+ "final_drive": 3.07,
+ "curb_mass_kg": 1350,
+ "weight_dist_front_pct": null,
+ "length_mm": 4450,
+ "width_mm": 1690,
+ "height_mm": 1380,
+ "wheelbase_mm": 2660,
+ "track_front_mm": null,
+ "track_rear_mm": null,
+ "tyre_sizes": [
+  "205/55 VR15"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 49590,
+  "currency": "DEM",
+  "year": 1984,
+  "market": "Germany",
+  "source": "https://mb190e16v.com/technics/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Mercedes-Benz_W201",
+  "https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html"
+ ],
+ "confidence": "med",
+ "notes": "16/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Mercedes-Benz-W201-190E-23.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 231
+ },
+ "provenance": {
+  "peak_power_kw": "https://mb190e16v.com/technics/",
+  "peak_power_rpm": "https://mb190e16v.com/technics/",
+  "peak_torque_nm": "https://mb190e16v.com/technics/",
+  "peak_torque_rpm": "https://mb190e16v.com/technics/",
+  "gear_ratios": "https://mb190e16v.com/technics/",
+  "final_drive": "https://mb190e16v.com/technics/",
+  "curb_mass_kg": "https://mb190e16v.com/technics/",
+  "tyre_sizes": "https://mb190e16v.com/technics/",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "length_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "width_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "height_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "wheelbase_mm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "engine.displacement_cc": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mercedes-Benz_W201, https://www.ultimatespecs.com/car-specs/Mercedes-Benz/2224/Mercedes-Benz-W201-190E-23.html)",
+  "redline_rpm": "https://www.hemmings.com/stories/the-drivers-benz-1985-88-mercedes-benz-190e-2-3-16/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "top_speed_kmh": "original 197 looks like 190E 2.3 (8V); published ~230 not verified",
+  "zero_to_100_s": "no source",
+  "track_front_mm": "no source found",
+  "track_rear_mm": "no source found"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: 97kW@5100/198Nm@3500 is the 8V 2.3; 16V M102 185PS=136kW@6200,235Nm@4500",
+  "Getrag dog-leg 5-speed 4.08/2.52/1.77/1.26/1.00; 2.3-16 differential 3.07 (2.5-16 3.27, Evo1 3.27, Evo2 3.46)",
+  "MSRP DM 49,590 from search synthesis (meinbenz price list) - unverified, launch year 1984",
+  "Kerb 1350 kg per mb190e16v page (1260 reported elsewhere)",
+  "2026-11-05: factory redline 7000 rpm per Hemmings 190E 2.3-16 feature (Cosworth)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

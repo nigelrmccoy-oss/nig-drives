@@ -1,0 +1,123 @@
+{
+ "make": "Toyota",
+ "model": "Supra (A80)",
+ "year": 1997,
+ "trim": "RZ",
+ "body_type": "coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-6",
+  "displacement_cc": 2997,
+  "aspiration": "twin-turbocharged"
+ },
+ "peak_power_kw": 206,
+ "peak_power_rpm": 5600,
+ "peak_torque_nm": 451,
+ "peak_torque_rpm": 3600,
+ "torque_curve": [
+  [
+   1400,
+   306.3
+  ],
+  [
+   2200,
+   387.3
+  ],
+  [
+   3600,
+   451.0
+  ],
+  [
+   4600,
+   401.1
+  ],
+  [
+   5600,
+   351.3
+  ],
+  [
+   6200,
+   316.1
+  ],
+  [
+   6800,
+   281.0
+  ]
+ ],
+ "redline_rpm": 6800,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.724,
+  2.246,
+  1.541,
+  1.205,
+  1.0,
+  0.818
+ ],
+ "final_drive": 3.266,
+ "curb_mass_kg": 1510,
+ "weight_dist_front_pct": null,
+ "length_mm": 4520,
+ "width_mm": 1810,
+ "height_mm": 1275,
+ "wheelbase_mm": 2550,
+ "track_front_mm": 1520,
+ "track_rear_mm": 1525,
+ "tyre_sizes": [
+  "235/45",
+  "255/40"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 4480000,
+  "currency": "JPY",
+  "year": 1997,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Toyota_Supra",
+  "https://www.ultimatespecs.com/car-specs/Toyota/34652/Toyota-Soarer-25-GT-T.html"
+ ],
+ "confidence": "high",
+ "notes": "18/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Toyota-Soarer-25-GT-T.html).",
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "length_mm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "width_mm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "height_mm": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "final_drive": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/toyota/supra/e-jza80/1000971/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_Supra, https://www.ultimatespecs.com/car-specs/Toyota/34652/Toyota-Soarer-25-GT-T.html)",
+  "redline_rpm": "https://www.mkivsupra.net/topic/194136-rev-limit-stock-2jz-gte-j-spec/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "Original had 2491cc/206kW@6200 /378Nm@6200 /1560kg/FD 4.08/225/55R16 (mixed: 1JZ-GTE displacement + wrong figures); RZ is 2JZ-GTE 2997cc 206kW(280PS)@5600 451Nm@3600, 6MT (JDM, 1997-08)",
+  "Original tyres 225/55R16 wrong; RZ runs 235/45 ZR17 front / 255/40 ZR17 rear",
+  "2026-11-05: Stock J-spec non-VVTi 2JZ-GTE rev limit 6800 rpm (mkivsupra / owner ECU consensus). Aug-1997+ VVTi cars are commonly 7200 — this file is the classic 280 PS @5600 RZ figure, treated as non-VVTi"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

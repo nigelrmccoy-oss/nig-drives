@@ -1,0 +1,66 @@
+{
+  "make": "Mercedes-Benz",
+  "model": "190 E 2.3-16",
+  "year": 1988,
+  "trim": "2.3-16",
+  "body_type": "4-door saloon",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 2298,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 136,
+  "peak_power_rpm": 6200,
+  "peak_torque_nm": 235,
+  "peak_torque_rpm": 4500,
+  "redline_rpm": 7000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    4.08,
+    2.52,
+    1.77,
+    1.26,
+    1.0
+  ],
+  "final_drive": 3.07,
+  "curb_mass_kg": 1350,
+  "length_mm": 4450,
+  "width_mm": 1690,
+  "height_mm": 1380,
+  "wheelbase_mm": 2660,
+  "tyre_sizes": [
+    "205/55 VR15"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      201.5
+    ],
+    [
+      2700,
+      223.7
+    ],
+    [
+      4500,
+      235.0
+    ],
+    [
+      5400,
+      221.5
+    ],
+    [
+      6200,
+      209.5
+    ],
+    [
+      6600,
+      196.9
+    ],
+    [
+      7000,
+      184.3
+    ]
+  ],
+  "redline_provenance": "https://www.hemmings.com/stories/the-drivers-benz-1985-88-mercedes-benz-190e-2-3-16/"
+}

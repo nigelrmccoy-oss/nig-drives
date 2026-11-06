@@ -1,0 +1,126 @@
+{
+ "make": "Porsche",
+ "model": "911 Carrera RS 2.7",
+ "year": 1973,
+ "trim": "Carrera RS",
+ "body_type": "coupé",
+ "drivetrain": "RR",
+ "engine": {
+  "layout": "flat-6",
+  "displacement_cc": 2687,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 154,
+ "peak_power_rpm": 6300,
+ "peak_torque_nm": 255,
+ "peak_torque_rpm": 5100,
+ "torque_curve": [
+  [
+   1400,
+   214.7
+  ],
+  [
+   3100,
+   243.2
+  ],
+  [
+   5100,
+   255.0
+  ],
+  [
+   5700,
+   244.2
+  ],
+  [
+   6300,
+   233.4
+  ],
+  [
+   6800,
+   217.9
+  ],
+  [
+   7200,
+   205.4
+  ]
+ ],
+ "redline_rpm": 7200,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.18,
+  1.83,
+  1.26,
+  0.92,
+  0.72
+ ],
+ "final_drive": 4.429,
+ "curb_mass_kg": 1075,
+ "weight_dist_front_pct": null,
+ "length_mm": 4102,
+ "width_mm": 1652,
+ "height_mm": 1320,
+ "wheelbase_mm": 2271,
+ "track_front_mm": 1372,
+ "track_rear_mm": 1394,
+ "tyre_sizes": [
+  "185/70 VR15",
+  "215/60 VR15"
+ ],
+ "zero_to_100_s": 5.8,
+ "top_speed_kmh": 245,
+ "msrp": {
+  "amount": 34000,
+  "currency": "DEM",
+  "year": 1973,
+  "market": "Germany",
+  "source": "https://newsroom.porsche.com/en/press-kits/Porsche-Museum/Porsche-911-Carrera-RS-2.7.html"
+ },
+ "sources": [
+  "https://www.ultimatespecs.com/car-specs/Porsche/14839/Porsche-912-E.html"
+ ],
+ "confidence": "med",
+ "notes": "17/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Porsche-912-E.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 238,
+  "required_CdA_m2_for_top_speed": 0.63
+ },
+ "provenance": {
+  "engine.layout": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "engine.displacement_cc": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "engine.aspiration": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "peak_power_kw": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "peak_power_rpm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "peak_torque_nm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "peak_torque_rpm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "gearbox_type": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "gear_ratios": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "final_drive": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "curb_mass_kg": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "wheelbase_mm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "track_front_mm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "track_rear_mm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "length_mm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "width_mm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "height_mm": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "tyre_sizes": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "zero_to_100_s": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "top_speed_kmh": "https://radical-mag.com/wp-content/uploads/2019/11/Technische-Daten-Porsche-911-Carrera-RS-2.7.pdf",
+  "drivetrain": "unverified-original (local model; sources: https://www.ultimatespecs.com/car-specs/Porsche/14839/Porsche-912-E.html)",
+  "redline_rpm": "https://rmsothebys.com/auctions/dd24/lots/r0095-1973-porsche-911-carrera-rs-27-touring/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "ORIGINAL BADLY WRONG: flat-4 1971cc 64kW; real RS 2.7 is flat-6 2687cc 210PS",
+  "Mass: Touring 1075 kg (Sport 960 kg) - original trim ambiguous",
+  "0-100 5.8s / 245 km/h per data sheet (Sport spec); MSRP DM 34,000 from search synthesis",
+  "2026-11-05: Car and Driver (Mike Duff) road test quoted on RM Sotheby lot: tach redline 7200 rpm"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

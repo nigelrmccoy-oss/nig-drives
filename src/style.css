@@ -879,3 +879,19 @@ body:has(#hud-assist-panel:not([hidden])) .telemetry-plus {
   background: linear-gradient(180deg, #0c0e1200, #0c0e12f2 22px);
   z-index: 1;
 }
+
+.overlay-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 18, 0.72);
+  padding: 24px;
+}
+.overlay-menu.hidden { display: none; }
+.pause-card, .options-card, .tutorial-card { max-width: 720px; width: min(720px, 96vw); max-height: 90vh; overflow: auto; }
+.opt-slider { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #cfd8ea; font-size: 13px; padding: 6px 4px; }
+.opt-slider input { flex: 1; }
+.hud-tyres { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }

@@ -5,6 +5,7 @@
 import type { CatalogCar } from '../../data/cars';
 import type { VehicleSpec } from './Vehicle';
 import type { DriveLayout, PhysicsSpec, TorquePoint } from '../physics/PhysicsSpec';
+import { suspensionFromMass } from '../physics/suspensionDefaults';
 
 function tyreRadiusM(sizes: string[] | null | undefined): number {
   const list = sizes ?? [];
@@ -146,6 +147,7 @@ export function physicsSpecFromCatalog(slug: string, car: CatalogCar): PhysicsSp
       bodyFreqHz: 1.4,
       bodyDamping: 0.45,
     },
+    suspension: suspensionFromMass(vs.mass, vs.wheelbase, vs.frontBias, 'estimated'),
     tire: {
       radius,
       widthM: tyreWidthM(car.tyre_sizes),

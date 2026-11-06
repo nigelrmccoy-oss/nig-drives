@@ -1,0 +1,125 @@
+{
+ "make": "Nissan",
+ "model": "Silvia (S15)",
+ "year": 1999,
+ "trim": "Spec-R",
+ "body_type": "coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1998,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 184,
+ "peak_power_rpm": 6400,
+ "peak_torque_nm": 275,
+ "peak_torque_rpm": 4800,
+ "torque_curve": [
+  [
+   1500,
+   167.4
+  ],
+  [
+   2900,
+   234.9
+  ],
+  [
+   4800,
+   275.0
+  ],
+  [
+   5600,
+   274.8
+  ],
+  [
+   6400,
+   274.5
+  ],
+  [
+   7000,
+   244.6
+  ],
+  [
+   7500,
+   219.6
+  ]
+ ],
+ "redline_rpm": 7500,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.626,
+  2.2,
+  1.541,
+  1.213,
+  1.0,
+  0.767
+ ],
+ "final_drive": 3.692,
+ "curb_mass_kg": 1240,
+ "weight_dist_front_pct": null,
+ "length_mm": 4445,
+ "width_mm": 1695,
+ "height_mm": 1285,
+ "wheelbase_mm": 2525,
+ "track_front_mm": 1470,
+ "track_rear_mm": 1460,
+ "tyre_sizes": [
+  "205/55 R16"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 2390000,
+  "currency": "JPY",
+  "year": 1999,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Nissan_Silvia"
+ ],
+ "confidence": "low",
+ "notes": "9/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 269
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "length_mm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "width_mm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "height_mm": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "final_drive": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/nissan/silvia/gf-s15/1502079/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_Silvia)",
+  "redline_rpm": "estimated: estimated: SR20DET Spec-R peaks at 6400; conflicting 7500–8000 — pick 7500 as conservative tach/fuel-cut mid of that band",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "Original (Wikipedia-only, low) had 1770cc/1105kg no power; Spec-R is SR20DET 1998cc turbo 184kW/275Nm 6MT (JDM, 1999-01 launch)",
+  "2026-11-05: left null — published figures conflict (~7500–8000); no factory catalog tach marking opened this pass",
+  "2026-11-05: redline_rpm=7500 ESTIMATED — estimated: SR20DET Spec-R peaks at 6400; conflicting 7500–8000 — pick 7500 as conservative tach/fuel-cut mid of that band"
+ ],
+ "checked_confidence": "high",
+ "checked_note": " | redline 7500 estimated 2026-11-05",
+ "original_confidence": "low",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "turbo"
+}

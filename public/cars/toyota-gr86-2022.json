@@ -1,0 +1,65 @@
+{
+  "make": "Toyota",
+  "model": "GR86",
+  "year": 2022,
+  "trim": "ZN8",
+  "body_type": "2-door fastback coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "flat-4",
+    "displacement_cc": 2387,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 173,
+  "peak_power_rpm": 7000,
+  "peak_torque_nm": 250,
+  "peak_torque_rpm": 3700,
+  "redline_rpm": 7400,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.626,
+    2.189,
+    1.541,
+    1.213,
+    1.0,
+    0.767
+  ],
+  "final_drive": 4.1,
+  "curb_mass_kg": 1280,
+  "length_mm": 4265,
+  "width_mm": 1775,
+  "height_mm": 1310,
+  "wheelbase_mm": 2575,
+  "track_front_mm": 1520,
+  "track_rear_mm": 1550,
+  "tyre_sizes": [
+    "215/40 R18"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      223.5
+    ],
+    [
+      2200,
+      237.7
+    ],
+    [
+      3700,
+      250.0
+    ],
+    [
+      5400,
+      242.8
+    ],
+    [
+      7000,
+      236.0
+    ],
+    [
+      7400,
+      207.7
+    ]
+  ],
+  "redline_provenance": "https://manual.toyota.jp/86/2408/cv/ja_JP/contents/vhch08se020401.php"
+}

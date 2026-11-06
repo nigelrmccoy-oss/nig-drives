@@ -78,6 +78,12 @@ export class TelemetryPlus {
       c.fillText(`κ ${(w.kappa * 100).toFixed(0)}%`, x + 5, y + 46);
       c.fillText(`α ${((Math.atan(w.tanAlpha) * 180) / Math.PI).toFixed(1)}°`, x + 5, y + 62);
       c.fillText(`grip ${(use * 100).toFixed(0)}%`, x + 5, y + 78);
+      const tc = (w as { tempC?: number }).tempC;
+      const tg = (w as { tempGrip?: number }).tempGrip;
+      if (tc != null) {
+        c.fillText(`T ${tc.toFixed(0)}°C`, x + 5, y + 94);
+        if (tg != null) c.fillStyle = tg < 0.85 ? '#f44336' : '#fff';
+      }
       // grip-use bar
       c.fillStyle = 'rgba(255,255,255,0.15)';
       c.fillRect(x + 5, y + 88, 72, 6);

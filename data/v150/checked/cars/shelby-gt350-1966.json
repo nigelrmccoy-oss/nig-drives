@@ -1,0 +1,123 @@
+{
+ "make": "Shelby",
+ "model": "Mustang GT350",
+ "year": 1966,
+ "trim": "GT350",
+ "body_type": "fastback",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "V-8",
+  "displacement_cc": 4727,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 228,
+ "peak_power_rpm": 6000,
+ "peak_torque_nm": 446,
+ "peak_torque_rpm": 4200,
+ "torque_curve": [
+  [
+   1300,
+   403.5
+  ],
+  [
+   2500,
+   431.4
+  ],
+  [
+   4200,
+   446.0
+  ],
+  [
+   5100,
+   404.4
+  ],
+  [
+   6000,
+   362.9
+  ],
+  [
+   6500,
+   308.4
+  ]
+ ],
+ "redline_rpm": 6500,
+ "gearbox_type": "4-speed manual",
+ "gear_ratios": [
+  2.36,
+  1.62,
+  1.2,
+  1.0
+ ],
+ "final_drive": 3.89,
+ "curb_mass_kg": 1334,
+ "weight_dist_front_pct": 53,
+ "length_mm": 4613,
+ "width_mm": 1732,
+ "height_mm": 1300,
+ "wheelbase_mm": 2743,
+ "track_front_mm": 1422,
+ "track_rear_mm": 1422,
+ "tyre_sizes": [
+  "7.75-15"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": 200,
+ "msrp": {
+  "amount": 4428,
+  "currency": "USD",
+  "year": 1966,
+  "market": "US",
+  "source": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Shelby_Mustang"
+ ],
+ "confidence": "low",
+ "notes": "7/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "required_CdA_m2_for_top_speed": 1.77
+ },
+ "provenance": {
+  "engine.layout": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "engine.displacement_cc": "derived:289 cid x16.387 (page misprints 4272cc)",
+  "engine.aspiration": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "peak_power_kw": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "peak_power_rpm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "peak_torque_nm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "peak_torque_rpm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "gearbox_type": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "gear_ratios": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "final_drive": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "curb_mass_kg": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "weight_dist_front_pct": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "wheelbase_mm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "track_front_mm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "track_rear_mm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "length_mm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "width_mm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "height_mm": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "tyre_sizes": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "top_speed_kmh": "https://theshelbycars.com/1966-gt-350-main-menu/1966-gt-350-shelby-specifications/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Shelby_Mustang)",
+  "redline_rpm": "estimated: estimated: 289 Hi-Po peaks at 6000; period Hi-Po practice and solid-lifter cousins run ~6500 (9000 is tach scale, not redline)",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "zero_to_100_s": "source gives 0-60mph 7.3s / 0-100mph 19.0s, no 0-100km/h"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: 3-speed automatic (that is the GT350H Hertz) ; displacement 4700",
+  "306hp SAE gross, 329 lb-ft; imperial units converted",
+  "Top speed 124mph @7000rpm per source",
+  "SANITY drag: top speed 200 km/h at 228kW needs CdA 1.77 m2 (implausible)",
+  "2026-11-05 re-check: 200 km/h (=124 mph) matches the source mph figure; CdA sanity still looks high — possible aero or gearing oddity on a 1966 pony car. Left unchanged.",
+  "2026-11-05: left null — 9000-rpm tach scale is not the same as redline; Hi-Po 289 redline not pinned in a factory doc this pass",
+  "2026-11-05: redline_rpm=6500 ESTIMATED — estimated: 289 Hi-Po peaks at 6000; period Hi-Po practice and solid-lifter cousins run ~6500 (9000 is tach scale, not redline)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": " | redline 6500 estimated 2026-11-05",
+ "original_confidence": "low",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "V8"
+}

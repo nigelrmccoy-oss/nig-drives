@@ -1,0 +1,120 @@
+{
+ "make": "Honda",
+ "model": "Civic Type R (FK8)",
+ "year": 2017,
+ "trim": "Type R",
+ "body_type": "hatchback",
+ "drivetrain": "FF",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1995,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 235,
+ "peak_power_rpm": 6500,
+ "peak_torque_nm": 400,
+ "peak_torque_rpm": 2500,
+ "torque_curve": [
+  [
+   1400,
+   328.8
+  ],
+  [
+   2500,
+   400.0
+  ],
+  [
+   4500,
+   372.6
+  ],
+  [
+   6500,
+   345.2
+  ],
+  [
+   6800,
+   303.8
+  ],
+  [
+   7000,
+   276.2
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.625,
+  2.115,
+  1.529,
+  1.125,
+  0.911,
+  0.734
+ ],
+ "final_drive": 4.111,
+ "curb_mass_kg": 1390,
+ "weight_dist_front_pct": null,
+ "length_mm": 4560,
+ "width_mm": 1875,
+ "height_mm": 1435,
+ "wheelbase_mm": 2700,
+ "track_front_mm": 1600,
+ "track_rear_mm": 1595,
+ "tyre_sizes": [
+  "245/30 ZR20"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 4500360,
+  "currency": "JPY",
+  "year": 2017,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Honda_Civic_Type_R"
+ ],
+ "confidence": "med",
+ "notes": "12/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 266
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "length_mm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "width_mm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "height_mm": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "final_drive": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/honda/civic/dba-fk8/10111901/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_Civic_Type_R)",
+  "redline_rpm": "https://hondanews.com/en-US/releases/honda-civic-type-r-powertrain",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "original value came from a wrong-generation page; no new source",
+  "top_speed_kmh": "original value came from a wrong-generation page; no new source"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG GENERATION: 1595cc 136kW 1070kg (EK9) for the FK8; FK8 K20C1 1995cc 235kW 400Nm 6MT 1390kg (JDM)",
+  "Original length 4180/wb 2620 = EK9 dims",
+  "2026-11-05: Engine redline 7000 rpm per Honda Civic Type R Powertrain press kit"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

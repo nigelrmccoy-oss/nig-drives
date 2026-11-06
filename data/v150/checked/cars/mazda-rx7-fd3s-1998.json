@@ -1,0 +1,127 @@
+{
+ "make": "Mazda",
+ "model": "RX-7 (FD3S)",
+ "year": 1998,
+ "trim": "Type RS",
+ "body_type": "coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "rotary",
+  "displacement_cc": 1308,
+  "aspiration": "twin-sequential turbocharged"
+ },
+ "peak_power_kw": 206,
+ "peak_power_rpm": 6500,
+ "peak_torque_nm": 314,
+ "peak_torque_rpm": 5000,
+ "torque_curve": [
+  [
+   1600,
+   193.3
+  ],
+  [
+   3000,
+   267.2
+  ],
+  [
+   5000,
+   314.0
+  ],
+  [
+   5800,
+   307.9
+  ],
+  [
+   6500,
+   302.6
+  ],
+  [
+   7200,
+   274.4
+  ],
+  [
+   8000,
+   242.1
+  ]
+ ],
+ "redline_rpm": 8000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.483,
+  2.015,
+  1.391,
+  1.0,
+  0.762
+ ],
+ "final_drive": 4.3,
+ "curb_mass_kg": 1280,
+ "weight_dist_front_pct": 50,
+ "length_mm": 4285,
+ "width_mm": 1760,
+ "height_mm": 1230,
+ "wheelbase_mm": 2425,
+ "track_front_mm": 1460,
+ "track_rear_mm": 1460,
+ "tyre_sizes": [
+  "235/45 ZR17",
+  "255/40 ZR17"
+ ],
+ "zero_to_100_s": 5.3,
+ "top_speed_kmh": 250,
+ "msrp": {
+  "amount": 3778000,
+  "currency": "JPY",
+  "year": 1998,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Mazda_RX-7",
+  "https://www.ultimatespecs.com/car-specs/Mazda/7613/Mazda-RX-7-FD-Twin-Turbo.html"
+ ],
+ "confidence": "high",
+ "notes": "19/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Mazda-RX-7-FD-Twin-Turbo.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 238,
+  "required_CdA_m2_for_top_speed": 0.8
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "length_mm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "width_mm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "height_mm": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "final_drive": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/mazda/rx-7/gf-fd3s/2500970/",
+  "zero_to_100_s": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_RX-7, https://www.ultimatespecs.com/car-specs/Mazda/7613/Mazda-RX-7-FD-Twin-Turbo.html)",
+  "top_speed_kmh": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_RX-7, https://www.ultimatespecs.com/car-specs/Mazda/7613/Mazda-RX-7-FD-Twin-Turbo.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_RX-7, https://www.ultimatespecs.com/car-specs/Mazda/7613/Mazda-RX-7-FD-Twin-Turbo.html)",
+  "redline_rpm": "http://www.rx7.net.nz/usspec.htm",
+  "weight_dist_front_pct": "http://www.rx7.net.nz/usspec.htm",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {},
+ "checked_flags": [
+  "Catalog page is Type RS 5MT from 1999-01 sales (280PS) = model-year 1998 car in CSV; original had 177kW/294Nm/1310kg/225/50R16 (older 255PS Series 1-4 mix)",
+  "Peak torque 313.8Nm (32.0 kgm), original 294 Nm wrong",
+  "Rotary: 1308cc is 654cc x2 chamber nominal",
+  "2026-11-05: US FD brochure lists 9000-rpm tach with 8000-rpm redline (MT); AT is 7000. JDM 1998 shares 13B-REW MT redline 8000.",
+  "2026-11-05: weight_dist 50/50 from US FD brochure (same chassis family)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

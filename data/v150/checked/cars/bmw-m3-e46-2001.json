@@ -1,0 +1,124 @@
+{
+ "make": "BMW",
+ "model": "M3 (E46)",
+ "year": 2001,
+ "trim": "M3",
+ "body_type": "sedan",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-6",
+  "displacement_cc": 3246,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 248,
+ "peak_power_rpm": 7900,
+ "peak_torque_nm": 355,
+ "peak_torque_rpm": 4900,
+ "torque_curve": [
+  [
+   1600,
+   306.7
+  ],
+  [
+   2900,
+   337.3
+  ],
+  [
+   4900,
+   355.0
+  ],
+  [
+   6400,
+   327.4
+  ],
+  [
+   7900,
+   299.8
+  ],
+  [
+   8000,
+   263.8
+  ]
+ ],
+ "redline_rpm": 8000,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  4.23,
+  2.53,
+  1.67,
+  1.23,
+  1.0,
+  0.83
+ ],
+ "final_drive": 3.62,
+ "curb_mass_kg": 1570,
+ "weight_dist_front_pct": 49,
+ "length_mm": null,
+ "width_mm": null,
+ "height_mm": null,
+ "wheelbase_mm": 2725,
+ "track_front_mm": null,
+ "track_rear_mm": null,
+ "tyre_sizes": [
+  "225/45 ZR18",
+  "255/40 ZR18"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 45970,
+  "currency": "USD",
+  "year": 2001,
+  "market": "US",
+  "source": "https://www.e46fanatics.com/attachments/e46-m3-press-release-pdf.418260/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/BMW_M3"
+ ],
+ "confidence": "med",
+ "notes": "15/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "torque_curve_shape": "NA",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 332,
+  "top_gear_at_peak-power_rpm_kmh": 328
+ },
+ "provenance": {
+  "engine.layout": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "engine.displacement_cc": "https://grassrootsmotorsports.com/new-cars/2001-bmw-m3/",
+  "engine.aspiration": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "peak_power_kw": "https://grassrootsmotorsports.com/new-cars/2001-bmw-m3/",
+  "peak_power_rpm": "https://grassrootsmotorsports.com/new-cars/2001-bmw-m3/",
+  "peak_torque_nm": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "peak_torque_rpm": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "redline_rpm": "https://mye46.com/gear-ratios/",
+  "gearbox_type": "https://mye46.com/gear-ratios/",
+  "gear_ratios": "https://mye46.com/gear-ratios/",
+  "final_drive": "https://mye46.com/gear-ratios/",
+  "curb_mass_kg": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "weight_dist_front_pct": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "wheelbase_mm": "https://www.spannerrash.com/bmw-e46-m3-specs/",
+  "tyre_sizes": "https://grassrootsmotorsports.com/new-cars/2001-bmw-m3/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/BMW_M3)",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "length_mm": "not retrieved",
+  "width_mm": "not retrieved",
+  "height_mm": "not retrieved",
+  "track_front_mm": "not retrieved",
+  "track_rear_mm": "not retrieved",
+  "zero_to_100_s": "only 0-60 (4.8s grassroots) found, not 0-100",
+  "top_speed_kmh": "155 mph limiter (spannerrash) = 250 km/h electronically limited"
+ },
+ "checked_flags": [
+  "ORIGINAL WAS WRONG GENERATION: inline-4 2.5L 162kW (E30 M3 Evo) for the E46 M3",
+  "US-spec figures used (333hp=248kW @7900, 262 lb-ft=355Nm @4900); EU-spec is 252kW/365Nm",
+  "MSRP sources disagree: $45,400 (MotorWeek), $45,970 (BMW Dec-2000 press release), $46,045 later; 45,970 used",
+  "Peak torque 262lb-ft converted = 355Nm; spannerrash lists 269 lb-ft for EU",
+  "Dry weight 1495 kg vs kerb 1570"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true
+}

@@ -1,0 +1,127 @@
+{
+ "make": "Citroën",
+ "model": "DS 21",
+ "year": 1967,
+ "trim": "DS 21",
+ "body_type": "4-door saloon",
+ "drivetrain": "FF",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 2175,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 74,
+ "peak_power_rpm": 5500,
+ "peak_torque_nm": 164,
+ "peak_torque_rpm": 3000,
+ "torque_curve": [
+  [
+   1200,
+   146.3
+  ],
+  [
+   1800,
+   156.1
+  ],
+  [
+   3000,
+   164.0
+  ],
+  [
+   4200,
+   146.9
+  ],
+  [
+   5500,
+   128.5
+  ],
+  [
+   5800,
+   119.2
+  ],
+  [
+   6000,
+   113.1
+  ]
+ ],
+ "redline_rpm": 6000,
+ "gearbox_type": "4-speed manual (hydraulic clutch/gear selection)",
+ "gear_ratios": [
+  3.251,
+  1.833,
+  1.207,
+  0.852
+ ],
+ "final_drive": 4.375,
+ "curb_mass_kg": 1295,
+ "weight_dist_front_pct": null,
+ "length_mm": 4874,
+ "width_mm": 1803,
+ "height_mm": 1470,
+ "wheelbase_mm": 3125,
+ "track_front_mm": null,
+ "track_rear_mm": null,
+ "tyre_sizes": [
+  "180 HR15 front",
+  "155 HR15 rear"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": 175,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "launch FRF price not found (ADAC shows converted EUR 7536)"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Citro%C3%ABn_DS"
+ ],
+ "confidence": "low",
+ "notes": "9/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 175,
+  "required_CdA_m2_for_top_speed": 0.77
+ },
+ "provenance": {
+  "engine.layout": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "engine.displacement_cc": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "engine.aspiration": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "peak_power_kw": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "peak_power_rpm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "peak_torque_nm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "peak_torque_rpm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "gearbox_type": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "gear_ratios": "derived:1/ (0.3076,0.5454,0.8285,1.1739) output/input ratios, DS 21 from 09/1967",
+  "final_drive": "http://www.citroen-ds-id.com/ds/DS_Gearbox.html",
+  "curb_mass_kg": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "length_mm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "width_mm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "height_mm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "wheelbase_mm": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "tyre_sizes": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "top_speed_kmh": "https://www.adac.de/rund-ums-fahrzeug/autokatalog/marken-modelle/citroen/ds/1generation-facelift/350665/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Citro%C3%ABn_DS)",
+  "redline_rpm": "estimated: estimated: peak power 5500 + ~500 rpm; soft 1960s pushrod I4 (no tach) — 6000 is a conservative fuel-cut stand-in",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure (front-heavy, not found)",
+  "track_front_mm": "hd19 lists 1500/1300 only via search summary; table not parsed",
+  "track_rear_mm": "see track_front",
+  "zero_to_100_s": "not found"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: gearbox 5-speed (1967 DS 21 is 4-speed; 5-speed only from 10/1970)",
+  "Gear ratios are 1/(output/input) from citroen-ds-id.com 09/1967 table; DS21 ADAC mass is EU (incl 75kg driver)",
+  "Displacement ADAC says 2160, true 2175; 2175 used (Wikipedia/orig)",
+  "2026-11-05: left redline null — pre-1972 D-series typically had no tach; not inventing from speedo dots",
+  "2026-11-05: redline_rpm=6000 ESTIMATED — estimated: peak power 5500 + ~500 rpm; soft 1960s pushrod I4 (no tach) — 6000 is a conservative fuel-cut stand-in"
+ ],
+ "checked_confidence": "med",
+ "checked_note": " | redline 6000 estimated 2026-11-05",
+ "original_confidence": "low",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "NA"
+}

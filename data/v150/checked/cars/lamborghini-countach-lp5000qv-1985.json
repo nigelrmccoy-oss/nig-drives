@@ -1,0 +1,124 @@
+{
+ "make": "Lamborghini",
+ "model": "Countach LP5000 QV",
+ "year": 1985,
+ "trim": "LP5000 QV",
+ "body_type": "coupe",
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "V-12",
+  "displacement_cc": 5167,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 335,
+ "peak_power_rpm": 7000,
+ "peak_torque_nm": 501,
+ "peak_torque_rpm": 5200,
+ "torque_curve": [
+  [
+   1500,
+   450.3
+  ],
+  [
+   3100,
+   484.7
+  ],
+  [
+   5200,
+   501.0
+  ],
+  [
+   6100,
+   479.0
+  ],
+  [
+   7000,
+   457.0
+  ],
+  [
+   7500,
+   388.4
+  ]
+ ],
+ "redline_rpm": 7500,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  2.232,
+  1.625,
+  1.088,
+  0.858,
+  0.707
+ ],
+ "final_drive": 4.091,
+ "curb_mass_kg": 1490,
+ "weight_dist_front_pct": 41,
+ "length_mm": 4140,
+ "width_mm": 2000,
+ "height_mm": 1070,
+ "wheelbase_mm": 2500,
+ "track_front_mm": 1536,
+ "track_rear_mm": 1606,
+ "tyre_sizes": [
+  "225/50 VR15",
+  "345/35 VR15"
+ ],
+ "zero_to_100_s": 6.5,
+ "top_speed_kmh": 245,
+ "msrp": {
+  "amount": 188500000,
+  "currency": "ITL",
+  "year": 1986,
+  "market": "Italy",
+  "source": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Lamborghini_Countach",
+  "https://www.ultimatespecs.com/car-specs/Lamborghini/16827/Lamborghini-Countach-LP5000S-QV.html"
+ ],
+ "confidence": "high",
+ "notes": "20/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Lamborghini-Countach-LP5000S-QV.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 284,
+  "required_CdA_m2_for_top_speed": 1.42
+ },
+ "provenance": {
+  "engine.displacement_cc": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "peak_power_kw": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "peak_power_rpm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "peak_torque_nm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "peak_torque_rpm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "gear_ratios": "http://lamborghinicars.tripod.com/countachlp500qv.html",
+  "final_drive": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "curb_mass_kg": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "weight_dist_front_pct": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "wheelbase_mm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "track_front_mm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "track_rear_mm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "length_mm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "width_mm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "height_mm": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "tyre_sizes": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "zero_to_100_s": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "top_speed_kmh": "https://www.lambocars.com/countach-lp500-quattrovalvole-specs-performance/",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lamborghini_Countach, https://www.ultimatespecs.com/car-specs/Lamborghini/16827/Lamborghini-Countach-LP5000S-QV.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lamborghini_Countach, https://www.ultimatespecs.com/car-specs/Lamborghini/16827/Lamborghini-Countach-LP5000S-QV.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lamborghini_Countach, https://www.ultimatespecs.com/car-specs/Lamborghini/16827/Lamborghini-Countach-LP5000S-QV.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lamborghini_Countach, https://www.ultimatespecs.com/car-specs/Lamborghini/16827/Lamborghini-Countach-LP5000S-QV.html)",
+  "redline_rpm": "https://wobcars.com/product/1989-lamborghini-countach-25th-anniversary/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {},
+ "checked_flags": [
+  "Orig top speed 298 and 0-100 4.8 replaced by 245 / 6.5 s from lambocars (Wikipedia-derived; other tests show ~5s, ~290km/h claim)",
+  "Gear ratios from search synthesis citing lamborghinicars.tripod/supercars.net (pages not verified)",
+  "MSRP Italian 188.5M lira (1986); US $100,000",
+  "SANITY drag: top speed 245 km/h at 335kW needs CdA 1.42 m2 (implausible)",
+  "2026-11-05 re-check: lambocars lists 245 km/h; other period claims ~290. CdA sanity is harsh on a wedge (Cd~0.42). Left 245 with existing provenance; do not invent a higher figure without a named road test.",
+  "2026-11-05: Jaeger Countach tach redline 7500 rpm documented on 5.2 V12 25th Anniversary cluster (WOB); LP5000 QV uses the same Jaeger instrument family — applied as QV tach redline"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "V8"
+}

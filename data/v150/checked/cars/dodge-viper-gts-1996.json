@@ -1,0 +1,129 @@
+{
+ "make": "Dodge",
+ "model": "Viper GTS",
+ "year": 1996,
+ "trim": "GTS",
+ "body_type": "sedan",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "V-10",
+  "displacement_cc": 7990,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 335,
+ "peak_power_rpm": 5200,
+ "peak_torque_nm": 664,
+ "peak_torque_rpm": 3700,
+ "torque_curve": [
+  [
+   1200,
+   603.4
+  ],
+  [
+   2200,
+   642.2
+  ],
+  [
+   3700,
+   664.0
+  ],
+  [
+   4400,
+   641.2
+  ],
+  [
+   5200,
+   615.2
+  ],
+  [
+   5600,
+   569.0
+  ],
+  [
+   6000,
+   522.9
+  ]
+ ],
+ "redline_rpm": 6000,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  2.66,
+  1.78,
+  1.3,
+  1.0,
+  0.74,
+  0.5
+ ],
+ "final_drive": 3.07,
+ "curb_mass_kg": 1535,
+ "weight_dist_front_pct": 46,
+ "length_mm": 4488,
+ "width_mm": 1924,
+ "height_mm": 1195,
+ "wheelbase_mm": 2444,
+ "track_front_mm": 1514,
+ "track_rear_mm": 1538,
+ "tyre_sizes": [
+  "275/40 ZR17",
+  "335/35 ZR17"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": 304,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "$66,000-66,700 reported; no primary source"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Dodge_Viper",
+  "https://www.ultimatespecs.com/car-specs/Dodge/22458/Dodge-Hemi-8.html"
+ ],
+ "confidence": "med",
+ "notes": "14/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Dodge-Hemi-8.html).",
+ "torque_curve_shape": "V8",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 491,
+  "top_gear_at_peak-power_rpm_kmh": 425,
+  "required_CdA_m2_for_top_speed": 0.73
+ },
+ "provenance": {
+  "engine.layout": "http://www.vipercentral.com/specifications/1996.html",
+  "engine.displacement_cc": "http://www.vipercentral.com/specifications/1996.html",
+  "engine.aspiration": "http://www.vipercentral.com/specifications/1996.html",
+  "peak_power_kw": "http://www.vipercentral.com/specifications/1996.html",
+  "peak_power_rpm": "http://www.vipercentral.com/specifications/1996.html",
+  "peak_torque_nm": "http://www.vipercentral.com/specifications/1996.html",
+  "peak_torque_rpm": "http://www.vipercentral.com/specifications/1996.html",
+  "redline_rpm": "http://www.vipercentral.com/specifications/1996.html",
+  "gearbox_type": "http://www.vipercentral.com/specifications/1996.html",
+  "gear_ratios": "http://www.vipercentral.com/specifications/1996.html",
+  "final_drive": "http://www.vipercentral.com/specifications/1996.html",
+  "curb_mass_kg": "http://www.vipercentral.com/specifications/1996.html",
+  "weight_dist_front_pct": "http://www.vipercentral.com/specifications/1996.html",
+  "wheelbase_mm": "http://www.vipercentral.com/specifications/1996.html",
+  "track_front_mm": "http://www.vipercentral.com/specifications/1996.html",
+  "track_rear_mm": "http://www.vipercentral.com/specifications/1996.html",
+  "length_mm": "http://www.vipercentral.com/specifications/1996.html",
+  "width_mm": "http://www.vipercentral.com/specifications/1996.html",
+  "height_mm": "http://www.vipercentral.com/specifications/1996.html",
+  "tyre_sizes": "http://www.vipercentral.com/specifications/1996.html",
+  "top_speed_kmh": "http://www.vipercentral.com/specifications/1996.html",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Dodge_Viper, https://www.ultimatespecs.com/car-specs/Dodge/22458/Dodge-Hemi-8.html)",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "zero_to_100_s": "source gives 0-60mph 4.1s only"
+ },
+ "checked_flags": [
+  "ORIGINAL BADLY WRONG: 5700cc V8 263kW 4-speed auto; real GTS is 8.0 V10 450hp 6MT",
+  "Top speed 189 mph = 304 km/h",
+  "FD 3.07 is \"effective final drive\" (top-gear overall 1.54)",
+  "INFO gearing: top gear at redline = 491 km/h, published top speed 304 (overdrive/drag-limited)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true
+}

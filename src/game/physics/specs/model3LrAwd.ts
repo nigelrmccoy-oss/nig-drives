@@ -27,6 +27,18 @@ export const MODEL3_LR_AWD: PhysicsSpec = {
     bodyFreqHz: 1.7,
     bodyDamping: 0.5,
   },
+  suspension: {
+    rideHeightMm: 140,
+    springFront: 28000,
+    springRear: 30000,
+    damperBumpFront: 2200,
+    damperBumpRear: 2400,
+    damperReboundFront: 2600,
+    damperReboundRear: 2800,
+    arbFront: 16000,
+    arbRear: 14000,
+    provenance: 'estimated',
+  },
   tire: {
     radius: 0.336, // 235/45 R18
     widthM: 0.235,

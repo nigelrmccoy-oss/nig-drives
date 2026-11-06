@@ -1,0 +1,123 @@
+{
+ "make": "Honda",
+ "model": "S2000",
+ "year": 1999,
+ "trim": "AP1",
+ "body_type": "roadster",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1997,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 184,
+ "peak_power_rpm": 8300,
+ "peak_torque_nm": 218,
+ "peak_torque_rpm": 7500,
+ "torque_curve": [
+  [
+   1800,
+   180.2
+  ],
+  [
+   4500,
+   207.5
+  ],
+  [
+   7500,
+   218.0
+  ],
+  [
+   8300,
+   211.7
+  ],
+  [
+   8600,
+   200.8
+  ],
+  [
+   9000,
+   186.3
+  ]
+ ],
+ "redline_rpm": 9000,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.133,
+  2.045,
+  1.481,
+  1.161,
+  0.97,
+  0.81
+ ],
+ "final_drive": 4.1,
+ "curb_mass_kg": 1250,
+ "weight_dist_front_pct": 49,
+ "length_mm": 4135,
+ "width_mm": 1750,
+ "height_mm": 1285,
+ "wheelbase_mm": 2400,
+ "track_front_mm": 1470,
+ "track_rear_mm": 1510,
+ "tyre_sizes": [
+  "215/45 R17",
+  "245/40 R17"
+ ],
+ "zero_to_100_s": 6.2,
+ "top_speed_kmh": 240,
+ "msrp": {
+  "amount": 3500000,
+  "currency": "JPY",
+  "year": 1999,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Honda_S2000",
+  "https://www.ultimatespecs.com/car-specs/Honda/856/Honda-S2000-20-VTEC.html"
+ ],
+ "confidence": "high",
+ "notes": "19/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Honda-S2000-20-VTEC.html).",
+ "derived_speeds": {
+  "required_CdA_m2_for_top_speed": 0.81
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "length_mm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "width_mm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "height_mm": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/honda/s2000/la-ap1/10013000/",
+  "zero_to_100_s": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_S2000, https://www.ultimatespecs.com/car-specs/Honda/856/Honda-S2000-20-VTEC.html)",
+  "top_speed_kmh": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_S2000, https://www.ultimatespecs.com/car-specs/Honda/856/Honda-S2000-20-VTEC.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_S2000, https://www.ultimatespecs.com/car-specs/Honda/856/Honda-S2000-20-VTEC.html)",
+  "redline_rpm": "https://hondanews.com/en-US/honda-automobiles/releases/release-5cf69ff7f30a01d81cc648004c34c870-honda-s2000-powertrain",
+  "final_drive": "https://hondanews.com/en-US/releases/release-4a111fc377fd37d93a2f73004c34c870-honda-s2000-transmission",
+  "weight_dist_front_pct": "https://hondanews.com/en-US/honda-automobiles/releases/release-1731f2d3f03cd0ad1cb963004c34c89c-2001-honda-s2000-specifications",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {},
+ "checked_flags": [
+  "Original 177kW@8300/208Nm@7500/1320kg/FD null were JDM-vs-US mix; JDM AP1 250PS 184kW @8300, 218Nm @7500, 1250kg",
+  "Original tyre 215/45 R17 245/40 R17 confirmed",
+  "2026-11-05: redline = Honda 9000 rpm rev limit (press powertrain page)",
+  "2026-11-05: final_drive = Honda secondary 4.100; Honda also lists primary gear reduction 1.160 — stage-g physics must multiply primary×secondary (effective ~4.756) or bake primary into gears",
+  "2026-11-05: weight_dist 49/51 from Honda 2001 S2000 specifications"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "Filled redline/FD/weight_dist from Honda News 2026-11-05",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

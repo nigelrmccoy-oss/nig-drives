@@ -1,0 +1,66 @@
+{
+  "make": "BMW",
+  "model": "M3",
+  "year": 1988,
+  "trim": "E30 Euro (S14 2.3, non-cat)",
+  "body_type": "2-door coupe",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 2302,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 147,
+  "peak_power_rpm": 6750,
+  "peak_torque_nm": 240,
+  "peak_torque_rpm": 4750,
+  "redline_rpm": 7250,
+  "gearbox_type": "5-speed manual (Getrag 265/5 dogleg)",
+  "gear_ratios": [
+    3.72,
+    2.4,
+    1.77,
+    1.26,
+    1.0
+  ],
+  "final_drive": 3.25,
+  "curb_mass_kg": 1200,
+  "length_mm": 4345,
+  "width_mm": 1680,
+  "height_mm": 1370,
+  "wheelbase_mm": 2562,
+  "track_front_mm": 1412,
+  "track_rear_mm": 1433,
+  "tyre_sizes": [
+    "205/55 VR15"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      204.2
+    ],
+    [
+      2800,
+      227.9
+    ],
+    [
+      4750,
+      240.0
+    ],
+    [
+      5800,
+      223.2
+    ],
+    [
+      6750,
+      208.0
+    ],
+    [
+      7250,
+      183.0
+    ]
+  ],
+  "top_speed_kmh": 235,
+  "zero_to_100_s": 6.7,
+  "redline_provenance": "https://www.roadandtrack.com/reviews/a37867983/bmw-m3-guide/"
+}

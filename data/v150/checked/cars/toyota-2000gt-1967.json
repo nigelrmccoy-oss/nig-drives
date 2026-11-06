@@ -1,0 +1,127 @@
+{
+ "make": "Toyota",
+ "model": "2000GT",
+ "year": 1967,
+ "trim": "MF10",
+ "body_type": "2-door fastback coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-6",
+  "displacement_cc": 1988,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 110,
+ "peak_power_rpm": 6600,
+ "peak_torque_nm": 176,
+ "peak_torque_rpm": 5000,
+ "torque_curve": [
+  [
+   1500,
+   150.1
+  ],
+  [
+   3000,
+   167.6
+  ],
+  [
+   5000,
+   176.0
+  ],
+  [
+   5800,
+   167.6
+  ],
+  [
+   6600,
+   159.2
+  ],
+  [
+   7000,
+   149.6
+  ],
+  [
+   7400,
+   140.1
+  ]
+ ],
+ "redline_rpm": 7400,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.143,
+  1.636,
+  1.179,
+  1.0,
+  0.844
+ ],
+ "final_drive": 4.375,
+ "curb_mass_kg": 1120,
+ "weight_dist_front_pct": 50.4,
+ "length_mm": 4175,
+ "width_mm": 1600,
+ "height_mm": 1160,
+ "wheelbase_mm": 2330,
+ "track_front_mm": 1300,
+ "track_rear_mm": 1300,
+ "tyre_sizes": [
+  "165 HR15"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": 220,
+ "msrp": {
+  "amount": 2380000,
+  "currency": "JPY",
+  "year": 1967,
+  "market": "Japan",
+  "source": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Toyota_2000GT"
+ ],
+ "confidence": "med",
+ "notes": "10/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 217,
+  "required_CdA_m2_for_top_speed": 0.6
+ },
+ "provenance": {
+  "engine.layout": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "engine.displacement_cc": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "engine.aspiration": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "peak_power_kw": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "peak_power_rpm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "peak_torque_nm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "peak_torque_rpm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "gearbox_type": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_2.html",
+  "gear_ratios": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_2.html",
+  "final_drive": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_2.html",
+  "curb_mass_kg": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "weight_dist_front_pct": "derived:565/(565+555) unladen axle loads, ty",
+  "wheelbase_mm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "track_front_mm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "track_rear_mm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "length_mm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "width_mm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "height_mm": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "tyre_sizes": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "top_speed_kmh": "https://toyota.jp/spo/information/collection/2000gt/datafile/2_4_1.html",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_2000GT)",
+  "redline_rpm": "estimated: estimated: 3M peaks at 6600; high-rev 1960s DOHC six — 7400 sits under the 9000 tach scale and above power peak",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "zero_to_100_s": "no source"
+ },
+ "checked_flags": [
+  "Source: Toyota new-model explanatory data sheet (early model)",
+  "ORIGINAL: 110kW kept (150PS); tracks 1300/1300 (not 1365 rear); drivetrain FR",
+  "MSRP 2,380,000 JPY from search synthesis (Yamaha/Wikipedia) - not on Toyota page",
+  "2026-11-05: left null — some sources cite 9000 tach scale; peak power 6600; redline vs scale-max not separated in a brochure text we opened",
+  "2026-11-05: redline_rpm=7400 ESTIMATED — estimated: 3M peaks at 6600; high-rev 1960s DOHC six — 7400 sits under the 9000 tach scale and above power peak"
+ ],
+ "checked_confidence": "high",
+ "checked_note": " | redline 7400 estimated 2026-11-05",
+ "original_confidence": "med",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "NA"
+}

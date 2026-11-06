@@ -1,0 +1,124 @@
+{
+ "make": "Mitsubishi",
+ "model": "Lancer Evolution VI",
+ "year": 1999,
+ "trim": "GSR",
+ "body_type": "sedan",
+ "drivetrain": "4WD",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1997,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 206,
+ "peak_power_rpm": 6500,
+ "peak_torque_nm": 373,
+ "peak_torque_rpm": 3000,
+ "torque_curve": [
+  [
+   1400,
+   278.7
+  ],
+  [
+   1800,
+   317.5
+  ],
+  [
+   3000,
+   373.0
+  ],
+  [
+   4800,
+   336.8
+  ],
+  [
+   6500,
+   302.6
+  ],
+  [
+   6800,
+   266.3
+  ],
+  [
+   7000,
+   242.1
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  2.785,
+  1.95,
+  1.407,
+  1.031,
+  0.761
+ ],
+ "final_drive": 4.529,
+ "curb_mass_kg": 1360,
+ "weight_dist_front_pct": null,
+ "length_mm": 4350,
+ "width_mm": 1770,
+ "height_mm": 1415,
+ "wheelbase_mm": 2510,
+ "track_front_mm": 1510,
+ "track_rear_mm": 1505,
+ "tyre_sizes": [
+  "225/45 ZR17"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 3248000,
+  "currency": "JPY",
+  "year": 1999,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Mitsubishi_Lancer_Evolution",
+  "https://www.ultimatespecs.com/car-specs/Mitsubishi/6906/Mitsubishi-Carisma-16.html"
+ ],
+ "confidence": "med",
+ "notes": "13/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Mitsubishi-Carisma-16.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 225
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "length_mm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "width_mm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "height_mm": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "final_drive": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/mitsubishi/lancer/gf-cp9a/4003219/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mitsubishi_Lancer_Evolution, https://www.ultimatespecs.com/car-specs/Mitsubishi/6906/Mitsubishi-Carisma-16.html)",
+  "redline_rpm": "https://www.caranddriver.com/reviews/a15140122/mitsubishi-lancer-evolution-vi-specialty-file/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "Original peak torque null, now 373Nm@3000; GSR Evolution VI JDM 5MT 280PS",
+  "Original tyres null; now 225/45 ZR17",
+  "2026-11-05: C&D May 2000 Evo VI test: ran to 7000-rpm redline in fifth"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

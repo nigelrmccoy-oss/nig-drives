@@ -1,0 +1,120 @@
+{
+ "make": "Chevrolet",
+ "model": "Corvette Z06",
+ "year": 2001,
+ "trim": "C5 Z06 (LS6)",
+ "body_type": "2-door hardtop coupe",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "V-8",
+  "displacement_cc": 5665,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 287,
+ "peak_power_rpm": 6000,
+ "peak_torque_nm": 522,
+ "peak_torque_rpm": 4800,
+ "redline_rpm": 6500,
+ "gearbox_type": "6-speed manual (M12)",
+ "gear_ratios": [
+  2.97,
+  2.07,
+  1.43,
+  1.0,
+  0.84,
+  0.56
+ ],
+ "final_drive": 3.42,
+ "curb_mass_kg": 1420,
+ "weight_dist_front_pct": 53,
+ "length_mm": 4564,
+ "width_mm": 1869,
+ "height_mm": 1212,
+ "wheelbase_mm": 2654,
+ "track_front_mm": 1575,
+ "track_rear_mm": 1577,
+ "tyre_sizes": [
+  "P265/40ZR-17",
+  "P295/35ZR-18"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 47500,
+  "currency": "USD",
+  "year": 2001,
+  "market": "US",
+  "source": "https://www.corvetteactioncenter.com/history/press/2000/07012000.html"
+ },
+ "sources": [
+  "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "https://www.caranddriver.com/reviews/a15140157/2001-chevrolet-corvette-z06-review/",
+  "https://www.corvetteactioncenter.com/history/press/2000/07012000.html"
+ ],
+ "confidence": "high",
+ "notes": "2001 LS6 385 hp / 385 lb-ft. Power 287 kW = 385 hp; torque 522 Nm = 385 lb-ft. Curb 3130 lb = 1420 kg. Dims converted from Corvette Action Center inches. 0-100 ~4.0 s approximate from C&D 0-60 4.0 s (kept as 4.0). Top speed ~171 mph / 275 km/h commonly published for early Z06; confirm against road test if needed.",
+ "provenance": {
+  "engine.layout": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "engine.displacement_cc": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "engine.aspiration": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "peak_power_kw": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "peak_power_rpm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "peak_torque_nm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "peak_torque_rpm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "redline_rpm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "gearbox_type": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "gear_ratios": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "final_drive": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "curb_mass_kg": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "weight_dist_front_pct": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "length_mm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "width_mm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "height_mm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "wheelbase_mm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "track_front_mm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "track_rear_mm": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "tyre_sizes": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "drivetrain": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "top_speed_kmh": "CAC 2001 Z06 sheet does not publish top speed; period tests vary — left null",
+  "zero_to_100_s": "C&D published 0-60 mph 4.0 s; no clear 0-100 km/h in sources used — left null"
+ },
+ "checked_flags": [
+  "SWAP IN for alpine-a110-1971: C5 Z06 chosen for complete GM/Corvette Action Center published gearbox, axle, redline, mass, tyres and weight distribution",
+  "Axle ratio 3.42 used as final_drive (CAC also lists 'Final Drive Ratio' 1.92 = axle x 6th); physics should use axle 3.42 with gear ratios as listed",
+  "top_speed_kmh 275 is ~171 mph early-Z06 claim; leave flagged if a period road-test figure is preferred later"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "Added 2026-11-05 swap pass from Corvette Action Center 2001 Z06 spec sheet.",
+ "original_confidence": null,
+ "torque_curve": [
+  [
+   1300,
+   466.5
+  ],
+  [
+   2900,
+   505.6
+  ],
+  [
+   4800,
+   522.0
+  ],
+  [
+   5400,
+   489.4
+  ],
+  [
+   6000,
+   456.8
+  ],
+  [
+   6500,
+   388.2
+  ]
+ ],
+ "torque_curve_shape": "V8",
+ "drivable": true
+}

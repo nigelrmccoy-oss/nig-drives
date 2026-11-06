@@ -1,0 +1,125 @@
+{
+ "make": "Toyota",
+ "model": "MR2 (SW20)",
+ "year": 1990,
+ "trim": "GT Turbo",
+ "body_type": null,
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1998,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 180,
+ "peak_power_rpm": 6000,
+ "peak_torque_nm": 304,
+ "peak_torque_rpm": 4000,
+ "torque_curve": [
+  [
+   1400,
+   195.6
+  ],
+  [
+   2400,
+   258.7
+  ],
+  [
+   4000,
+   304.0
+  ],
+  [
+   5000,
+   295.2
+  ],
+  [
+   6000,
+   286.5
+  ],
+  [
+   6600,
+   257.8
+  ],
+  [
+   7200,
+   229.2
+  ]
+ ],
+ "redline_rpm": 7200,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.23,
+  1.913,
+  1.258,
+  0.918,
+  0.731
+ ],
+ "final_drive": 4.285,
+ "curb_mass_kg": 1270,
+ "weight_dist_front_pct": null,
+ "length_mm": 4170,
+ "width_mm": 1695,
+ "height_mm": 1235,
+ "wheelbase_mm": 2400,
+ "track_front_mm": 1470,
+ "track_rear_mm": 1450,
+ "tyre_sizes": [
+  "195/55 R15",
+  "225/50 R15"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 2955000,
+  "currency": "JPY",
+  "year": 1990,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Toyota_MR2",
+  "https://www.ultimatespecs.com/car-specs/Toyota/5364/Toyota-Paseo-II-15i.html"
+ ],
+ "confidence": "med",
+ "notes": "14/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Toyota-Paseo-II-15i.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 219
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "length_mm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "width_mm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "height_mm": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "final_drive": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/toyota/mr2/e-sw20/1002264/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_MR2, https://www.ultimatespecs.com/car-specs/Toyota/5364/Toyota-Paseo-II-15i.html)",
+  "redline_rpm": "https://www.mr2oc.com/threads/a-few-questions-about-1990-1991-mr2-gt-turbo.193260/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: 66kW/130Nm/895kg (NA SW20 4-cyl?) for GT Turbo; catalog GT (3S-GTE) is 245PS rev (from ~1991-93); launch 1989-90 GT was 225PS - year/rev UNVERIFIED",
+  "Page 1002264 (GT, 245PS) used: 180kW@6000, 304Nm@4000, 1270kg",
+  "2026-11-05: SW20 turbo tach/fuel-cut redline 7200 rpm per MR2OC Gen2 discussion"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

@@ -1,0 +1,65 @@
+{
+  "make": "Honda",
+  "model": "Civic Type R (FK8)",
+  "year": 2017,
+  "trim": "Type R",
+  "body_type": "hatchback",
+  "drivetrain": "FF",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1995,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 235,
+  "peak_power_rpm": 6500,
+  "peak_torque_nm": 400,
+  "peak_torque_rpm": 2500,
+  "redline_rpm": 7000,
+  "gearbox_type": "6-speed manual",
+  "gear_ratios": [
+    3.625,
+    2.115,
+    1.529,
+    1.125,
+    0.911,
+    0.734
+  ],
+  "final_drive": 4.111,
+  "curb_mass_kg": 1390,
+  "length_mm": 4560,
+  "width_mm": 1875,
+  "height_mm": 1435,
+  "wheelbase_mm": 2700,
+  "track_front_mm": 1600,
+  "track_rear_mm": 1595,
+  "tyre_sizes": [
+    "245/30 ZR20"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      328.8
+    ],
+    [
+      2500,
+      400.0
+    ],
+    [
+      4500,
+      372.6
+    ],
+    [
+      6500,
+      345.2
+    ],
+    [
+      6800,
+      303.8
+    ],
+    [
+      7000,
+      276.2
+    ]
+  ],
+  "redline_provenance": "https://hondanews.com/en-US/releases/honda-civic-type-r-powertrain"
+}

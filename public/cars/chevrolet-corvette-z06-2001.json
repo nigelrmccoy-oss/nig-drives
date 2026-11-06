@@ -1,0 +1,67 @@
+{
+  "make": "Chevrolet",
+  "model": "Corvette Z06",
+  "year": 2001,
+  "trim": "C5 Z06 (LS6)",
+  "body_type": "2-door hardtop coupe",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "V-8",
+    "displacement_cc": 5665,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 287,
+  "peak_power_rpm": 6000,
+  "peak_torque_nm": 522,
+  "peak_torque_rpm": 4800,
+  "redline_rpm": 6500,
+  "gearbox_type": "6-speed manual (M12)",
+  "gear_ratios": [
+    2.97,
+    2.07,
+    1.43,
+    1.0,
+    0.84,
+    0.56
+  ],
+  "final_drive": 3.42,
+  "curb_mass_kg": 1420,
+  "weight_dist_front_pct": 53,
+  "length_mm": 4564,
+  "width_mm": 1869,
+  "height_mm": 1212,
+  "wheelbase_mm": 2654,
+  "track_front_mm": 1575,
+  "track_rear_mm": 1577,
+  "tyre_sizes": [
+    "P265/40ZR-17",
+    "P295/35ZR-18"
+  ],
+  "torque_curve": [
+    [
+      1300,
+      466.5
+    ],
+    [
+      2900,
+      505.6
+    ],
+    [
+      4800,
+      522.0
+    ],
+    [
+      5400,
+      489.4
+    ],
+    [
+      6000,
+      456.8
+    ],
+    [
+      6500,
+      388.2
+    ]
+  ],
+  "redline_provenance": "https://www.corvetteactioncenter.com/specs/c5/z06/2001z06.html"
+}

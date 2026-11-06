@@ -1,0 +1,70 @@
+{
+  "make": "Lancia",
+  "model": "Delta HF Integrale",
+  "year": 1992,
+  "trim": "Evoluzione",
+  "body_type": "hatchback",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1995,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 154,
+  "peak_power_rpm": 5750,
+  "peak_torque_nm": 304,
+  "peak_torque_rpm": 3500,
+  "redline_rpm": 6500,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.5,
+    2.176,
+    1.523,
+    1.156,
+    0.916
+  ],
+  "final_drive": 3.111,
+  "curb_mass_kg": 1350,
+  "weight_dist_front_pct": 62.4,
+  "length_mm": 3900,
+  "width_mm": 1770,
+  "height_mm": 1365,
+  "wheelbase_mm": 2480,
+  "track_front_mm": 1502,
+  "track_rear_mm": 1500,
+  "tyre_sizes": [
+    "205/50 ZR15"
+  ],
+  "torque_curve": [
+    [
+      1300,
+      201.6
+    ],
+    [
+      2100,
+      258.7
+    ],
+    [
+      3500,
+      304.0
+    ],
+    [
+      4600,
+      280.4
+    ],
+    [
+      5750,
+      255.7
+    ],
+    [
+      6100,
+      231.9
+    ],
+    [
+      6500,
+      204.6
+    ]
+  ],
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: peaks at 5750; Integrale Evo tach often marked ~6500 \u2014 matches Motormatchup/owner figures we would not treat as hard provenance"
+}

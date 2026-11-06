@@ -1,0 +1,68 @@
+{
+  "make": "Toyota",
+  "model": "MR2 (SW20)",
+  "year": 1990,
+  "trim": "GT Turbo",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1998,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 180,
+  "peak_power_rpm": 6000,
+  "peak_torque_nm": 304,
+  "peak_torque_rpm": 4000,
+  "redline_rpm": 7200,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.23,
+    1.913,
+    1.258,
+    0.918,
+    0.731
+  ],
+  "final_drive": 4.285,
+  "curb_mass_kg": 1270,
+  "length_mm": 4170,
+  "width_mm": 1695,
+  "height_mm": 1235,
+  "wheelbase_mm": 2400,
+  "track_front_mm": 1470,
+  "track_rear_mm": 1450,
+  "tyre_sizes": [
+    "195/55 R15",
+    "225/50 R15"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      195.6
+    ],
+    [
+      2400,
+      258.7
+    ],
+    [
+      4000,
+      304.0
+    ],
+    [
+      5000,
+      295.2
+    ],
+    [
+      6000,
+      286.5
+    ],
+    [
+      6600,
+      257.8
+    ],
+    [
+      7200,
+      229.2
+    ]
+  ],
+  "redline_provenance": "https://www.mr2oc.com/threads/a-few-questions-about-1990-1991-mr2-gt-turbo.193260/"
+}

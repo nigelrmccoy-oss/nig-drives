@@ -2,6 +2,9 @@
  * What the vehicle reads each frame (v1.4.0 M1). Input implements it; the headless
  * bench passes its own object. steer +1 = full left, throttle / brakeAxis 0–1.
  */
+import { bindingsFromSettings, type BindingsMap, type InputAction } from './bindings';
+import { loadSettings } from '../save/settings';
+
 export interface DriverInput {
   forward: boolean;
   back: boolean;
@@ -55,6 +58,8 @@ export class Input implements DriverInput {
   private assistToggleQueued = false;
   private telemetryPlusQueued = false;
   private imageryQueued = false;
+  private pauseQueued = false;
+  private bindings: BindingsMap = bindingsFromSettings(loadSettings().bindings);
 
   constructor() {
     window.addEventListener('keydown', this.onKeyDown);
@@ -62,44 +67,51 @@ export class Input implements DriverInput {
     window.addEventListener('blur', this.onBlur);
   }
 
+  /** Reload bindings after Options saves. */
+  reloadBindings(): void {
+    this.bindings = bindingsFromSettings(loadSettings().bindings);
+    this.sync();
+  }
+
+  private bound(action: InputAction): string[] {
+    return this.bindings[action]?.keys ?? [];
+  }
+
+  private anyDown(action: InputAction): boolean {
+    return this.bound(action).some((k) => this.pressed.has(k));
+  }
+
   private onKeyDown = (e: KeyboardEvent): void => {
     const k = e.code;
-    if (
-      k === 'KeyW' ||
-      k === 'KeyA' ||
-      k === 'KeyS' ||
-      k === 'KeyD' ||
-      k === 'ArrowUp' ||
-      k === 'ArrowDown' ||
-      k === 'ArrowLeft' ||
-      k === 'ArrowRight' ||
-      k === 'Space' ||
-      k === 'F1' ||
-      k === 'F2'
-    ) {
+    const driveCodes = [
+      ...this.bound('throttle'), ...this.bound('brake'),
+      ...this.bound('steer_left'), ...this.bound('steer_right'),
+      ...this.bound('handbrake'),
+    ];
+    if (driveCodes.includes(k) || this.bound('assists').includes(k) || this.bound('telemetry').includes(k)) {
       e.preventDefault();
     }
-    if (DRIVE_KEYS.includes(k)) this.analog = false; // a driving key hands control back to the keyboard
+    if (driveCodes.includes(k)) this.analog = false;
     if (!this.pressed.has(k)) {
-      if (k === 'KeyC') this.cameraToggleQueued = true;
-      if (k === 'KeyR') this.weatherCycleQueued = true;
-      if (k === 'KeyT') this.timeCycleQueued = true;
-      if (k === 'KeyP') this.timePauseQueued = true;
-      if (k === 'KeyE' || k === 'Equal' || k === 'NumpadAdd') this.gearUpQueued = true;
-      if (k === 'KeyQ' || k === 'Minus' || k === 'NumpadSubtract') this.gearDownQueued = true;
-      if (k === 'KeyG') this.autoSelectorQueued = true;
-      if (k === 'F1') this.assistToggleQueued = true;
-      if (k === 'F2') this.telemetryPlusQueued = true;
-      if (k === 'KeyI') this.imageryQueued = true;
-      // H-pattern: digits 1–6, KeyN = N, KeyB = reverse (R conflicts with weather)
-      if (k === 'Digit1' || k === 'Numpad1') this.hGearQueued = 1;
-      if (k === 'Digit2' || k === 'Numpad2') this.hGearQueued = 2;
-      if (k === 'Digit3' || k === 'Numpad3') this.hGearQueued = 3;
-      if (k === 'Digit4' || k === 'Numpad4') this.hGearQueued = 4;
-      if (k === 'Digit5' || k === 'Numpad5') this.hGearQueued = 5;
-      if (k === 'Digit6' || k === 'Numpad6') this.hGearQueued = 6;
-      if (k === 'KeyN') this.hGearQueued = 0;
-      if (k === 'KeyB') this.hGearQueued = -1;
+      if (this.bound('camera').includes(k)) this.cameraToggleQueued = true;
+      if (this.bound('weather').includes(k)) this.weatherCycleQueued = true;
+      if (this.bound('time').includes(k)) this.timeCycleQueued = true;
+      if (this.bound('time_pause').includes(k)) this.timePauseQueued = true;
+      if (this.bound('shift_up').includes(k)) this.gearUpQueued = true;
+      if (this.bound('shift_down').includes(k)) this.gearDownQueued = true;
+      if (this.bound('auto_selector').includes(k)) this.autoSelectorQueued = true;
+      if (this.bound('assists').includes(k)) this.assistToggleQueued = true;
+      if (this.bound('telemetry').includes(k)) this.telemetryPlusQueued = true;
+      if (this.bound('imagery').includes(k)) this.imageryQueued = true;
+      if (this.bound('pause').includes(k)) this.pauseQueued = true;
+      if (this.bound('h1').includes(k)) this.hGearQueued = 1;
+      if (this.bound('h2').includes(k)) this.hGearQueued = 2;
+      if (this.bound('h3').includes(k)) this.hGearQueued = 3;
+      if (this.bound('h4').includes(k)) this.hGearQueued = 4;
+      if (this.bound('h5').includes(k)) this.hGearQueued = 5;
+      if (this.bound('h6').includes(k)) this.hGearQueued = 6;
+      if (this.bound('h_n').includes(k)) this.hGearQueued = 0;
+      if (this.bound('h_r').includes(k)) this.hGearQueued = -1;
     }
     this.pressed.add(k);
     this.sync();
@@ -116,18 +128,19 @@ export class Input implements DriverInput {
   };
 
   private sync(): void {
-    this.forward = this.pressed.has('KeyW') || this.pressed.has('ArrowUp');
-    this.back = this.pressed.has('KeyS') || this.pressed.has('ArrowDown');
-    this.left = this.pressed.has('KeyA') || this.pressed.has('ArrowLeft');
-    this.right = this.pressed.has('KeyD') || this.pressed.has('ArrowRight');
-    this.brake = this.pressed.has('Space');
-    this.clutch = this.pressed.has('ShiftLeft') || this.pressed.has('ShiftRight');
+    this.forward = this.anyDown('throttle');
+    this.back = this.anyDown('brake');
+    this.left = this.anyDown('steer_left');
+    this.right = this.anyDown('steer_right');
+    this.brake = this.anyDown('handbrake');
+    this.clutch = this.anyDown('clutch');
     if (!this.analog) {
-      this.steer = (this.left ? 1 : 0) - (this.right ? 1 : 0);
+      this.steer = (this.left ? 1 : 0) + (this.right ? -1 : 0);
       this.throttle = this.forward ? 1 : 0;
-      this.brakeAxis = this.brake ? 1 : 0;
+      this.brakeAxis = this.back ? 1 : 0;
     }
   }
+
 
   /**
    * v1.4.0 M1: read the first connected gamepad (standard mapping). Call once per frame.
@@ -205,6 +218,12 @@ export class Input implements DriverInput {
   }
 
   /** v1.5.0b: I = satellite imagery on the ground (needs a Cesium ion key). */
+  consumePause(): boolean {
+    const v = this.pauseQueued;
+    this.pauseQueued = false;
+    return v;
+  }
+
   consumeImageryToggle(): boolean {
     const v = this.imageryQueued;
     this.imageryQueued = false;

@@ -1,0 +1,123 @@
+{
+ "make": "Nissan",
+ "model": "Skyline GT-R (R32)",
+ "year": 1991,
+ "trim": "BNR32",
+ "body_type": "sports car",
+ "drivetrain": "4WD",
+ "engine": {
+  "layout": "inline-6",
+  "displacement_cc": 2568,
+  "aspiration": "twin-turbocharged"
+ },
+ "peak_power_kw": 206,
+ "peak_power_rpm": 6800,
+ "peak_torque_nm": 353,
+ "peak_torque_rpm": 4400,
+ "torque_curve": [
+  [
+   1600,
+   231.6
+  ],
+  [
+   2600,
+   298.2
+  ],
+  [
+   4400,
+   353.0
+  ],
+  [
+   5600,
+   321.1
+  ],
+  [
+   6800,
+   289.3
+  ],
+  [
+   7400,
+   260.4
+  ],
+  [
+   8000,
+   231.4
+  ]
+ ],
+ "redline_rpm": 8000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.214,
+  1.925,
+  1.302,
+  1.0,
+  0.752
+ ],
+ "final_drive": 4.111,
+ "curb_mass_kg": 1480,
+ "weight_dist_front_pct": null,
+ "length_mm": 4545,
+ "width_mm": 1755,
+ "height_mm": 1340,
+ "wheelbase_mm": 2615,
+ "track_front_mm": 1480,
+ "track_rear_mm": 1480,
+ "tyre_sizes": [
+  "225/50 R16"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 4545000,
+  "currency": "JPY",
+  "year": 1991,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Nissan_Skyline_GT-R"
+ ],
+ "confidence": "med",
+ "notes": "15/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 262
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "length_mm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "width_mm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "height_mm": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "final_drive": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/nissan/skyline/e-bnr32/1501471/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Nissan_Skyline_GT-R)",
+  "redline_rpm": "https://www.hemmings.com/stories/godzilla/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "Original tyres 245/45R17 wrong for R32 GT-R (225/50R16); original 1430kg vs catalog 1480kg; original 2600cc nominal vs 2568cc",
+  "MSRP is catalog base GT-R price for this page (1,501471); original 1989 launch price may differ",
+  "2026-11-05: R32 GT-R tach redline 8000 rpm (Hemmings Godzilla feature / period tach markings)"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

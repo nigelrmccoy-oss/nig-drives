@@ -1,0 +1,67 @@
+{
+  "make": "Lancia",
+  "model": "Stratos HF Stradale",
+  "year": 1974,
+  "trim": "Stradale",
+  "body_type": "coup\u00e9",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "V-6",
+    "displacement_cc": 2418,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 140,
+  "peak_power_rpm": 7000,
+  "peak_torque_nm": 225,
+  "peak_torque_rpm": 4000,
+  "redline_rpm": 7500,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.554,
+    2.459,
+    1.781,
+    1.32,
+    0.986
+  ],
+  "final_drive": 3.824,
+  "curb_mass_kg": 980,
+  "length_mm": 3710,
+  "width_mm": 1750,
+  "height_mm": 1114,
+  "wheelbase_mm": 2180,
+  "track_front_mm": 1433,
+  "track_rear_mm": 1457,
+  "tyre_sizes": [
+    "205/70 ZR14"
+  ],
+  "torque_curve": [
+    [
+      1500,
+      198.6
+    ],
+    [
+      2400,
+      214.2
+    ],
+    [
+      4000,
+      225.0
+    ],
+    [
+      5500,
+      208.0
+    ],
+    [
+      7000,
+      191.0
+    ],
+    [
+      7500,
+      168.1
+    ]
+  ],
+  "top_speed_kmh": 230,
+  "zero_to_100_s": 6.8,
+  "redline_estimated": true,
+  "redline_provenance": "estimated: estimated: Dino V6 peaks at 7000; Stradale tach claims cluster at 7500 (vs contested 7800) \u2014 use 7500"
+}

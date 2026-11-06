@@ -1,0 +1,72 @@
+{
+  "make": "Mazda",
+  "model": "RX-7 (FD3S)",
+  "year": 1998,
+  "trim": "Type RS",
+  "body_type": "coup\u00e9",
+  "drivetrain": "FR",
+  "engine": {
+    "layout": "rotary",
+    "displacement_cc": 1308,
+    "aspiration": "twin-sequential turbocharged"
+  },
+  "peak_power_kw": 206,
+  "peak_power_rpm": 6500,
+  "peak_torque_nm": 314,
+  "peak_torque_rpm": 5000,
+  "redline_rpm": 8000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.483,
+    2.015,
+    1.391,
+    1.0,
+    0.762
+  ],
+  "final_drive": 4.3,
+  "curb_mass_kg": 1280,
+  "weight_dist_front_pct": 50,
+  "length_mm": 4285,
+  "width_mm": 1760,
+  "height_mm": 1230,
+  "wheelbase_mm": 2425,
+  "track_front_mm": 1460,
+  "track_rear_mm": 1460,
+  "tyre_sizes": [
+    "235/45 ZR17",
+    "255/40 ZR17"
+  ],
+  "torque_curve": [
+    [
+      1600,
+      193.3
+    ],
+    [
+      3000,
+      267.2
+    ],
+    [
+      5000,
+      314.0
+    ],
+    [
+      5800,
+      307.9
+    ],
+    [
+      6500,
+      302.6
+    ],
+    [
+      7200,
+      274.4
+    ],
+    [
+      8000,
+      242.1
+    ]
+  ],
+  "top_speed_kmh": 250,
+  "zero_to_100_s": 5.3,
+  "redline_provenance": "http://www.rx7.net.nz/usspec.htm"
+}

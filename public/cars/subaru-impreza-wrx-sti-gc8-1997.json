@@ -1,0 +1,68 @@
+{
+  "make": "Subaru",
+  "model": "Impreza WRX STi (GC8)",
+  "year": 1997,
+  "trim": "Version IV",
+  "body_type": "sedan",
+  "drivetrain": "4WD",
+  "engine": {
+    "layout": "H4",
+    "displacement_cc": 1994,
+    "aspiration": "turbocharged"
+  },
+  "peak_power_kw": 206,
+  "peak_power_rpm": 6500,
+  "peak_torque_nm": 353,
+  "peak_torque_rpm": 4000,
+  "redline_rpm": 8000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.166,
+    1.882,
+    1.296,
+    0.972,
+    0.738
+  ],
+  "final_drive": 4.444,
+  "curb_mass_kg": 1250,
+  "length_mm": 4340,
+  "width_mm": 1690,
+  "height_mm": 1405,
+  "wheelbase_mm": 2520,
+  "track_front_mm": 1470,
+  "track_rear_mm": 1460,
+  "tyre_sizes": [
+    "205/50 R16"
+  ],
+  "torque_curve": [
+    [
+      1600,
+      243.2
+    ],
+    [
+      2400,
+      300.4
+    ],
+    [
+      4000,
+      353.0
+    ],
+    [
+      5200,
+      328.8
+    ],
+    [
+      6500,
+      302.6
+    ],
+    [
+      7200,
+      274.4
+    ],
+    [
+      8000,
+      242.1
+    ]
+  ],
+  "redline_provenance": "https://www.trinituner.com/v4/forums/viewtopic.php?f=34&t=163407"
+}

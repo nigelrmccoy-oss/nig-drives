@@ -1,10 +1,13 @@
 import type { CompoundId, GarageCar, PartSlot, SetupSheet } from '../save/types';
+import type { EngineSpec } from '../physics/PhysicsSpec';
 
 /** Tunable build applied on top of a catalogue PhysicsSpec. */
 export interface CarBuild {
   tyres: { front: CompoundId; rear: CompoundId };
   parts: Partial<Record<PartSlot, { stage: number; variant?: string }>>;
   conversions?: { aspiration?: string; engine?: string; drivetrain?: string };
+  /** Sourced donor engine only — never invent a swap curve. */
+  donorEngine?: EngineSpec;
   setup: SetupSheet;
   ballastKg?: number;
 }

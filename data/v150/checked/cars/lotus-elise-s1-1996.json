@@ -1,0 +1,126 @@
+{
+ "make": "Lotus",
+ "model": "Elise (S1)",
+ "year": 1996,
+ "trim": "1.8",
+ "body_type": "roadster",
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1796,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 88,
+ "peak_power_rpm": 5500,
+ "peak_torque_nm": 165,
+ "peak_torque_rpm": 3000,
+ "torque_curve": [
+  [
+   1400,
+   150.9
+  ],
+  [
+   1800,
+   157.1
+  ],
+  [
+   3000,
+   165.0
+  ],
+  [
+   4200,
+   159.1
+  ],
+  [
+   5500,
+   152.8
+  ],
+  [
+   6200,
+   144.2
+  ],
+  [
+   7000,
+   134.4
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.167,
+  1.842,
+  1.307,
+  1.033,
+  0.765
+ ],
+ "final_drive": 3.938,
+ "curb_mass_kg": 690,
+ "weight_dist_front_pct": 39,
+ "length_mm": 3726,
+ "width_mm": 1701,
+ "height_mm": 1202,
+ "wheelbase_mm": 2300,
+ "track_front_mm": 1440,
+ "track_rear_mm": 1453,
+ "tyre_sizes": [
+  "185/55 R15",
+  "205/50 R16"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 18950,
+  "currency": "GBP",
+  "year": 1996,
+  "market": "UK",
+  "source": "http://www.lotusforum.be/TO-DOWNLOAD/Elise%20MKI/Elise%20s1%20scan%20autocar%2017th%20july%201996.pdf"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Lotus_Elise",
+  "https://www.ultimatespecs.com/car-specs/Lotus/7427/Lotus-Elise-S1-18.html"
+ ],
+ "confidence": "high",
+ "notes": "17/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Lotus-Elise-S1-18.html).",
+ "torque_curve_shape": "NA",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 268,
+  "top_gear_at_peak-power_rpm_kmh": 210
+ },
+ "provenance": {
+  "engine.displacement_cc": "https://www.elises.co.uk/models/s1/index.html",
+  "peak_power_kw": "https://www.elises.co.uk/models/s1/index.html",
+  "peak_power_rpm": "https://www.elises.co.uk/models/s1/index.html",
+  "peak_torque_nm": "https://www.elises.co.uk/models/s1/index.html",
+  "peak_torque_rpm": "https://www.elises.co.uk/models/s1/index.html",
+  "redline_rpm": "http://www.lotusforum.be/TO-DOWNLOAD/Elise%20MKI/Elise%20s1%20scan%20autocar%2017th%20july%201996.pdf",
+  "gear_ratios": "https://www.elises.co.uk/models/s1/index.html",
+  "final_drive": "https://www.elises.co.uk/models/s1/index.html",
+  "curb_mass_kg": "https://www.elises.co.uk/models/s1/index.html",
+  "weight_dist_front_pct": "https://www.elises.co.uk/models/s1/index.html",
+  "wheelbase_mm": "https://www.elises.co.uk/models/s1/index.html",
+  "track_front_mm": "https://www.elises.co.uk/models/s1/index.html",
+  "track_rear_mm": "https://www.elises.co.uk/models/s1/index.html",
+  "length_mm": "https://www.elises.co.uk/models/s1/index.html",
+  "width_mm": "https://www.elises.co.uk/models/s1/index.html",
+  "height_mm": "https://www.elises.co.uk/models/s1/index.html",
+  "tyre_sizes": "https://www.elises.co.uk/models/s1/index.html",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lotus_Elise, https://www.ultimatespecs.com/car-specs/Lotus/7427/Lotus-Elise-S1-18.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lotus_Elise, https://www.ultimatespecs.com/car-specs/Lotus/7427/Lotus-Elise-S1-18.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lotus_Elise, https://www.ultimatespecs.com/car-specs/Lotus/7427/Lotus-Elise-S1-18.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Lotus_Elise, https://www.ultimatespecs.com/car-specs/Lotus/7427/Lotus-Elise-S1-18.html)",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "zero_to_100_s": "original 5.9 unsourced",
+  "top_speed_kmh": "original 202 unsourced"
+ },
+ "checked_flags": [
+  "Mass 690 kg per first brochure (early cars ~725, later 755)",
+  "Redline 7000 and price GBP 18,950 from search synthesis citing Autocar scan - not verified in page text",
+  "Original mass 675 -> 690; torque 166->165"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true
+}

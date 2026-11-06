@@ -29,6 +29,8 @@ export class HUD {
   private weatherEl: HTMLElement;
   private timeEl: HTMLElement;
   private assistEl: HTMLElement;
+  private tyresEl!: HTMLElement;
+  private piEl!: HTMLElement;
   private surfaceEl: HTMLElement;
   private telemRpm: HTMLElement;
   private telemGear: HTMLElement;
@@ -61,7 +63,9 @@ export class HUD {
             ${ASSIST_KEYS.map((k) => `<span class="alight" data-light="${k}" title="${ASSIST_LABELS[k].hint}">${ASSIST_LABELS[k].short}</span>`).join('')}
             <span class="sub" id="hud-assist"></span>
           </div>
+          <div class="sub" id="hud-tyres">Tyres: —</div>
           <div class="sub" id="hud-surface">Surface: —</div>
+          <div class="sub" id="hud-pi"></div>
         </div>
         <div class="hud-panel">
           <div class="label">Location</div>
@@ -120,6 +124,8 @@ export class HUD {
     this.weatherEl = this.root.querySelector('#hud-weather')!;
     this.timeEl = this.root.querySelector('#hud-time')!;
     this.assistEl = this.root.querySelector('#hud-assist')!;
+    this.tyresEl = this.root.querySelector('#hud-tyres')!;
+    this.piEl = this.root.querySelector('#hud-pi')!;
     this.surfaceEl = this.root.querySelector('#hud-surface')!;
     this.telemRpm = this.root.querySelector('#telem-rpm')!;
     this.telemGear = this.root.querySelector('#telem-gear')!;
@@ -205,6 +211,18 @@ export class HUD {
     this.speedEl.textContent = `${v}`;
   }
 
+
+  setTyreTemps(tempsC: number[], compoundLabel: string, unit: 'c' | 'f' = 'c'): void {
+    const conv = (c: number) => (unit === 'f' ? (c * 9) / 5 + 32 : c);
+    const u = unit === 'f' ? '°F' : '°C';
+    const parts = tempsC.map((c, i) => `${['FL', 'FR', 'RL', 'RR'][i]} ${conv(c).toFixed(0)}`).join(' · ');
+    this.tyresEl.textContent = `Tyres ${compoundLabel}: ${parts}${u}`;
+  }
+
+  setPiBadge(text: string): void {
+    this.piEl.textContent = text ? `Class ${text}` : '';
+  }
+
   setSurface(label: string, grip: number): void {
     const g = Number.isFinite(grip) ? Math.round(grip * 100) : 0;
     this.surfaceEl.textContent = `Surface: ${label} · grip ${g}%`;
@@ -220,6 +238,10 @@ export class HUD {
   setImageryAttribution(text: string): void {
     const el = this.root.querySelector('#hud-sat-attr');
     if (el) el.textContent = text ? ' · ' + text : '';
+  }
+
+  setPaused(p: boolean): void {
+    this.pauseBanner.hidden = !p;
   }
 
   setStatus(msg: string): void {

@@ -1,0 +1,70 @@
+{
+  "make": "Lotus",
+  "model": "Elise (S1)",
+  "year": 1996,
+  "trim": "1.8",
+  "body_type": "roadster",
+  "drivetrain": "MR",
+  "engine": {
+    "layout": "inline-4",
+    "displacement_cc": 1796,
+    "aspiration": "naturally aspirated"
+  },
+  "peak_power_kw": 88,
+  "peak_power_rpm": 5500,
+  "peak_torque_nm": 165,
+  "peak_torque_rpm": 3000,
+  "redline_rpm": 7000,
+  "gearbox_type": "5-speed manual",
+  "gear_ratios": [
+    3.167,
+    1.842,
+    1.307,
+    1.033,
+    0.765
+  ],
+  "final_drive": 3.938,
+  "curb_mass_kg": 690,
+  "weight_dist_front_pct": 39,
+  "length_mm": 3726,
+  "width_mm": 1701,
+  "height_mm": 1202,
+  "wheelbase_mm": 2300,
+  "track_front_mm": 1440,
+  "track_rear_mm": 1453,
+  "tyre_sizes": [
+    "185/55 R15",
+    "205/50 R16"
+  ],
+  "torque_curve": [
+    [
+      1400,
+      150.9
+    ],
+    [
+      1800,
+      157.1
+    ],
+    [
+      3000,
+      165.0
+    ],
+    [
+      4200,
+      159.1
+    ],
+    [
+      5500,
+      152.8
+    ],
+    [
+      6200,
+      144.2
+    ],
+    [
+      7000,
+      134.4
+    ]
+  ],
+  "redline_provenance": "http://www.lotusforum.be/TO-DOWNLOAD/Elise%20MKI/Elise%20s1%20scan%20autocar%2017th%20july%201996.pdf"
+}

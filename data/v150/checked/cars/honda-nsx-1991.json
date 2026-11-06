@@ -1,0 +1,125 @@
+{
+ "make": "Honda",
+ "model": "NSX",
+ "year": 1991,
+ "trim": "NA1",
+ "body_type": "coupe",
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "V-6",
+  "displacement_cc": 2977,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 201,
+ "peak_power_rpm": 7100,
+ "peak_torque_nm": 284,
+ "peak_torque_rpm": 5300,
+ "torque_curve": [
+  [
+   1600,
+   242.5
+  ],
+  [
+   3200,
+   270.6
+  ],
+  [
+   5300,
+   284.0
+  ],
+  [
+   6200,
+   277.2
+  ],
+  [
+   7100,
+   270.3
+  ],
+  [
+   7600,
+   252.3
+  ],
+  [
+   8000,
+   237.9
+  ]
+ ],
+ "redline_rpm": 8000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.071,
+  1.727,
+  1.23,
+  0.967,
+  0.771
+ ],
+ "final_drive": 4.062,
+ "curb_mass_kg": 1365,
+ "weight_dist_front_pct": 42,
+ "length_mm": 4405,
+ "width_mm": 1810,
+ "height_mm": 1170,
+ "wheelbase_mm": 2530,
+ "track_front_mm": 1510,
+ "track_rear_mm": 1530,
+ "tyre_sizes": [
+  "205/50 ZR15",
+  "225/50 ZR16"
+ ],
+ "zero_to_100_s": 5.9,
+ "top_speed_kmh": 270,
+ "msrp": {
+  "amount": 60000,
+  "currency": "USD",
+  "year": 1991,
+  "market": "US",
+  "source": "https://www.nsxprime.com/threads/original-sticker-price-for-91nsx.5478/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Honda_NSX",
+  "https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html"
+ ],
+ "confidence": "high",
+ "notes": "17/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Honda-NSX-30-V6.html).",
+ "torque_curve_shape": "NA",
+ "derived_speeds": {
+  "top_gear_at_redline_kmh": 304,
+  "top_gear_at_peak-power_rpm_kmh": 270,
+  "required_CdA_m2_for_top_speed": 0.61
+ },
+ "provenance": {
+  "engine.displacement_cc": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "peak_power_kw": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "peak_power_rpm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "peak_torque_nm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "peak_torque_rpm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "redline_rpm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "gear_ratios": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "final_drive": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "curb_mass_kg": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "weight_dist_front_pct": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "length_mm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "width_mm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "height_mm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "wheelbase_mm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "track_front_mm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "track_rear_mm": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "tyre_sizes": "https://hondanews.com/en-US/releases/release-ff6633ebcc698302413a3d004c34ca74-1991-acura-nsx-specifications",
+  "zero_to_100_s": "https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html",
+  "top_speed_kmh": "https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_NSX, https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_NSX, https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_NSX, https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_NSX, https://www.ultimatespecs.com/car-specs/Honda/7969/Honda-NSX-30-V6.html)",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {},
+ "checked_flags": [
+  "Original rpm 7300/5400 were JDM (280PS) values mixed with US 270hp kW; US-spec 7100/5300 used",
+  "MSRP: $60,000 + $600 freight (nsxprime/R&T $60,600); LA Times quoted $61,000 at dealers"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true
+}

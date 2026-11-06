@@ -102,6 +102,28 @@ export interface TireSpec {
   inertia: number;
   /** Share of peak grip kept when fully sliding; default 0.8 when omitted. */
   slideFloor?: number;
+  /** Optimum tyre core temp (°C) and half-width of the grip window. */
+  optTempC?: number;
+  tempWindowC?: number;
+}
+
+
+export interface SuspensionSpec {
+  /** Ride height at stock (mm, visual + mild cg shift). */
+  rideHeightMm: number;
+  /** Wheel rate (N/m). */
+  springFront: number;
+  springRear: number;
+  /** Bump / rebound damping coefficients (Ns/m), lumped. */
+  damperBumpFront: number;
+  damperBumpRear: number;
+  damperReboundFront: number;
+  damperReboundRear: number;
+  /** Anti-roll bar stiffness (N·m/rad of axle roll), lumped into roll split. */
+  arbFront: number;
+  arbRear: number;
+  /** Provenance: 'sourced' | 'estimated'. */
+  provenance: 'sourced' | 'estimated';
 }
 
 export interface ChassisSpec {
@@ -196,6 +218,8 @@ export interface PhysicsSpec {
   source: string;
   drive: DriveLayout;
   chassis: ChassisSpec;
+  /** Stock suspension; setup sheet / upgrades mutate a copy via compileBuild. */
+  suspension: SuspensionSpec;
   tire: TireSpec;
   engine: EngineSpec;
   gearbox: GearboxSpec;

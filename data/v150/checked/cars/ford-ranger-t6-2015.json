@@ -1,0 +1,127 @@
+{
+ "make": "Ford",
+ "model": "Ranger (T6)",
+ "year": 2015,
+ "trim": "3.2 TDCi XLT",
+ "body_type": "pickup",
+ "drivetrain": "4WD",
+ "engine": {
+  "layout": "inline-5",
+  "displacement_cc": 3198,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 147,
+ "peak_power_rpm": 3000,
+ "peak_torque_nm": 470,
+ "peak_torque_rpm": 1750,
+ "torque_curve": [
+  [
+   1000,
+   390.4
+  ],
+  [
+   1750,
+   470.0
+  ],
+  [
+   2400,
+   468.9
+  ],
+  [
+   3000,
+   467.9
+  ],
+  [
+   4000,
+   418.6
+  ],
+  [
+   4900,
+   374.3
+  ]
+ ],
+ "redline_rpm": 4900,
+ "gearbox_type": "6-speed automatic (6R80)",
+ "gear_ratios": [
+  4.171,
+  2.342,
+  1.521,
+  1.143,
+  0.867,
+  0.691
+ ],
+ "final_drive": 3.73,
+ "curb_mass_kg": 2113,
+ "weight_dist_front_pct": null,
+ "length_mm": 5351,
+ "width_mm": 1850,
+ "height_mm": 1815,
+ "wheelbase_mm": 3220,
+ "track_front_mm": 1560,
+ "track_rear_mm": 1560,
+ "tyre_sizes": [
+  "265/65 R17"
+ ],
+ "zero_to_100_s": 11.6,
+ "top_speed_kmh": 180,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "AU price page empty"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Ford_Ranger_(T6)",
+  "https://www.ultimatespecs.com/car-specs/Ford/111157/Ford-F-150-27L-EcoBoost-V6-4x2-55-ft-SuperCrew.html"
+ ],
+ "confidence": "med",
+ "notes": "14/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Ford-F-150-27L-EcoBoost-V6-4x2-55-ft-SuperCrew.html).",
+ "torque_curve_shape": "turbo",
+ "derived_speeds": {
+  "required_CdA_m2_for_top_speed": 1.45
+ },
+ "provenance": {
+  "engine.layout": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "engine.displacement_cc": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "engine.aspiration": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "peak_power_kw": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "peak_power_rpm": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "peak_torque_nm": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "peak_torque_rpm": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "redline_rpm": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "gearbox_type": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "gear_ratios": "https://en.fordclub.eu/manual_download.php?id=5310",
+  "curb_mass_kg": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "wheelbase_mm": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "track_front_mm": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "track_rear_mm": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "length_mm": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "width_mm": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "height_mm": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "tyre_sizes": "https://www.carexpert.com.au/ford/ranger/2015-xlt-3-2l-utility-4x4-diesel-automatic-jkaoo5mf20150612",
+  "zero_to_100_s": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "top_speed_kmh": "https://www.fichacompleta.com.br/en/carros/ford/ranger-xlt-3-2-turbo-4x4-at-cd-2015",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Ford_Ranger_(T6), https://www.ultimatespecs.com/car-specs/Ford/111157/Ford-F-150-27L-EcoBoost-V6-4x2-55-ft-SuperCrew.html)",
+  "torque_curve": "derived:shape-from-peaks",
+  "final_drive": "https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Ranger/FordRanger2016_TechnicalSpecifications_EU.pdf"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "ORIGINAL BADLY WRONG: 2687cc twin-turbo V6 243kW/508Nm is the F-150 EcoBoost; real car is 3.2 Duratorq I5 147kW@3000/470Nm@1750",
+  "Redline 4900 = max engine rotation from fichacompleta (Brazil)",
+  "6R80 ratios from search synthesis citing Ford manual (not verified in page text)",
+  "0-100/top speed from Brazilian-spec page; mass 2113 AU XLT (BR page 2168)",
+  "Dimensions L/W/H are Brazilian-spec double cab",
+  "SANITY drag: top speed 180 km/h at 147kW needs CdA 1.45 m2 (implausible)",
+  "2026-11-05: final_drive 3.73 for 3.2 TDCi + 6R80 4x4 from Ford Europe Ranger 2016 Technical Specifications PDF",
+  "2026-11-05: SANITY drag CdA ~1.45 at 180 km/h is plausible for a double-cab pickup; treat prior implausible flag as INFO for trucks",
+  "2026-11-05 re-check: 180 km/h with CdA~1.45 is believable for a double-cab pickup; prior SANITY drag flag overstated."
+ ],
+ "checked_confidence": "high",
+ "checked_note": "Filled FD 3.73 from Ford EU tech specs 2026-11-05",
+ "original_confidence": "med",
+ "drivable": true
+}

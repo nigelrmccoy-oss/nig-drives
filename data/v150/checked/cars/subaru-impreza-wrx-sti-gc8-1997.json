@@ -1,0 +1,123 @@
+{
+ "make": "Subaru",
+ "model": "Impreza WRX STi (GC8)",
+ "year": 1997,
+ "trim": "Version IV",
+ "body_type": "sedan",
+ "drivetrain": "4WD",
+ "engine": {
+  "layout": "H4",
+  "displacement_cc": 1994,
+  "aspiration": "turbocharged"
+ },
+ "peak_power_kw": 206,
+ "peak_power_rpm": 6500,
+ "peak_torque_nm": 353,
+ "peak_torque_rpm": 4000,
+ "torque_curve": [
+  [
+   1600,
+   243.2
+  ],
+  [
+   2400,
+   300.4
+  ],
+  [
+   4000,
+   353.0
+  ],
+  [
+   5200,
+   328.8
+  ],
+  [
+   6500,
+   302.6
+  ],
+  [
+   7200,
+   274.4
+  ],
+  [
+   8000,
+   242.1
+  ]
+ ],
+ "redline_rpm": 8000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.166,
+  1.882,
+  1.296,
+  0.972,
+  0.738
+ ],
+ "final_drive": 4.444,
+ "curb_mass_kg": 1250,
+ "weight_dist_front_pct": null,
+ "length_mm": 4340,
+ "width_mm": 1690,
+ "height_mm": 1405,
+ "wheelbase_mm": 2520,
+ "track_front_mm": 1470,
+ "track_rear_mm": 1460,
+ "tyre_sizes": [
+  "205/50 R16"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 2899000,
+  "currency": "JPY",
+  "year": 1997,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Subaru_Impreza_WRX_STI"
+ ],
+ "confidence": "med",
+ "notes": "13/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 228
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "length_mm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "width_mm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "height_mm": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "final_drive": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/subaru/impreza/e-gc8/4502845/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Subaru_Impreza_WRX_STI)",
+  "redline_rpm": "https://www.trinituner.com/v4/forums/viewtopic.php?f=34&t=163407",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source"
+ },
+ "checked_flags": [
+  "Original had 6-speed (not available on WRX STi Version IV; that is 5MT), 200kW@5600/1595kg/length 4635; catalog 206kW(280PS)@6500, 353Nm@4000, 1250kg",
+  "Page = WRX STi Version IV (E-GC8, 4502845); Type RA is stripped variant",
+  "2026-11-05: GC8 EJ20K STi Version IV rev limit/redline ~8000 rpm (owner/tech consensus; gauge often to 10k)"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "turbo"
+}

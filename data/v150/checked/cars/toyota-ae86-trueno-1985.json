@@ -1,0 +1,127 @@
+{
+ "make": "Toyota",
+ "model": "Sprinter Trueno (AE86)",
+ "year": 1985,
+ "trim": "GT-Apex",
+ "body_type": "coupé",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1587,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 96,
+ "peak_power_rpm": 6600,
+ "peak_torque_nm": 149,
+ "peak_torque_rpm": 5200,
+ "torque_curve": [
+  [
+   1500,
+   126.4
+  ],
+  [
+   3100,
+   141.7
+  ],
+  [
+   5200,
+   149.0
+  ],
+  [
+   5900,
+   143.9
+  ],
+  [
+   6600,
+   138.9
+  ],
+  [
+   7100,
+   130.6
+  ],
+  [
+   7600,
+   122.2
+  ]
+ ],
+ "redline_rpm": 7600,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.587,
+  2.022,
+  1.384,
+  1.0,
+  0.861
+ ],
+ "final_drive": 4.3,
+ "curb_mass_kg": 940,
+ "weight_dist_front_pct": null,
+ "length_mm": 4205,
+ "width_mm": 1625,
+ "height_mm": 1335,
+ "wheelbase_mm": 2400,
+ "track_front_mm": 1355,
+ "track_rear_mm": 1345,
+ "tyre_sizes": [
+  "185/60 R14"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 1538000,
+  "currency": "JPY",
+  "year": 1983,
+  "market": "Japan",
+  "source": "http://www.kokudou.com/86data.html"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Toyota_AE86",
+  "https://www.ultimatespecs.com/car-specs/Toyota/573/Toyota-AE86-Corolla-Coupe-1600.html"
+ ],
+ "confidence": "med",
+ "notes": "16/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Toyota-AE86-Corolla-Coupe-1600.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 194
+ },
+ "provenance": {
+  "gearbox_type": "http://www.kokudou.com/86data.html",
+  "gear_ratios": "http://www.kokudou.com/86data.html",
+  "final_drive": "http://www.kokudou.com/86data.html",
+  "curb_mass_kg": "http://www.kokudou.com/86data.html",
+  "wheelbase_mm": "http://www.kokudou.com/86data.html",
+  "track_front_mm": "http://www.kokudou.com/86data.html",
+  "track_rear_mm": "http://www.kokudou.com/86data.html",
+  "length_mm": "http://www.kokudou.com/86data.html",
+  "width_mm": "http://www.kokudou.com/86data.html",
+  "height_mm": "http://www.kokudou.com/86data.html",
+  "peak_power_kw": "http://www.kokudou.com/86data.html",
+  "peak_power_rpm": "http://www.kokudou.com/86data.html",
+  "peak_torque_nm": "http://www.kokudou.com/86data.html",
+  "peak_torque_rpm": "http://www.kokudou.com/86data.html",
+  "engine.displacement_cc": "http://www.kokudou.com/86data.html",
+  "tyre_sizes": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_AE86, https://www.ultimatespecs.com/car-specs/Toyota/573/Toyota-AE86-Corolla-Coupe-1600.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_AE86, https://www.ultimatespecs.com/car-specs/Toyota/573/Toyota-AE86-Corolla-Coupe-1600.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_AE86, https://www.ultimatespecs.com/car-specs/Toyota/573/Toyota-AE86-Corolla-Coupe-1600.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Toyota_AE86, https://www.ultimatespecs.com/car-specs/Toyota/573/Toyota-AE86-Corolla-Coupe-1600.html)",
+  "redline_rpm": "https://ja.wikipedia.org/wiki/%E3%83%88%E3%83%A8%E3%82%BF%E3%83%BBAE86",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "original 195 unsourced"
+ },
+ "checked_flags": [
+  "Orig length 4180 was the Levin; Trueno 4205",
+  "Orig mass 910 -> 935-940 kg (Toyota data file)",
+  "Tyres: GT 185/70HR13 std, 185/60R14 82H optional/GT-Apex; original 185/60 R14 kept",
+  "FD 4.300 (4.100 earlier)",
+  "MSRP = Trueno GT-Apex 2dr at launch 1983.05 (153.8万円)",
+  "2026-11-05: JDM AE86 4A-GE tach red zone from 7600 rpm (JA Wikipedia AE86 / 4A-GEU factory marking consensus)"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "med",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

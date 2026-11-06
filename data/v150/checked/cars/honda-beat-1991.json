@@ -1,0 +1,120 @@
+{
+ "make": "Honda",
+ "model": "Beat",
+ "year": 1991,
+ "trim": "PP1",
+ "body_type": "2-door roadster",
+ "drivetrain": "MR",
+ "engine": {
+  "layout": "inline-3",
+  "displacement_cc": 656,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 47,
+ "peak_power_rpm": 8100,
+ "peak_torque_nm": 60,
+ "peak_torque_rpm": 7000,
+ "torque_curve": [
+  [
+   1700,
+   49.7
+  ],
+  [
+   4200,
+   57.1
+  ],
+  [
+   7000,
+   60.0
+  ],
+  [
+   7600,
+   57.5
+  ],
+  [
+   8100,
+   55.4
+  ],
+  [
+   8500,
+   48.8
+  ]
+ ],
+ "redline_rpm": 8500,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.428,
+  2.166,
+  1.576,
+  1.172,
+  0.941
+ ],
+ "final_drive": 5.714,
+ "curb_mass_kg": 760,
+ "weight_dist_front_pct": null,
+ "length_mm": 3295,
+ "width_mm": 1395,
+ "height_mm": 1175,
+ "wheelbase_mm": 2280,
+ "track_front_mm": 1210,
+ "track_rear_mm": 1210,
+ "tyre_sizes": [
+  "155/65 R13",
+  "165/60 R14"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 1388000,
+  "currency": "JPY",
+  "year": 1991,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Honda_Beat"
+ ],
+ "confidence": "low",
+ "notes": "8/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. No spec-site page matched; only the Wikipedia article text was used.",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 157
+ },
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "length_mm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "width_mm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "height_mm": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "final_drive": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/honda/beat/e-pp1/2002202/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Honda_Beat)",
+  "redline_rpm": "http://hondabeat.nl/beat-facts/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "no source (JDM 64PS kei, speed limiter not sourced)"
+ },
+ "checked_flags": [
+  "Original had only Wikipedia (low conf); catalog data replaces it. Original peak power/torque were null",
+  "Staggered tyres 155/65R13 front, 165/60R14 rear (Honda factbook confirms)",
+  "2026-11-05: factory tach redline 8500 rpm (Honda Beat PP1 facts / buyer guides); limiter higher"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "low",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

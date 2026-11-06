@@ -1,0 +1,129 @@
+{
+ "make": "Peugeot",
+ "model": "205 GTI",
+ "year": 1986,
+ "trim": "1.9",
+ "body_type": "hatchback",
+ "drivetrain": "FF",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1905,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 96,
+ "peak_power_rpm": 6000,
+ "peak_torque_nm": 161,
+ "peak_torque_rpm": 4750,
+ "torque_curve": [
+  [
+   1400,
+   137.0
+  ],
+  [
+   2800,
+   152.9
+  ],
+  [
+   4750,
+   161.0
+  ],
+  [
+   5400,
+   156.7
+  ],
+  [
+   6000,
+   152.8
+  ],
+  [
+   6400,
+   143.6
+  ],
+  [
+   6800,
+   134.4
+  ]
+ ],
+ "redline_rpm": 6800,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  2.923,
+  1.85,
+  1.36,
+  1.069,
+  0.865
+ ],
+ "final_drive": 3.688,
+ "curb_mass_kg": 910,
+ "weight_dist_front_pct": null,
+ "length_mm": 3705,
+ "width_mm": 1590,
+ "height_mm": 1380,
+ "wheelbase_mm": 2420,
+ "track_front_mm": 1395,
+ "track_rear_mm": 1330,
+ "tyre_sizes": [
+  "185/55 R15"
+ ],
+ "zero_to_100_s": 8.0,
+ "top_speed_kmh": 206,
+ "msrp": {
+  "amount": null,
+  "currency": null,
+  "year": null,
+  "market": null,
+  "reason": "not found"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Peugeot_205",
+  "https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html"
+ ],
+ "confidence": "high",
+ "notes": "17/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Peugeot-309-19-GTi-8v.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 207,
+  "required_CdA_m2_for_top_speed": 0.65
+ },
+ "provenance": {
+  "gear_ratios": "https://www.205gti.com/techgearboxUK.htm",
+  "final_drive": "https://www.205gti.com/techgearboxUK.htm",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/peugeot/205/e-20df/9003661/",
+  "length_mm": "https://www.nextage.jp/carcatalog/peugeot/205/e-20df/9003661/",
+  "width_mm": "https://www.nextage.jp/carcatalog/peugeot/205/e-20df/9003661/",
+  "height_mm": "https://www.nextage.jp/carcatalog/peugeot/205/e-20df/9003661/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/peugeot/205/e-20df/9003661/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/peugeot/205/e-20df/9003661/",
+  "peak_power_kw": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "peak_power_rpm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "peak_torque_nm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "peak_torque_rpm": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "curb_mass_kg": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "tyre_sizes": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "zero_to_100_s": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "top_speed_kmh": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "engine.displacement_cc": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Peugeot_205, https://www.ultimatespecs.com/car-specs/Peugeot/1236/Peugeot-309-19-GTi-8v.html)",
+  "redline_rpm": "estimated: estimated: XU9JA peaks at 6000; stock 8v GTI tach/limiter commonly ~6500–7000 — 6800 mid of that band (not the TT-conversion 7000 claim)",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure"
+ },
+ "checked_flags": [
+  "Orig length 4050/wheelbase 2470 wrong (205 is 3705/2420)",
+  "Track from JDM catalog (E-20DF, 1.9 cat, 100ps) - GTI 1.9 UK track maybe 1382/1339 per search synthesis",
+  "Mass 910 kept (original; synth suggests 875 - conflicting)",
+  "Power/torque 96kW@6000/161Nm@4750 kept from original (130PS DIN); unverified",
+  "2026-11-05: left null — Motor Sport Dec 1989 “7000 rpm red line” refers to a Turbo Technics conversion, not stock XU9; stock tach/limiter not verified in reachable brochure",
+  "2026-11-05: redline_rpm=6800 ESTIMATED — estimated: XU9JA peaks at 6000; stock 8v GTI tach/limiter commonly ~6500–7000 — 6800 mid of that band (not the TT-conversion 7000 claim)"
+ ],
+ "checked_confidence": "med",
+ "checked_note": " | redline 6800 estimated 2026-11-05",
+ "original_confidence": "high",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "NA"
+}

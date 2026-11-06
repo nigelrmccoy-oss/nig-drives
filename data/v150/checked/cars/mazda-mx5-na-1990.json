@@ -1,0 +1,124 @@
+{
+ "make": "Mazda",
+ "model": "MX-5 (NA)",
+ "year": 1990,
+ "trim": "1.6",
+ "body_type": "roadster",
+ "drivetrain": "FR",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1597,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 88,
+ "peak_power_rpm": 6500,
+ "peak_torque_nm": 137,
+ "peak_torque_rpm": 5500,
+ "torque_curve": [
+  [
+   1400,
+   114.2
+  ],
+  [
+   3300,
+   130.4
+  ],
+  [
+   5500,
+   137.0
+  ],
+  [
+   6000,
+   133.1
+  ],
+  [
+   6500,
+   129.3
+  ],
+  [
+   6800,
+   120.0
+  ],
+  [
+   7000,
+   113.8
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "5-speed manual",
+ "gear_ratios": [
+  3.136,
+  1.888,
+  1.33,
+  1.0,
+  0.814
+ ],
+ "final_drive": 4.3,
+ "curb_mass_kg": 940,
+ "weight_dist_front_pct": null,
+ "length_mm": 3970,
+ "width_mm": 1675,
+ "height_mm": 1235,
+ "wheelbase_mm": 2265,
+ "track_front_mm": 1405,
+ "track_rear_mm": 1420,
+ "tyre_sizes": [
+  "185/60 R14"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 1700000,
+  "currency": "JPY",
+  "year": 1989,
+  "market": "Japan",
+  "source": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Mazda_MX-5",
+  "https://www.ultimatespecs.com/car-specs/Mazda/7590/Mazda-Mx-3-16i.html"
+ ],
+ "confidence": "high",
+ "notes": "17/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Mazda-Mx-3-16i.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 202
+ },
+ "provenance": {
+  "engine.displacement_cc": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "peak_power_kw": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "peak_power_rpm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "peak_torque_nm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "peak_torque_rpm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "gear_ratios": "https://miata.net/garage/KnowYourCar/S8_Gears.html",
+  "final_drive": "https://miata.net/garage/KnowYourCar/S8_Gears.html",
+  "curb_mass_kg": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "wheelbase_mm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "track_front_mm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "track_rear_mm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "length_mm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "width_mm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "height_mm": "https://www.tc-v.com/specifications/mazda/eunos+roadster/base_mt_1.6/20271/",
+  "tyre_sizes": "https://miata.net/garage/KnowYourCar/S8_Gears.html",
+  "gearbox_type": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_MX-5, https://www.ultimatespecs.com/car-specs/Mazda/7590/Mazda-Mx-3-16i.html)",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_MX-5, https://www.ultimatespecs.com/car-specs/Mazda/7590/Mazda-Mx-3-16i.html)",
+  "engine.layout": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_MX-5, https://www.ultimatespecs.com/car-specs/Mazda/7590/Mazda-Mx-3-16i.html)",
+  "engine.aspiration": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mazda_MX-5, https://www.ultimatespecs.com/car-specs/Mazda/7590/Mazda-Mx-3-16i.html)",
+  "redline_rpm": "https://www.caranddriver.com/features/a38015568/buy-1990-1997-mazda-mx-5-miata/",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "original 10.5 unsourced",
+  "top_speed_kmh": "original 179 unsourced"
+ },
+ "checked_flags": [
+  "ORIGINAL WRONG: mass 1030, dims (2460/4220/1700/1310) were another car; JDM Eunos E-NA6CE used (120PS/14.0kgm); US spec 116hp/135Nm",
+  "Gear ratios/FD/tyres/price from search synthesis citing miata.net, mxfive.at, goo-net (not seen in page text)",
+  "2026-11-05: C&D buyers guide: early 1.6 revs to 7000-rpm redline; US tach solid red commonly at 7000 (limiter ~7200)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

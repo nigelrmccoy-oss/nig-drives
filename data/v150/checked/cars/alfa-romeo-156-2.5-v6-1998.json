@@ -1,0 +1,129 @@
+{
+ "make": "Alfa Romeo",
+ "model": "156",
+ "year": 1998,
+ "trim": "2.5 V6 24V",
+ "body_type": "sedan",
+ "drivetrain": "FF",
+ "engine": {
+  "layout": "V-6",
+  "displacement_cc": 2492,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 140,
+ "peak_power_rpm": 6300,
+ "peak_torque_nm": 222,
+ "peak_torque_rpm": 5000,
+ "torque_curve": [
+  [
+   1400,
+   187.5
+  ],
+  [
+   3000,
+   211.3
+  ],
+  [
+   5000,
+   222.0
+  ],
+  [
+   5600,
+   217.5
+  ],
+  [
+   6300,
+   212.2
+  ],
+  [
+   6600,
+   201.3
+  ],
+  [
+   7000,
+   186.7
+  ]
+ ],
+ "redline_rpm": 7000,
+ "gearbox_type": "6-speed manual",
+ "gear_ratios": [
+  3.5,
+  2.235,
+  1.52,
+  1.156,
+  0.971,
+  0.816
+ ],
+ "final_drive": 3.937,
+ "curb_mass_kg": 1320,
+ "weight_dist_front_pct": 62.9,
+ "length_mm": 4430,
+ "width_mm": 1755,
+ "height_mm": 1415,
+ "wheelbase_mm": 2595,
+ "track_front_mm": 1515,
+ "track_rear_mm": 1505,
+ "tyre_sizes": [
+  "205/60 R15",
+  "205/55 ZR16"
+ ],
+ "zero_to_100_s": 7.3,
+ "top_speed_kmh": 230,
+ "msrp": {
+  "amount": 3990000,
+  "currency": "JPY",
+  "year": 1998,
+  "market": "Japan",
+  "source": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Alfa_Romeo_156",
+  "https://www.ultimatespecs.com/car-specs/Alfa-Romeo/895/Alfa-Romeo-155-16-TS.html"
+ ],
+ "confidence": "high",
+ "notes": "19/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Alfa-Romeo-155-16-TS.html).",
+ "derived_speeds": {
+  "top_gear_at_peak-power_rpm_kmh": 234,
+  "required_CdA_m2_for_top_speed": 0.68
+ },
+ "provenance": {
+  "engine.layout": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "engine.displacement_cc": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "engine.aspiration": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "peak_power_kw": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "peak_power_rpm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "peak_torque_nm": "http://www.alfisti.ru/156/technica.htm",
+  "peak_torque_rpm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "gearbox_type": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "gear_ratios": "http://www.alfisti.ru/156/technica.htm",
+  "final_drive": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "curb_mass_kg": "http://www.alfisti.ru/156/technica.htm",
+  "weight_dist_front_pct": "http://www.alfisti.ru/156/technica.htm",
+  "length_mm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "width_mm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "height_mm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "wheelbase_mm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "track_front_mm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "track_rear_mm": "https://gazoo.com/catalog/maker/ALFA_ROMEO/ALFA_156/199805/9000372/",
+  "tyre_sizes": "http://www.alfisti.ru/156/technica.htm",
+  "zero_to_100_s": "https://en.alfaromeo-club.com/engine_detail.php?id=14",
+  "top_speed_kmh": "https://en.alfaromeo-club.com/engine_detail.php?id=14",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Alfa_Romeo_156, https://www.ultimatespecs.com/car-specs/Alfa-Romeo/895/Alfa-Romeo-155-16-TS.html)",
+  "redline_rpm": "http://www.rsiauto.com/alfa-romeo/1998-156-2.5-v6-24-229.php",
+  "torque_curve": "derived:shape-from-peaks"
+ },
+ "null_reasons": {},
+ "checked_flags": [
+  "ORIGINAL WAS WRONG VARIANT: model extracted 1.6 inline-4 88kW (156 1.6 TS) for the 2.5 V6 trim",
+  "Final drive: alfisti.ru prints 3.973 but 63/16=3.9375; gazoo/alfaowner 3.937 used",
+  "Mass: 1320 kg DIN (alfisti.ru, with 830/490 split) vs 1360 JDM gazoo vs 1395 alfaromeo-club",
+  "MSRP is JPY (Japan 1998 price); Italian lira launch price not found",
+  "Tyres: 205/60R15 standard (alfisti), 205/55ZR16 JDM/optional",
+  "2026-11-05: rsiauto tech sheet lists Redline 7000 rpm for 156 2.5 V6 24V; peak power remains 6300"
+ ],
+ "checked_confidence": "med",
+ "checked_note": "",
+ "original_confidence": "high",
+ "drivable": true,
+ "torque_curve_shape": "NA"
+}

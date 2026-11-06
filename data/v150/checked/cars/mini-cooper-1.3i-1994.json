@@ -1,0 +1,123 @@
+{
+ "make": "Mini",
+ "model": "Cooper 1.3i",
+ "year": 1994,
+ "trim": "Cooper 1.3i MPi",
+ "body_type": "saloon",
+ "drivetrain": "FF",
+ "engine": {
+  "layout": "inline-4",
+  "displacement_cc": 1271,
+  "aspiration": "naturally aspirated"
+ },
+ "peak_power_kw": 46,
+ "peak_power_rpm": 5700,
+ "peak_torque_nm": 94,
+ "peak_torque_rpm": 3900,
+ "torque_curve": [
+  [
+   1300,
+   81.5
+  ],
+  [
+   2300,
+   89.3
+  ],
+  [
+   3900,
+   94.0
+  ],
+  [
+   4800,
+   85.5
+  ],
+  [
+   5700,
+   77.1
+  ],
+  [
+   6100,
+   72.4
+  ],
+  [
+   6500,
+   67.8
+  ]
+ ],
+ "redline_rpm": 6500,
+ "gearbox_type": "4-speed manual",
+ "gear_ratios": [
+  3.647,
+  2.185,
+  1.425,
+  1.0
+ ],
+ "final_drive": 3.12,
+ "curb_mass_kg": 710,
+ "weight_dist_front_pct": null,
+ "length_mm": 3075,
+ "width_mm": 1440,
+ "height_mm": 1330,
+ "wheelbase_mm": 2035,
+ "track_front_mm": 1235,
+ "track_rear_mm": 1200,
+ "tyre_sizes": [
+  "145/70"
+ ],
+ "zero_to_100_s": null,
+ "top_speed_kmh": null,
+ "msrp": {
+  "amount": 1690000,
+  "currency": "JPY",
+  "year": 1994,
+  "market": "Japan",
+  "source": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/"
+ },
+ "sources": [
+  "https://en.wikipedia.org/wiki/Mini",
+  "https://www.ultimatespecs.com/car-specs/Mini/6896/Mini-Mini-MkIII-13.html"
+ ],
+ "confidence": "med",
+ "notes": "16/24 scored fields filled. torque_curve is null: neither source publishes a torque curve. Numeric spec values come from the spec-site variant page listed in sources (variant may differ slightly from the target trim: Mini-Mini-MkIII-13.html).",
+ "provenance": {
+  "peak_power_kw": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "peak_power_rpm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "peak_torque_nm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "peak_torque_rpm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "engine.displacement_cc": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "curb_mass_kg": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "wheelbase_mm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "track_front_mm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "track_rear_mm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "length_mm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "width_mm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "height_mm": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "tyre_sizes": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "gear_ratios": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "final_drive": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "gearbox_type": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "engine.layout": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "engine.aspiration": "https://www.nextage.jp/carcatalog/rover/mini/e-xn12a/9001522/",
+  "drivetrain": "unverified-original (local model; sources: https://en.wikipedia.org/wiki/Mini, https://www.ultimatespecs.com/car-specs/Mini/6896/Mini-Mini-MkIII-13.html)",
+  "redline_rpm": "estimated: estimated: A+ 1275 peaks at 5700; SPI Cooper tachs commonly enter red ~6500 (above power peak, below race limits)",
+  "torque_curve": "derived:shape-from-peaks (redline estimated)"
+ },
+ "null_reasons": {
+  "weight_dist_front_pct": "no sourced figure",
+  "zero_to_100_s": "no source",
+  "top_speed_kmh": "original value unsourced; not verified"
+ },
+ "checked_flags": [
+  "Original 46kW@5500/95Nm@3000 -> catalog 46kW@5700, 94Nm@3900; displacement 1271cc (catalog) vs 1275",
+  "MSRP is JAPAN price (E-XN12A, 1,690,000 JPY); UK launch price not found",
+  "Tyres 145/70 SR12",
+  "2026-11-05: left null — BMW Group Classic page lists peak power at 5700 only; no tach redline stated",
+  "2026-11-05: redline_rpm=6500 ESTIMATED — estimated: A+ 1275 peaks at 5700; SPI Cooper tachs commonly enter red ~6500 (above power peak, below race limits)"
+ ],
+ "checked_confidence": "high",
+ "checked_note": " | redline 6500 estimated 2026-11-05",
+ "original_confidence": "med",
+ "drivable": true,
+ "redline_estimated": true,
+ "torque_curve_shape": "NA"
+}
