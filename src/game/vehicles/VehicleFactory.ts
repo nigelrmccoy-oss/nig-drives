@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { Vehicle, VEHICLE_SPECS, vehicleClassOf, type VehicleId } from './Vehicle';
+import type { CarBuild } from '../tuning/CarBuild';
+import { stockBuild } from '../tuning/CarBuild';
 import type { TransmissionMode } from './Transmission';
 
 const PAINT = 0xb71c1c;
@@ -753,7 +755,11 @@ function buildPackCar(spec: { length: number; width: number; height: number; nam
 
 const PACK_COLORS = [0x2a3344, 0x7a1f1f, 0x1f4a7a, 0x2f5a2f, 0x5a4a1f, 0x3a3a3a, 0x6a2a4a, 0x1a5a5a];
 
-export function createVehicle(id: VehicleId, transmission: TransmissionMode = 'auto'): Vehicle {
+export function createVehicle(
+  id: VehicleId,
+  transmission: TransmissionMode = 'auto',
+  build: CarBuild = stockBuild(),
+): Vehicle {
   const spec = VEHICLE_SPECS[id];
   if (!spec) throw new Error(`Unknown vehicle id: ${id}`);
   const cls = vehicleClassOf(id);
@@ -767,5 +773,5 @@ export function createVehicle(id: VehicleId, transmission: TransmissionMode = 'a
     mesh = buildPackCar(spec, PACK_COLORS[Math.abs(h) % PACK_COLORS.length]);
   }
   mesh.name = spec.name;
-  return new Vehicle(spec, mesh, transmission);
+  return new Vehicle(spec, mesh, transmission, build);
 }

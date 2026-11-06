@@ -13,14 +13,27 @@ const menu = new StartMenu(app, async (sel) => {
   await game.start(sel);
 });
 
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape') return;
+  // Esc: leave free roam back to the start menu (driver / car / tyre picks).
+  if (!menu.isHidden()) return;
+  game.returnToMenu();
+  menu.show();
+});
+
 // QA hook for headless play-tests: only in `npm run dev` or with ?debug=1.
 if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')) {
   (window as unknown as { __nig: unknown }).__nig = {
     game,
+    menu,
     THREE: { Raycaster, Vector3 },
     start: async (sel: StartSelection) => {
       menu.hide();
       await game.start(sel);
+    },
+    returnToMenu: () => {
+      game.returnToMenu();
+      menu.show();
     },
   };
 }

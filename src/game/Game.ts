@@ -13,6 +13,8 @@ import { EngineSound } from './vehicles/EngineSound';
 import { Vehicle } from './vehicles/Vehicle';
 import type { VehicleId } from './vehicles/Vehicle';
 import type { TransmissionMode } from './vehicles/Transmission';
+import type { CarBuild } from './tuning/CarBuild';
+import { stockBuild } from './tuning/CarBuild';
 import { Environment, WEATHER_LABELS } from './weather/Environment';
 import { PostFX } from './visuals/PostFX';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -33,6 +35,8 @@ export interface GameStartOptions {
   quality?: QualityLevel;
   /** v1.4.0: ABS / TCS / stability switches (defaults: last saved, else all on). */
   assists?: AssistPrefs;
+  /** v1.5.0b: tyre/parts/setup build for the active driver garage car. */
+  build?: CarBuild;
 }
 
 export class Game {
@@ -216,7 +220,7 @@ export class Game {
     this.chase.reset();
     this.tiles.setTileSwapListener((info) => this.onTileSwap(info));
 
-    this.vehicle = createVehicle(opts.vehicle, trans);
+    this.vehicle = createVehicle(opts.vehicle, trans, opts.build ?? stockBuild());
     this.scene.add(this.vehicle.mesh);
     this.engineSound.setVehicle(opts.vehicle);
     this.applyAssists(opts.assists ?? loadAssistPrefs());
@@ -647,6 +651,18 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.post.setSize(window.innerWidth, window.innerHeight, this.renderer.getPixelRatio());
   };
+
+  /**
+   * Leave free roam and tear down the world so the start menu can show again.
+   * Keeps the renderer / audio context alive.
+   */
+  returnToMenu(): void {
+    this.stopLoop();
+    this.hud.hide();
+    this.minimap.setVisible(false);
+    this.telemetryPlus.setVisible(false);
+    this.clearWorld();
+  }
 
   dispose(): void {
     this.stopLoop();

@@ -6,7 +6,7 @@ import { MAX_FRAME_DT, MAX_SUBSTEPS, PHYS_DT } from '../physics/FixedStep';
 import type { PhysicsSpec } from '../physics/PhysicsSpec';
 import { physicsSpecFor } from '../physics/deriveSpec';
 import { compileBuild } from '../tuning/compileBuild';
-import { stockBuild } from '../tuning/CarBuild';
+import { stockBuild, type CarBuild } from '../tuning/CarBuild';
 import { Assists, understeerGradient } from '../physics/Assists';
 import { Powertrain } from '../physics/Powertrain';
 import { EvDrive } from '../physics/Motor';
@@ -412,9 +412,14 @@ export class Vehicle {
   private throttleIn = 0;
   private brakeIn = 0;
 
-  constructor(spec: VehicleSpec, mesh: THREE.Group, transmissionMode: TransmissionMode = 'auto') {
+  constructor(
+    spec: VehicleSpec,
+    mesh: THREE.Group,
+    transmissionMode: TransmissionMode = 'auto',
+    build: CarBuild = stockBuild(),
+  ) {
     this.spec = spec;
-    this.phys = compileBuild(physicsSpecFor(spec), stockBuild());
+    this.phys = compileBuild(physicsSpecFor(spec), build);
     this.sim = new VehicleSim(this.phys);
     this.powertrain = new Powertrain(this.phys);
     this.ev = this.phys.ev ? new EvDrive(this.phys.ev) : null;

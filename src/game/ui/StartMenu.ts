@@ -15,13 +15,19 @@ import { ASSIST_LABELS, loadAssistPrefs, saveAssistPrefs, type AssistPrefs } fro
 import { openDyno } from './Dyno';
 import { MODEL3_LR_AWD } from '../physics/specs/model3LrAwd';
 import {
+  activeGarage,
   createDriver,
   getActiveDriver,
   listDrivers,
   renameDriver,
+  saveActiveGarage,
   switchDriver,
 } from '../save/drivers';
+import { stockGarageCar } from '../save/garage';
 import { loadSettings, saveSettings } from '../save/settings';
+import type { CompoundId } from '../save/types';
+import { carBuildFromGarage, type CarBuild } from '../tuning/CarBuild';
+import { COMPOUND_ORDER, COMPOUNDS } from '../tuning/compounds';
 
 export interface StartSelection {
   vehicle: VehicleId;
@@ -30,6 +36,8 @@ export interface StartSelection {
   quality: QualityLevel;
   /** v1.4.0: ABS / TCS / stability switches. */
   assists: AssistPrefs;
+  /** v1.5.0b: compiled from the active driver's garage car (tyres/parts/setup). */
+  build?: CarBuild;
 }
 
 const CLASS_VARIANTS: Record<VehicleClass, { ids: VehicleId[]; label: string; first: VehicleId }> = {
@@ -51,6 +59,7 @@ export class StartMenu {
   private transmission: TransmissionMode = 'auto';
   private quality: QualityLevel = loadQualityLevel();
   private assists: AssistPrefs = loadAssistPrefs();
+  private compound: CompoundId = 'all_season';
   private onStart: (sel: StartSelection) => void;
 
   constructor(parent: HTMLElement, onStart: (sel: StartSelection) => void) {
@@ -136,6 +145,19 @@ export class StartMenu {
             </button>`;
             })
             .join('')}
+        </div>
+
+        <div class="section-label">Tyres (active driver)</div>
+        <div class="choice-row variants pack-list" id="tyre-choices">
+          ${COMPOUND_ORDER.map((id) => {
+            const c = COMPOUNDS[id];
+            const selected = id === this.compound ? 'selected' : '';
+            return `
+            <button type="button" class="choice ${selected}" data-compound="${id}">
+              <strong>${c.label}</strong>
+              <span>dry ${c.mu.toFixed(2)} · wet ${c.wet.toFixed(2)} · snow ${c.snow.toFixed(2)}</span>
+            </button>`;
+          }).join('')}
         </div>
 
         <div class="section-label">Transmission</div>
@@ -245,6 +267,14 @@ export class StartMenu {
       this.render();
     });
 
+    this.root.querySelectorAll('[data-compound]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.compound = (btn as HTMLElement).dataset.compound as CompoundId;
+        this.root.querySelectorAll('[data-compound]').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
     this.root.querySelectorAll('[data-vehicle]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.vehicle = (btn as HTMLElement).dataset.vehicle as VehicleId;
@@ -298,14 +328,40 @@ export class StartMenu {
 
     this.root.querySelector('#start-btn')!.addEventListener('click', () => {
       saveSettings({ quality: this.quality, assistsDefault: { ...this.assists }, lastCityId: this.cityId });
+      const build = this.persistBuildForVehicle(this.vehicle);
       this.onStart({
         vehicle: this.vehicle,
         cityId: this.cityId,
         transmission: this.vehicleClass === 'ev' ? 'auto' : this.transmission,
         quality: this.quality,
         assists: { ...this.assists },
+        build,
       });
     });
+  }
+
+  /** Write compound (and assists/trans) onto the active driver's garage car for this model. */
+  private persistBuildForVehicle(modelId: VehicleId): CarBuild {
+    let garage = activeGarage();
+    let car = garage.cars.find((c) => c.modelId === modelId);
+    if (!car) {
+      car = stockGarageCar(modelId, this.assists);
+      garage = { ...garage, cars: [...garage.cars, car], activeId: car.id };
+    }
+    car = {
+      ...car,
+      tyres: { front: this.compound, rear: this.compound },
+      assists: { ...this.assists },
+      transmission: this.vehicleClass === 'ev' ? 'auto' : this.transmission,
+      updatedAt: new Date().toISOString(),
+    };
+    garage = {
+      ...garage,
+      cars: garage.cars.map((c) => (c.modelId === modelId ? car! : c)),
+      activeId: car.id,
+    };
+    saveActiveGarage(garage);
+    return carBuildFromGarage(car);
   }
 
   hide(): void {
@@ -314,6 +370,10 @@ export class StartMenu {
 
   show(): void {
     this.root.classList.remove('hidden');
+  }
+
+  isHidden(): boolean {
+    return this.root.classList.contains('hidden');
   }
 }
 
