@@ -9,7 +9,7 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ## Changelog
 
-### v1.5.0b (package 1.5.0-b) — sight lines + 41-car pack
+### v1.5.0b (package 1.5.0-b) — sight lines + 41-car pack + driver profiles
 
 - Start menu **Car pack** lists all 41 checked cars (make · year), driven from `src/data/cars/*.json` with real gear ratios, final drive, redline, and torque curves. Generated body scaled to length/width/height — no ripped meshes. Nine redlines are labeled estimated.
 

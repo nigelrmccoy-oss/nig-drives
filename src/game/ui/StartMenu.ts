@@ -14,6 +14,14 @@ import { QUALITY, loadQualityLevel, saveQualityLevel, type QualityLevel } from '
 import { ASSIST_LABELS, loadAssistPrefs, saveAssistPrefs, type AssistPrefs } from './assistPrefs';
 import { openDyno } from './Dyno';
 import { MODEL3_LR_AWD } from '../physics/specs/model3LrAwd';
+import {
+  createDriver,
+  getActiveDriver,
+  listDrivers,
+  renameDriver,
+  switchDriver,
+} from '../save/drivers';
+import { loadSettings, saveSettings } from '../save/settings';
 
 export interface StartSelection {
   vehicle: VehicleId;
@@ -47,6 +55,13 @@ export class StartMenu {
 
   constructor(parent: HTMLElement, onStart: (sel: StartSelection) => void) {
     this.onStart = onStart;
+    // Pull global settings (shared across drivers); migrate legacy keys once.
+    const settings = loadSettings();
+    this.quality = settings.quality;
+    this.assists = { ...settings.assistsDefault };
+    if (settings.lastCityId) this.cityId = settings.lastCityId;
+    // Ensure Driver 1 (etc.) exists and garage is seeded.
+    getActiveDriver();
     this.root = document.createElement('div');
     this.root.id = 'menu';
     parent.appendChild(this.root);
@@ -61,7 +76,32 @@ export class StartMenu {
     this.root.innerHTML = `
       <div class="menu-card">
         <h1>Nig Drives <span class="ver">v1.5.0b</span></h1>
-        <p class="tagline">v1.5.0b: sight lines · 41-car checked pack in the picker · accurate terrain &amp; roads · real tyre &amp; drivetrain physics · Tesla Model 3 · assists (F1) · Telemetry+ (F2) · Dyno.</p>
+        <p class="tagline">v1.5.0b: sight lines · 41-car pack · driver profiles (separate garage saves) · accurate terrain &amp; roads · real tyre &amp; drivetrain physics · assists (F1) · Telemetry+ (F2) · Dyno.</p>
+
+        <div class="section-label">Driver profile</div>
+        <p class="hint-line">Each driver is a separate save (garage cars, upgrades, setups, nicknames). Graphics and assists defaults stay shared.</p>
+        <div class="choice-row" id="driver-choices">
+          ${listDrivers()
+            .map((d) => {
+              const selected = d.id === getActiveDriver().id ? 'selected' : '';
+              return `
+            <button type="button" class="choice ${selected}" data-driver="${d.id}">
+              <strong>${d.name}</strong>
+              <span>${d.id === getActiveDriver().id ? 'Active save' : 'Switch to this save'}</span>
+            </button>`;
+            })
+            .join('')}
+        </div>
+        <div class="choice-row driver-actions">
+          <button type="button" class="choice" id="driver-new">
+            <strong>New driver</strong>
+            <span>Creates Driver ${listDrivers().length + 1} with a fresh garage</span>
+          </button>
+          <button type="button" class="choice" id="driver-rename">
+            <strong>Rename</strong>
+            <span>Change ${getActiveDriver().name}'s name</span>
+          </button>
+        </div>
 
         <div class="section-label">Vehicle</div>
         <div class="choice-row" id="class-choices">
@@ -181,6 +221,30 @@ export class StartMenu {
       });
     });
 
+    this.root.querySelectorAll('[data-driver]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.driver!;
+        switchDriver(id);
+        this.render();
+      });
+    });
+    this.root.querySelector('#driver-new')?.addEventListener('click', () => {
+      const suggested = `Driver ${listDrivers().length + 1}`;
+      const name = window.prompt('Name for the new driver', suggested);
+      if (name == null) return;
+      const res = createDriver(name.trim() || suggested);
+      if (!res.ok) window.alert(res.error || 'Could not create driver');
+      this.render();
+    });
+    this.root.querySelector('#driver-rename')?.addEventListener('click', () => {
+      const cur = getActiveDriver();
+      const name = window.prompt('Rename driver', cur.name);
+      if (name == null) return;
+      const res = renameDriver(cur.id, name);
+      if (!res.ok) window.alert(res.error || 'Could not rename');
+      this.render();
+    });
+
     this.root.querySelectorAll('[data-vehicle]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.vehicle = (btn as HTMLElement).dataset.vehicle as VehicleId;
@@ -195,6 +259,7 @@ export class StartMenu {
         const k = (btn as HTMLElement).dataset.assist as keyof AssistPrefs;
         this.assists = { ...this.assists, [k]: !this.assists[k] };
         saveAssistPrefs(this.assists);
+        saveSettings({ assistsDefault: { ...this.assists } });
         btn.classList.toggle('selected', this.assists[k]);
         btn.setAttribute('aria-pressed', String(this.assists[k]));
         btn.querySelector('strong')!.textContent = `${ASSIST_LABELS[k].name}: ${this.assists[k] ? 'On' : 'Off'}`;
@@ -217,6 +282,7 @@ export class StartMenu {
       btn.addEventListener('click', () => {
         this.quality = (btn as HTMLElement).dataset.quality as QualityLevel;
         saveQualityLevel(this.quality);
+        saveSettings({ quality: this.quality });
         this.root.querySelectorAll('[data-quality]').forEach((b) => b.classList.remove('selected'));
         btn.classList.add('selected');
       });
@@ -231,6 +297,7 @@ export class StartMenu {
     });
 
     this.root.querySelector('#start-btn')!.addEventListener('click', () => {
+      saveSettings({ quality: this.quality, assistsDefault: { ...this.assists }, lastCityId: this.cityId });
       this.onStart({
         vehicle: this.vehicle,
         cityId: this.cityId,

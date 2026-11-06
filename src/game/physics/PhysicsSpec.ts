@@ -100,6 +100,8 @@ export interface TireSpec {
   relaxLength: number;
   /** Wheel + tyre + brake disc (kg·m²). */
   inertia: number;
+  /** Share of peak grip kept when fully sliding; default 0.8 when omitted. */
+  slideFloor?: number;
 }
 
 export interface ChassisSpec {

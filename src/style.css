@@ -71,6 +71,15 @@ canvas.game-canvas {
   font-size: 0.95rem;
 }
 
+.hint-line {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+.choice-row.driver-actions {
+  margin-bottom: 8px;
+}
 .section-label {
   font-size: 0.75rem;
   text-transform: uppercase;

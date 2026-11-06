@@ -73,7 +73,8 @@ export function tireForces(
     return out;
   }
   // past the peak a sliding tyre keeps most of its grip (~80 %), it doesn't fall off a cliff
-  const f = limit * (s > 1 ? Math.max(magic(s, C, B), SLIDE_FLOOR) : magic(s, C, B));
+  const floor = t.slideFloor ?? SLIDE_FLOOR;
+  const f = limit * (s > 1 ? Math.max(magic(s, C, B), floor) : magic(s, C, B));
   const perS = f / s;
   out.fx = perS * sx;
   out.fy = -perS * sy;
