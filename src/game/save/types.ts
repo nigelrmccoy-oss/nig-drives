@@ -112,6 +112,8 @@ export interface GlobalSettings {
   audio: { master: number; engine: number; ui: number };
   tutorialDone: boolean;
   lastCityId?: string;
-  /** Input bindings land in 1.5.0f; reserved. */
+  /** Keyboard rebinds (action → primary KeyboardEvent.code). */
   bindings?: Record<string, string>;
+  /** v1.5.0c: gamepad rebinds (PadAction → PadInput or null = unbound). Validated on read; see input/padBindings.ts. */
+  padBindings?: Record<string, unknown>;
 }

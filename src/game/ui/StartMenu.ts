@@ -87,8 +87,8 @@ export class StartMenu {
 
     this.root.innerHTML = `
       <div class="menu-card">
-        <h1>Nig Drives <span class="ver">v1.5.0b</span></h1>
-        <p class="tagline">v1.5.0b: sight lines · 41-car pack · driver profiles (separate garage saves) · accurate terrain &amp; roads · real tyre &amp; drivetrain physics · assists (F1) · Telemetry+ (F2) · Dyno.</p>
+        <h1>Nig Drives <span class="ver">v1.5.0c</span></h1>
+        <p class="tagline">v1.5.0c: gamepad rebinding · sight lines · 41-car pack · driver profiles (separate garage saves) · accurate terrain &amp; roads · real tyre &amp; drivetrain physics · assists (F1) · Telemetry+ (F2) · Dyno.</p>
 
         <div class="section-label">Driver profile</div>
         <p class="hint-line">Each driver is a separate save (garage cars, upgrades, setups, nicknames). Graphics and assists defaults stay shared.</p>

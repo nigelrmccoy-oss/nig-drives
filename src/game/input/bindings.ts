@@ -26,7 +26,7 @@ export type InputAction =
 export interface ActionBinding {
   /** Keyboard KeyboardEvent.code values (any match). */
   keys: string[];
-  /** Optional gamepad button index (standard mapping). */
+  /** Legacy hint only (unused). v1.5.0c: the live gamepad map is input/padBindings.ts. */
   padButton?: number;
 }
 

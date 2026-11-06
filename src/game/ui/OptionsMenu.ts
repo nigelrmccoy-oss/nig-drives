@@ -6,6 +6,19 @@ import {
   bindingsFromSettings,
   type InputAction,
 } from '../input/bindings';
+import {
+  PAD_ACTIONS,
+  PAD_ACTION_LABELS,
+  DEFAULT_PAD_BINDINGS,
+  assignPadBinding,
+  padActionAcceptsButton,
+  padBindingsFromSettings,
+  padCapture,
+  padInputLabel,
+  type PadAction,
+  type PadBindingsMap,
+  type PadInput,
+} from '../input/padBindings';
 import type { QualityLevel } from '../visuals/Quality';
 import { saveQualityLevel } from '../visuals/Quality';
 
@@ -20,12 +33,21 @@ export class OptionsMenu {
   private visible = false;
   private listening: InputAction | null = null;
   private flat: Record<string, string>;
+  /** v1.5.0c gamepad rebinding state. */
+  private padMap: PadBindingsMap;
+  private padListening: PadAction | null = null;
+  private padPhase: 'listen' | 'release' = 'listen';
+  private padBase: { axes: number[]; buttons: boolean[] } | null = null;
+  private padRaf = 0;
+  private padReleaseUntil = 0;
+  private padNote = '';
   onClose: (() => void) | null = null;
   onBindingsChanged: (() => void) | null = null;
 
   constructor(parent: HTMLElement) {
     const s = loadSettings();
     this.flat = { ...flattenBindings(bindingsFromSettings(s.bindings)), ...(s.bindings || {}) };
+    this.padMap = padBindingsFromSettings(s.padBindings);
     this.root = document.createElement('div');
     this.root.id = 'options-menu';
     this.root.className = 'overlay-menu hidden';
@@ -34,12 +56,15 @@ export class OptionsMenu {
 
   show(): void {
     this.visible = true;
+    this.padMap = padBindingsFromSettings(loadSettings().padBindings);
+    this.padNote = '';
     this.root.classList.remove('hidden');
     this.render();
   }
   hide(): void {
     this.visible = false;
     this.listening = null;
+    this.stopPadListen();
     this.root.classList.add('hidden');
   }
   isVisible(): boolean {
@@ -87,6 +112,22 @@ export class OptionsMenu {
         </div>
         <div class="choice-row">
           <button type="button" class="choice" id="opt-reset-binds"><strong>Reset binds</strong><span>Restore keyboard defaults</span></button>
+        </div>
+
+        <div class="section-label">Gamepad binds (click, then press a button or move a stick / trigger)</div>
+        <p class="hint-line" id="opt-pad-status">${this.padStatusLine()}</p>
+        <div class="choice-row variants pack-list" id="opt-pad-binds">
+          ${PAD_ACTIONS.map((a) => {
+            const on = this.padListening === a;
+            const prompt = a === 'steer' ? 'Push the stick LEFT…' : 'Press a button / move an axis…';
+            return `<button type="button" class="choice ${on ? 'selected' : ''}" data-padbind="${a}">
+              <strong>${PAD_ACTION_LABELS[a]}</strong>
+              <span>${on ? prompt : padInputLabel(this.padMap[a], a)}</span>
+            </button>`;
+          }).join('')}
+        </div>
+        <div class="choice-row">
+          <button type="button" class="choice" id="opt-reset-pad"><strong>Reset gamepad</strong><span>Restore Xbox standard layout</span></button>
           <button type="button" class="choice selected" id="opt-close"><strong>Done</strong><span>Save &amp; close</span></button>
         </div>
       </div>`;
@@ -121,8 +162,25 @@ export class OptionsMenu {
         saveSettings({ audio });
       });
     });
+    this.root.querySelectorAll('[data-padbind]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const a = (btn as HTMLElement).dataset.padbind as PadAction;
+        if (this.padListening === a) this.stopPadListen();
+        else this.startPadListen(a);
+        this.render();
+      });
+    });
+    this.root.querySelector('#opt-reset-pad')?.addEventListener('click', () => {
+      this.stopPadListen();
+      this.padMap = structuredClone(DEFAULT_PAD_BINDINGS);
+      saveSettings({ padBindings: undefined });
+      this.padNote = 'Gamepad reset to the Xbox standard layout.';
+      this.onBindingsChanged?.();
+      this.render();
+    });
     this.root.querySelectorAll('[data-bind]').forEach((btn) => {
       btn.addEventListener('click', () => {
+        this.stopPadListen();
         this.listening = (btn as HTMLElement).dataset.bind as InputAction;
         this.render();
       });
@@ -143,6 +201,11 @@ export class OptionsMenu {
 
   /** Call from a capturing keydown while listening. */
   handleRebindKey(code: string): boolean {
+    if (this.padListening && this.padPhase === 'listen' && code === 'Escape') {
+      this.stopPadListen();
+      this.render();
+      return true;
+    }
     if (!this.listening) return false;
     if (code === 'Escape') {
       this.listening = null;
@@ -156,4 +219,112 @@ export class OptionsMenu {
     this.render();
     return true;
   }
+
+  private padStatusLine(): string {
+    const pad = firstPad();
+    const who = pad ? `Pad: ${escapeHtml(pad.id.slice(0, 60))}${pad.mapping === 'standard' ? '' : ' (non-standard mapping)'}` : 'No gamepad detected — press any pad button to wake it.';
+    return `${who}${this.padNote ? ' · ' + escapeHtml(this.padNote) : ''} · Global, all drivers. Esc cancels.`;
+  }
+
+  private startPadListen(a: PadAction): void {
+    this.listening = null;
+    this.padListening = a;
+    this.padPhase = 'listen';
+    this.padBase = null;
+    this.padNote = '';
+    padCapture.active = true;
+    cancelAnimationFrame(this.padRaf);
+    this.padRaf = requestAnimationFrame(this.padFrame);
+  }
+
+  private stopPadListen(): void {
+    this.padListening = null;
+    this.padPhase = 'listen';
+    this.padBase = null;
+    padCapture.active = false;
+    cancelAnimationFrame(this.padRaf);
+    this.padRaf = 0;
+  }
+
+  private snapshot(pad: Gamepad): { axes: number[]; buttons: boolean[] } {
+    return { axes: [...pad.axes], buttons: pad.buttons.map((b) => b.pressed || b.value > 0.5) };
+  }
+
+  /** Capture loop: only runs while a pad row is listening (or waiting for the captured input to be let go). */
+  private padFrame = (): void => {
+    const pad = firstPad();
+    const now = performance.now();
+    if (this.padPhase === 'release') {
+      const base = this.padBase;
+      const settled =
+        !pad || !base ||
+        (pad.buttons.every((b, i) => !(b.pressed || b.value > 0.5) || base.buttons[i]) &&
+          pad.axes.every((v, i) => Math.abs(v - (base.axes[i] ?? 0)) < 0.25));
+      if (settled || now > this.padReleaseUntil) {
+        this.stopPadListen();
+        return;
+      }
+      this.padRaf = requestAnimationFrame(this.padFrame);
+      return;
+    }
+    const action = this.padListening;
+    if (!action) return this.stopPadListen();
+    if (!pad) {
+      this.padRaf = requestAnimationFrame(this.padFrame);
+      return;
+    }
+    if (!this.padBase) {
+      this.padBase = this.snapshot(pad);
+      this.padRaf = requestAnimationFrame(this.padFrame);
+      return;
+    }
+    const base = this.padBase;
+    let got: PadInput | null = null;
+    if (padActionAcceptsButton(action)) {
+      for (let i = 0; i < pad.buttons.length; i++) {
+        const b = pad.buttons[i];
+        if ((b.pressed || b.value > 0.5) && !base.buttons[i]) {
+          got = { kind: 'button', index: i };
+          break;
+        }
+      }
+    }
+    if (!got) {
+      for (let i = 0; i < pad.axes.length; i++) {
+        const d = pad.axes[i] - (base.axes[i] ?? 0);
+        if (Math.abs(d) > 0.5) {
+          const dir: 1 | -1 = d > 0 ? 1 : -1;
+          const full = action !== 'steer' && Math.abs(base.axes[i] ?? 0) > 0.8 && Math.sign(base.axes[i]) === -dir;
+          got = full ? { kind: 'axis', index: i, dir, full: true } : { kind: 'axis', index: i, dir };
+          break;
+        }
+      }
+    }
+    if (!got) {
+      this.padRaf = requestAnimationFrame(this.padFrame);
+      return;
+    }
+    const cleared = assignPadBinding(this.padMap, action, got);
+    saveSettings({ padBindings: { ...this.padMap } });
+    this.padNote = cleared.length
+      ? `${PAD_ACTION_LABELS[action]} → ${padInputLabel(got, action)}; cleared ${cleared.map((c) => PAD_ACTION_LABELS[c]).join(', ')} (was on the same input)`
+      : `${PAD_ACTION_LABELS[action]} → ${padInputLabel(got, action)}`;
+    this.onBindingsChanged?.();
+    // Keep the game's pad reader muted until the captured control is let go, so it doesn't fire on resume.
+    this.padListening = null;
+    this.padPhase = 'release';
+    this.padReleaseUntil = now + 2000;
+    this.render();
+    this.padRaf = requestAnimationFrame(this.padFrame);
+  };
+}
+
+function firstPad(): Gamepad | null {
+  const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const p of pads) if (p && p.connected) return p;
+  return null;
+}
+
+function escapeHtml(t: string): string {
+  return t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 }

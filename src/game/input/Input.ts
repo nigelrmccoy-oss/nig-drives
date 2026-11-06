@@ -4,6 +4,7 @@
  */
 import { bindingsFromSettings, type BindingsMap, type InputAction } from './bindings';
 import { loadSettings } from '../save/settings';
+import { padBindingsFromSettings, padCapture, readPadInput, type PadAction, type PadBindingsMap } from './padBindings';
 
 export interface DriverInput {
   forward: boolean;
@@ -43,7 +44,11 @@ export class Input implements DriverInput {
   throttle = 0;
   brakeAxis = 0;
   analog = false;
-  private padPrev: boolean[] = [];
+  /** v1.5.0c: previous held state per digital pad action (edge detection on whatever input is bound). */
+  private padPrev: Partial<Record<PadAction, boolean>> = {};
+  /** Axes that have reported a non-zero value (trigger-as-axis reads 0 until first touched on some browsers). */
+  private padSeenAxes = new Set<number>();
+  private padBindings: PadBindingsMap = padBindingsFromSettings(loadSettings().padBindings);
   private padPrevAxes = { stick: 0, rt: 0, lt: 0 };
 
   private pressed = new Set<string>();
@@ -69,7 +74,9 @@ export class Input implements DriverInput {
 
   /** Reload bindings after Options saves. */
   reloadBindings(): void {
-    this.bindings = bindingsFromSettings(loadSettings().bindings);
+    const s = loadSettings();
+    this.bindings = bindingsFromSettings(s.bindings);
+    this.padBindings = padBindingsFromSettings(s.padBindings);
     this.sync();
   }
 
@@ -143,9 +150,10 @@ export class Input implements DriverInput {
 
 
   /**
-   * v1.4.0 M1: read the first connected gamepad (standard mapping). Call once per frame.
-   * Left stick steer, RT throttle, LT brake, B reverse/brake, X clutch,
-   * RB/LB shift up/down, Y camera, View/Back cycles P-R-N-D.
+   * v1.4.0 M1: read the first connected gamepad. Call once per frame.
+   * v1.5.0c: inputs come from the (rebindable) pad map; defaults are the standard Xbox layout:
+   * left stick steer, RT throttle, LT brake, B reverse, X clutch, RB/LB shift up/down, Y camera,
+   * View cycles P-R-N-D.
    */
   poll(): void {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
@@ -164,23 +172,40 @@ export class Input implements DriverInput {
       return;
     }
     const gp = pad;
-    const held = (i: number): boolean => !!gp.buttons[i]?.pressed;
-    const edge = (i: number): boolean => {
-      const now = held(i);
-      const was = this.padPrev[i] ?? false;
-      this.padPrev[i] = now;
+    const map = this.padBindings;
+    const value = (a: PadAction): number => readPadInput(gp, map[a], this.padSeenAxes);
+    const held = (a: PadAction): boolean => value(a) > 0.5;
+    if (padCapture.active) {
+      // Options is listening for a pad input: track state so nothing fires as an edge afterwards, but don't drive.
+      for (const a of ['shift_up', 'shift_down', 'camera', 'auto_selector'] as PadAction[]) this.padPrev[a] = held(a);
+      if (this.analog) {
+        this.analog = false;
+        this.sync();
+      }
+      return;
+    }
+    const edge = (a: PadAction): boolean => {
+      const now = held(a);
+      const was = this.padPrev[a] ?? false;
+      this.padPrev[a] = now;
       return now && !was;
     };
-    if (edge(5)) this.gearUpQueued = true;
-    if (edge(4)) this.gearDownQueued = true;
-    if (edge(3)) this.cameraToggleQueued = true;
-    if (edge(8)) this.autoSelectorQueued = true;
-    const raw = gp.axes[0] ?? 0;
-    const stick = Math.abs(raw) < PAD_DEADZONE ? 0 : (Math.sign(raw) * (Math.abs(raw) - PAD_DEADZONE)) / (1 - PAD_DEADZONE);
-    const rt = gp.buttons[7]?.value ?? 0;
-    const lt = gp.buttons[6]?.value ?? 0;
+    if (edge('shift_up')) this.gearUpQueued = true;
+    if (edge('shift_down')) this.gearDownQueued = true;
+    if (edge('camera')) this.cameraToggleQueued = true;
+    if (edge('auto_selector')) this.autoSelectorQueued = true;
+    const sb = map.steer;
+    let stick = 0;
+    if (sb && sb.kind === 'axis') {
+      const raw = (gp.axes[sb.index] ?? 0) * sb.dir; // +1 = full left
+      stick = Math.abs(raw) < PAD_DEADZONE ? 0 : (Math.sign(raw) * (Math.abs(raw) - PAD_DEADZONE)) / (1 - PAD_DEADZONE);
+    }
+    const rt = value('throttle');
+    const lt = value('brake');
+    const rev = held('reverse');
+    const clu = held('clutch');
     // v1.4.1 P2-8: the most recently used device drives. The pad takes over when it is being moved
-    // (stick past the takeover threshold, a trigger or B/X), or when it is held deflected while no
+    // (stick past the takeover threshold, a pedal or reverse/clutch), or when it is held deflected while no
     // driving key is down. A slightly deflected / drifting stick no longer blocks keyboard steering.
     const prev = this.padPrevAxes;
     const moving =
@@ -188,19 +213,19 @@ export class Input implements DriverInput {
     prev.stick = stick;
     prev.rt = rt;
     prev.lt = lt;
-    const engaged = Math.abs(stick) > PAD_TAKEOVER || rt > 0.04 || lt > 0.04 || held(1) || held(2);
-    const keysDown = DRIVE_KEYS.some((k) => this.pressed.has(k));
-    if (engaged && (moving || !keysDown || held(1) || held(2))) this.analog = true;
+    const engaged = Math.abs(stick) > PAD_TAKEOVER || rt > 0.04 || lt > 0.04 || rev || clu;
+    const keysDown = DRIVE_KEYS.some((k) => this.pressed.has(k)) || ['throttle', 'brake', 'steer_left', 'steer_right', 'handbrake'].some((a) => this.anyDown(a as InputAction));
+    if (engaged && (moving || !keysDown || rev || clu)) this.analog = true;
     if (!this.analog) return;
-    this.steer = Math.max(-1, Math.min(1, -stick));
+    this.steer = Math.max(-1, Math.min(1, stick));
     this.throttle = Math.max(0, Math.min(1, rt));
     this.brakeAxis = Math.max(0, Math.min(1, lt));
     this.forward = this.throttle > 0.5;
     this.brake = this.brakeAxis > 0.5;
-    this.back = held(1);
+    this.back = rev;
     this.left = this.steer > 0.25;
     this.right = this.steer < -0.25;
-    this.clutch = held(2);
+    this.clutch = clu;
   }
 
   /** v1.4.1: F1 switches all assists off / back on (the panel is the HUD button). */

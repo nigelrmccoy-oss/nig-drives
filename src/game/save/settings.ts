@@ -12,7 +12,7 @@ function defaultSettings(): GlobalSettings {
   return {
     schema: SETTINGS_SCHEMA,
     app: 'nig-drives',
-    gameVersion: '1.5.0-b',
+    gameVersion: '1.5.0-c',
     updatedAt: nowIso(),
     quality: 'medium',
     assistsDefault: { abs: true, tcs: true, stability: true },
