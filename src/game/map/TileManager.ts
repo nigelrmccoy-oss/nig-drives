@@ -51,11 +51,6 @@ const NEAR_RING: RingConfig = { name: 'near', size: 1000, res: 336, recenter: 13
 const MID_RING: RingConfig = { name: 'mid', size: 4800, res: 160, recenter: 700, skirt: 40, carve: false };
 const FAR_RING: RingConfig = { name: 'far', size: 16000, res: 128, recenter: 2600, skirt: 120, carve: false };
 const SPAWN_DEADLINE_MS = 14_000;
-/**
- * v1.3.6: a tile shows offline roads if Overpass hasn't answered within this
- * (the spawn tile: at once, unless cached); the real tile is swapped in later.
- */
-const TILE_FILLER_AFTER_MS = 20_000;
 /** How long a tile build waits for its DEM before building with provisional heights. */
 const DEM_WAIT_MS = 15_000;
 /** How often (s) to look for provisional tiles whose DEM has since arrived. */
@@ -133,16 +128,6 @@ export interface TileSwapInfo {
   maxX: number;
   minZ: number;
   maxZ: number;
-}
-
-/** Resolve with the promise's value, or null after `ms` (or on rejection). */
-function raceDeadline<T>(p: Promise<T>, ms: number): Promise<T | null> {
-  const safe = p.then(
-    (v) => v,
-    () => null,
-  );
-  if (ms <= 0) return Promise.resolve(null);
-  return Promise.race([safe, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
 }
 
 export interface WaterInfo {
@@ -247,6 +232,7 @@ export class TileManager {
   private seenWayIds = new Set<number>();
   private seenBuildingIds = new Set<number>();
   private fallbackBuilt = false;
+  private warnedRoadFallback = false;
   private centerlines: RoadCenterline[] = [];
   private usedOfflineFallback = false;
   /** When true, skip Overpass and always use offline road grids (QA: ?fallback=1). */
@@ -1215,40 +1201,31 @@ export class TileManager {
         await this.applyTileFallback(entry, heightAt);
         this.emitStatus(`Forced offline roads · tile ${key}`);
       } else {
-        // v1.3.6 P1: never block on Overpass. The spawn tile builds from the
-        // cache when it has one, else from the offline grid at once; other
-        // tiles wait up to TILE_FILLER_AFTER_MS. The request keeps running in
-        // the background (long budget) and the real tile is swapped in place.
+        // Prefer cache, then await the bounded mirror/backoff policy. A slow first
+        // response is not a reason to spawn synthetic roads immediately.
         const alive = () => !this.disposed && !entry.cancelled && gen === this.fetchGen && this.tiles.get(key) === entry;
-        let result: OverpassResult | null = null;
-        let fetchP: Promise<OverpassResult> | null = null;
-        if (spawn) {
-          result = await this.client.peekTile(key);
-          if (!alive()) return;
-          if (result) this.spawnCacheSource = result.source;
-        }
+        let result = spawn ? await this.client.peekTile(key) : null;
+        if (!alive()) return;
+        if (result && spawn) this.spawnCacheSource = result.source;
         if (!result) {
-          fetchP = this.client.fetchTile(key, b.south, b.west, b.north, b.east, gen, undefined, spawn, alive);
-          result = await raceDeadline(fetchP, spawn ? 0 : TILE_FILLER_AFTER_MS);
+          result = await this.client.fetchTile(key, b.south, b.west, b.north, b.east, gen, undefined, spawn, alive);
         }
         if (!alive()) return;
-        if (result) {
-          const ok = await this.applyOsmResult(entry, result, gen, false);
-          if (ok && spawn) this.spawnOsmAtMs = 0;
-          if (result.partial) this.scheduleUpgrade(entry, gen, 1, 30_000);
-        } else {
-          await this.applyTileFallback(entry, heightAt);
-          entry.awaitingOsm = true;
-          this.emitStatus(`Offline roads for tile ${key} — OSM streaming in the background`);
-          if (fetchP) void this.upgradeTile(entry, fetchP, gen, 0);
-        }
+        const ok = await this.applyOsmResult(entry, result, gen, false);
+        if (ok && spawn) this.spawnOsmAtMs = 0;
+        if (result.partial) this.scheduleUpgrade(entry, gen, 1, 30_000);
       }
     } catch (err) {
-      if (this.disposed || entry.cancelled) {
+      if (this.disposed || entry.cancelled || gen !== this.fetchGen) {
         this.finishLoading(key);
         return;
       }
-      console.warn('Tile load failed — offline fallback', key, err);
+      if (!this.warnedRoadFallback) {
+        this.warnedRoadFallback = true;
+        console.warn('OSM roads unavailable after bounded mirror retries; using offline roads. Further tile failures suppressed.', {
+          tile: key, reason: err instanceof Error ? err.message : String(err),
+        });
+      }
       await this.applyTileFallback(entry, heightAt);
       entry.awaitingOsm = true;
       this.scheduleUpgrade(entry, gen, 1, 30_000);
@@ -1392,7 +1369,8 @@ export class TileManager {
   }
 
   private scheduleUpgrade(entry: TileEntry, gen: number, attempt: number, delayMs: number): void {
-    if (attempt > 5) return;
+    // Two delayed recovery rounds at most; each query has its own four-attempt cap.
+    if (attempt > 2) return;
     setTimeout(() => {
       const alive = () => !this.disposed && !entry.cancelled && gen === this.fetchGen && this.tiles.get(entry.key) === entry;
       if (!alive() || this.forceOffline) return;

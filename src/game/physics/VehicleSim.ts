@@ -192,7 +192,8 @@ export class VehicleSim {
       w.fx = f.fx * w.tempGrip;
       w.fy = f.fy * w.tempGrip;
       w.slip = f.slip;
-      w.tempC = stepTyreTemp(w.tempC, dt, f.slip, vLong, w.fz, this.heat);
+      const slipPowerW = Math.abs(w.fx * (w.omega * rad - vLong)) + Math.abs(w.fy * vLat);
+      w.tempC = stepTyreTemp(w.tempC, dt, slipPowerW, vLong, w.fz, this.heat);
 
       // Implicit wheel-spin update (tyre force linearised in ω) so stiff tyres stay stable at 120 Hz.
       const I = t.inertia + inp.extraInertia[i];

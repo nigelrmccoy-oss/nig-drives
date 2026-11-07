@@ -25,7 +25,7 @@ export function heatParamsForCompound(id: CompoundId | string | undefined, ambie
   return {
     optTempC: opt,
     windowC: c.family === 'race' ? 18 : 28,
-    heatGain: c.family === 'race' ? 1.35 : c.family === 'sport' ? 1.15 : 1.0,
+    heatGain: c.family === 'race' ? 1.35 : c.family === 'sport' ? 1.15 : c.family === 'winter' ? 0.55 : c.family === 'rally' ? 0.9 : 1.0,
     coolGain: 1.0,
     ambientC,
   };
@@ -40,23 +40,31 @@ export function gripFromTemp(tempC: number, opt: number, window: number): number
 }
 
 /**
- * Advance core temp. slip = combined normalised slip; speed m/s; fz N.
+ * Advance core temperature from dissipated contact-patch slip power (watts), not normalised slip.
+ * speed m/s; fz N.
  * Returns new temp °C.
  */
 export function stepTyreTemp(
   tempC: number,
   dt: number,
-  slip: number,
+  slipPowerW: number,
   speedMs: number,
   fz: number,
   p: HeatParams,
 ): number {
-  const work = Math.min(4, Math.abs(slip)) * (fz / 4000) * p.heatGain;
-  const roll = (Math.abs(speedMs) / 40) * 0.35 * p.heatGain;
-  const heat = (work + roll) * 18; // °C/s scale
-  const air = 0.15 + Math.min(1.2, Math.abs(speedMs) / 35) * p.coolGain;
-  const cool = (tempC - p.ambientC) * air * 0.55;
-  let next = tempC + (heat - cool) * dt;
+  // Effective heated tread/belt: 3 kJ/K (~2 kg rubber at 1.5 kJ/kg/K).
+  // 60% of slip work enters the tyre; conduction into the core is limited by
+  // surface heat rejection (20 kW transfer knee), rather than instantly depositing
+  // every burnout watt in the core. Rolling hysteresis: Crr=0.012, 75% retained.
+  // Loss conductance: 18 W/K still-air + 1.5 W/K per m/s of airflow.
+  // These are sandbox estimates, not measured OEM thermal parameters.
+  const power = Math.max(0, slipPowerW);
+  const slipHeatW = 0.6 * p.heatGain * power / (1 + power / 20_000);
+  const rollHeatW = 0.75 * 0.012 * Math.max(0, fz) * Math.abs(speedMs);
+  const conductance = (18 + 1.5 * Math.abs(speedMs)) * p.coolGain;
+  // Exact first-order update stays stable even on a long frame.
+  const equilibrium = p.ambientC + (slipHeatW + rollHeatW) / conductance;
+  let next = equilibrium + (tempC - equilibrium) * Math.exp(-conductance * Math.max(0, dt) / 3000);
   if (!Number.isFinite(next)) next = p.ambientC;
   return Math.max(p.ambientC - 5, Math.min(140, next));
 }

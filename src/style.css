@@ -895,3 +895,9 @@ body:has(#hud-assist-panel:not([hidden])) .telemetry-plus {
 .opt-slider { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #cfd8ea; font-size: 13px; padding: 6px 4px; }
 .opt-slider input { flex: 1; }
 .hud-tyres { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+/* Keep the keyboard/gamepad entry points discoverable in short Options cards. */
+.options-sections { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0; background: #151b24; }
+.options-sections button { padding: 8px 12px; border: 1px solid #667387; border-radius: 6px; background: #253247; color: #fff; cursor: pointer; }
+.options-sections button:focus-visible { outline: 2px solid #f4c877; }
+.options-card .section-label { scroll-margin-top: 64px; }

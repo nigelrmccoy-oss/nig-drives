@@ -64,6 +64,8 @@ const SERVER_TIMEOUT_S = 45;
 const HEDGE_MS = 35_000;
 /** Cap on attempts in flight across all requests before a hedge may start. */
 const HEDGE_MAX_GLOBAL = 3;
+/** At most four attempts per query, with exponential backoff and mirror failover. */
+const MAX_ATTEMPTS = 4;
 /** Default network budget for one request (ms) → cache → offline grid. */
 const REQUEST_BUDGET_MS = 150_000;
 /** A cached response younger than this is used without asking a mirror. */
@@ -453,6 +455,8 @@ export class OverpassClient {
     return new Promise((resolve, reject) => {
       const out = new Map<Mirror, AbortController>();
       let done = false;
+      let attempts = 0;
+      const tried = new Set<Mirror>();
       let lastErr: unknown = new Error('Overpass: all mirrors failed');
       let best: { parsed: T; source: string } | null = null;
       let hedgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -475,6 +479,12 @@ export class OverpassClient {
         fn();
       };
       const giveUp = () => finish(() => (best ? resolve({ ...best, partial: true }) : reject(lastErr)));
+      const retry = (): void => {
+        if (done || out.size > 0) return;
+        if (attempts >= MAX_ATTEMPTS) { giveUp(); return; }
+        if (waitTimer) clearTimeout(waitTimer);
+        waitTimer = setTimeout(() => { waitTimer = null; launch(); }, 1000 * 2 ** Math.max(0, attempts - 1));
+      };
       const launch = (hedge = false): void => {
         if (done) return;
         if (stale()) {
@@ -486,7 +496,16 @@ export class OverpassClient {
           if (out.size === 0) giveUp();
           return;
         }
-        const pick = pickMirror(new Set(out.keys()));
+        if (attempts >= MAX_ATTEMPTS) {
+          if (out.size === 0) giveUp();
+          return;
+        }
+        // Apply the cap to primary attempts too, not only hedges.
+        if (attemptsOut >= HEDGE_MAX_GLOBAL) {
+          if (out.size === 0) waitTimer = setTimeout(() => { waitTimer = null; launch(); }, 500);
+          return;
+        }
+        const pick = pickMirror(new Set([...tried, ...out.keys()]));
         const m = pick.mirror;
         if (!m) {
           if (out.size === 0) {
@@ -502,6 +521,8 @@ export class OverpassClient {
           }
           return;
         }
+        attempts++;
+        tried.add(m);
         if (hedge) overpassStats.hedges++;
         const timeout = Math.min(OVERPASS_ATTEMPT_MS, left);
         const viaProxy = proxiesUsable;
@@ -532,7 +553,7 @@ export class OverpassClient {
             // server timed out mid-query: keep what came back, try elsewhere
             best = { parsed: r.parsed, source: src };
             coolMirror(m);
-            if (out.size === 0) launch();
+            if (out.size === 0) retry();
           },
           (err: unknown) => {
             settle();
@@ -542,12 +563,13 @@ export class OverpassClient {
             if (viaProxy && (status === 404 || status === 405 || err instanceof SyntaxError)) {
               // No same-origin proxy (static hosting): go direct from now on
               proxiesUsable = false;
-              if (out.size === 0) launch();
+              tried.delete(m); // The direct endpoint has not been attempted yet.
+              if (out.size === 0) retry();
               return;
             }
             coolMirror(m);
             if (status === 0 || RETRY_STATUS.has(status)) overpassStats.retries++;
-            if (out.size === 0) launch();
+            if (out.size === 0) retry();
           },
         );
         if (out.size === 1) {

@@ -1,3 +1,5 @@
+import { loadSettings } from '../save/settings';
+import { bindingsFromSettings, type InputAction } from '../input/bindings';
 import { WEATHER_LABELS, type WeatherPreset } from '../weather/Environment';
 import { ASSIST_LABELS, type AssistPrefs } from './assistPrefs';
 
@@ -103,7 +105,7 @@ export class HUD {
       </div>
       <div class="hud-bottom">
         <div class="controls-hint">
-          W/↑ accel · S/↓ brake/reverse · A/D steer · Space brake · C camera<br/>
+          W/↑ accel · S/↓ brake/reverse · A/D steer · Space handbrake · C camera<br/>
           G auto P-R-N-D · Q/E shift · 1–6/N/B H-pattern · Shift clutch<br/>
           R weather · T time · P pause clock · I satellite ground (needs key) · F1 assists on/off · F2 Telemetry+<br/>
           Gamepad: stick steer · RT/LT throttle/brake · LB/RB shift · B reverse · X clutch · Y camera
@@ -115,6 +117,7 @@ export class HUD {
       <div class="osm-badge">© OpenStreetMap · Overpass · NRCan HRDEM (OGL-Canada) · Terrarium DEM (AWS) · textures CC0 Poly Haven · ambientCG<span id="hud-sat-attr"></span> · v1.5.0c</div>
     `;
     parent.appendChild(this.root);
+    this.refreshControlHints();
     this.speedEl = this.root.querySelector('#hud-speed')!;
     this.gearEl = this.root.querySelector('#hud-gear')!;
     this.vehicleEl = this.root.querySelector('#hud-vehicle')!;
@@ -158,6 +161,23 @@ export class HUD {
         this.onAssistsChange?.({ ...this.assistSwitches });
       });
     });
+  }
+
+  /** Match the active keyboard map, including saved primary keys and retained alternatives. */
+  refreshControlHints(): void {
+    const map = bindingsFromSettings(loadSettings().bindings);
+    const key = (a: InputAction) => map[a].keys.map((k) => k
+      .replace(/^Key|^Digit/, '').replace('ArrowUp', '↑').replace('ArrowDown', '↓')
+      .replace('ArrowLeft', '←').replace('ArrowRight', '→').replace('Escape', 'Esc')).join('/');
+    const hint = this.root.querySelector<HTMLElement>('.controls-hint');
+    if (!hint) return;
+    hint.style.whiteSpace = 'pre-line';
+    hint.textContent = [
+      `${key('throttle')} accel · ${key('brake')} brake/reverse · ${key('steer_left')}/${key('steer_right')} steer · ${key('handbrake')} handbrake · ${key('camera')} camera`,
+      `${key('auto_selector')} auto P-R-N-D · ${key('shift_down')}/${key('shift_up')} shift · 1–6/N/B H-pattern · ${key('clutch')} clutch`,
+      `${key('weather')} weather · ${key('time')} time · ${key('time_pause')} pause clock · ${key('imagery')} satellite ground · ${key('assists')} assists · ${key('telemetry')} Telemetry+ · ${key('pause')} pause/menu`,
+      'Gamepad: see Options → Gamepad for current bindings',
+    ].join('\n');
   }
 
   /** v1.4.0: called when the driver flips an assist in the HUD panel. */

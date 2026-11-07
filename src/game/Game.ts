@@ -669,6 +669,7 @@ export class Game {
 
   reloadInputBindings(): void {
     this.input.reloadBindings();
+    this.hud.refreshControlHints();
   }
 
   setPaused(p: boolean): void {

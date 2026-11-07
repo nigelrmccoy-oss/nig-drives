@@ -72,19 +72,23 @@ export class OptionsMenu {
   }
 
   private render(): void {
+    const scrollTop = this.root.querySelector('.options-card')?.scrollTop ?? 0;
     const s = loadSettings();
     this.root.innerHTML = `
       <div class="menu-card options-card">
         <h2>Options</h2>
+        <nav class="options-sections" aria-label="Options sections">
+          ${['Graphics', 'Units', 'Audio', 'Keyboard', 'Gamepad'].map((name) => `<button type="button" data-section="${name.toLowerCase()}">${name}</button>`).join('')}
+        </nav>
         <p class="hint-line">Global — shared across all drivers. Xbox pad + keyboard defaults unchanged until you rebind.</p>
 
-        <div class="section-label">Graphics</div>
+        <div class="section-label" id="opt-section-graphics" tabindex="-1">Graphics</div>
         <div class="choice-row" id="opt-quality">
           ${(['low','medium','high'] as QualityLevel[]).map((q) => `
             <button type="button" class="choice ${s.quality===q?'selected':''}" data-quality="${q}"><strong>${q}</strong></button>`).join('')}
         </div>
 
-        <div class="section-label">Units</div>
+        <div class="section-label" id="opt-section-units" tabindex="-1">Units</div>
         <div class="choice-row">
           <button type="button" class="choice ${s.units.speed==='kmh'?'selected':''}" data-speed="kmh"><strong>km/h</strong></button>
           <button type="button" class="choice ${s.units.speed==='mph'?'selected':''}" data-speed="mph"><strong>mph</strong></button>
@@ -92,14 +96,14 @@ export class OptionsMenu {
           <button type="button" class="choice ${s.units.temp==='f'?'selected':''}" data-temp="f"><strong>°F</strong></button>
         </div>
 
-        <div class="section-label">Audio (0–100)</div>
+        <div class="section-label" id="opt-section-audio" tabindex="-1">Audio (0–100)</div>
         <div class="choice-row" style="grid-template-columns:1fr">
           <label class="opt-slider">Master <input type="range" min="0" max="100" value="${Math.round(s.audio.master*100)}" data-audio="master"/></label>
           <label class="opt-slider">Engine <input type="range" min="0" max="100" value="${Math.round(s.audio.engine*100)}" data-audio="engine"/></label>
           <label class="opt-slider">UI <input type="range" min="0" max="100" value="${Math.round(s.audio.ui*100)}" data-audio="ui"/></label>
         </div>
 
-        <div class="section-label">Key binds (click, then press a key)</div>
+        <div class="section-label" id="opt-section-keyboard" tabindex="-1">Key binds (click, then press a key)</div>
         <div class="choice-row variants pack-list" id="opt-binds">
           ${REBINDABLE.map((a) => {
             const code = this.flat[a] || DEFAULT_BINDINGS[a].keys[0];
@@ -114,7 +118,7 @@ export class OptionsMenu {
           <button type="button" class="choice" id="opt-reset-binds"><strong>Reset binds</strong><span>Restore keyboard defaults</span></button>
         </div>
 
-        <div class="section-label">Gamepad binds (click, then press a button or move a stick / trigger)</div>
+        <div class="section-label" id="opt-section-gamepad" tabindex="-1">Gamepad binds (click, then press a button or move a stick / trigger)</div>
         <p class="hint-line" id="opt-pad-status">${this.padStatusLine()}</p>
         <div class="choice-row variants pack-list" id="opt-pad-binds">
           ${PAD_ACTIONS.map((a) => {
@@ -132,6 +136,15 @@ export class OptionsMenu {
         </div>
       </div>`;
 
+    const card = this.root.querySelector<HTMLElement>('.options-card');
+    if (card) card.scrollTop = scrollTop;
+    this.root.querySelectorAll<HTMLButtonElement>('[data-section]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const section = this.root.querySelector<HTMLElement>(`#opt-section-${btn.dataset.section}`);
+        section?.scrollIntoView({ block: 'start' });
+        section?.focus({ preventScroll: true });
+      });
+    });
     this.root.querySelectorAll('[data-quality]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const q = (btn as HTMLElement).dataset.quality as QualityLevel;
