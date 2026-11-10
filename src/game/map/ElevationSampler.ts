@@ -1,3 +1,4 @@
+import { cachedDem } from './OverpassCache';
 /**
  * Real DEM via AWS Open Data Terrarium tiles (Mapzen/Joerd lineage).
  * URL: https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png
@@ -386,9 +387,7 @@ export class ElevationSampler {
       const ctrl = new AbortController();
       const abortTimer = setTimeout(() => ctrl.abort(), DEM_FETCH_MS);
       try {
-        const res = await fetch(url, { signal: ctrl.signal });
-        if (!res.ok) throw new Error(`DEM ${res.status}`);
-        const blob = await res.blob();
+        const blob = await cachedDem(url, ctrl.signal);
         const bitmap = await createImageBitmap(blob);
         if (this.disposed) {
           bitmap.close();

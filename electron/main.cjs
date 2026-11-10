@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, session } = require('electron');
+const { app, BrowserWindow, shell, session, ipcMain } = require('electron');
 const path = require('path');
 
 const isDev = process.env.ELECTRON_DEV === '1';
@@ -15,6 +15,7 @@ function createWindow() {
     title: 'Nig Drives',
     backgroundColor: '#0a0e14',
     webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -64,6 +65,8 @@ function identifyToOverpass() {
 }
 
 app.whenReady().then(() => {
+  const { installMapCache } = require('./map-cache.cjs');
+  installMapCache(ipcMain, path.join(app.getPath('userData'), 'map-cache'), () => mainWindow?.webContents);
   identifyToOverpass();
   createWindow();
 

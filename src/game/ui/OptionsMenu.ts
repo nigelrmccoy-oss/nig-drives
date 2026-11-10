@@ -1,3 +1,4 @@
+import { cacheStats, clearMapCache } from '../map/OverpassCache';
 import { loadSettings, saveSettings } from '../save/settings';
 import {
   ACTION_LABELS,
@@ -78,7 +79,7 @@ export class OptionsMenu {
       <div class="menu-card options-card">
         <h2>Options</h2>
         <nav class="options-sections" aria-label="Options sections">
-          ${['Graphics', 'Units', 'Audio', 'Keyboard', 'Gamepad'].map((name) => `<button type="button" data-section="${name.toLowerCase()}">${name}</button>`).join('')}
+          ${['Graphics', 'Units', 'Audio', 'Map', 'Keyboard', 'Gamepad'].map((name) => `<button type="button" data-section="${name.toLowerCase()}">${name}</button>`).join('')}
         </nav>
         <p class="hint-line">Global — shared across all drivers. Xbox pad + keyboard defaults unchanged until you rebind.</p>
 
@@ -103,6 +104,10 @@ export class OptionsMenu {
           <label class="opt-slider">UI <input type="range" min="0" max="100" value="${Math.round(s.audio.ui*100)}" data-audio="ui"/></label>
         </div>
 
+        <div class="section-label" id="opt-section-map" tabindex="-1">Self-growing map</div>
+        <p id="opt-cache-info">Reading cached map…</p>
+        <p class="hint-line">Real OSM roads and open elevation stay until you clear them. Browser quota applies. Imagery uses HTTP caching only.</p>
+        <button type="button" id="opt-clear-map">Clear map cache…</button>
         <div class="section-label" id="opt-section-keyboard" tabindex="-1">Key binds (click, then press a key)</div>
         <div class="choice-row variants pack-list" id="opt-binds">
           ${REBINDABLE.map((a) => {
@@ -136,6 +141,13 @@ export class OptionsMenu {
         </div>
       </div>`;
 
+    void cacheStats().then(s => {
+      const label = this.root.querySelector('#opt-cache-info');
+      if (label) label.textContent = `${s.count} tiles / records · ${(s.bytes / 1048576).toFixed(1)} MiB · ${s.notice || 'saved permanently (subject to browser storage policy)'}`;
+    }).catch(() => { const label = this.root.querySelector('#opt-cache-info'); if (label) label.textContent = 'Map storage unavailable'; });
+    this.root.querySelector('#opt-clear-map')?.addEventListener('click', () => {
+      if (confirm('Clear ALL saved roads and elevation? Offline areas will need downloading again.')) void clearMapCache().then(() => this.render());
+    });
     const card = this.root.querySelector<HTMLElement>('.options-card');
     if (card) card.scrollTop = scrollTop;
     this.root.querySelectorAll<HTMLButtonElement>('[data-section]').forEach((btn) => {
