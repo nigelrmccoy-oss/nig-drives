@@ -9,6 +9,12 @@ Built with **Vite + TypeScript + Three.js**. No Google Maps or Earth data, no AP
 
 ## Changelog
 
+### v1.6.0 (package 1.6.0) — persistent map cache
+
+- **Self-growing map cache.** OSM tiles and elevation stay in IndexedDB in the browser, or on disk in the Electron build (`userData/map-cache`). Options has a Map section with cache size and a clear button.
+- DEM tiles reuse the same cache, with a 30-day background refresh when online.
+- This is the 1.6a cache slice only. Tile-loading holes, interchange fill, nav HUD, autopilot and slew mode are still planned.
+
 ### v1.5.0b (package 1.5.0-b) — sight lines + 41-car pack + driver profiles
 
 - **Tyre heat** per wheel (temp → grip window) on HUD + Telemetry+; **per-car suspension** (springs/dampers/ARB/ride height, estimated from mass unless sourced).

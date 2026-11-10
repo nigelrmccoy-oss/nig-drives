@@ -77,7 +77,7 @@ export function seedGarage(assists: GlobalSettings['assistsDefault']): GarageDoc
   return {
     schema: GARAGE_SCHEMA,
     app: 'nig-drives',
-    gameVersion: '1.5.0-b',
+    gameVersion: '1.6.0',
     updatedAt: nowIso(),
     activeId: cars[1]?.id ?? cars[0]?.id ?? null, // ABA default
     cars,
@@ -88,7 +88,7 @@ function migrateGarage(raw: unknown, _from: number): GarageDoc {
   const empty: GarageDoc = {
     schema: GARAGE_SCHEMA,
     app: 'nig-drives',
-    gameVersion: '1.5.0-b',
+    gameVersion: '1.6.0',
     updatedAt: nowIso(),
     activeId: null,
     cars: [],

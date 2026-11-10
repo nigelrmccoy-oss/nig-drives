@@ -37,7 +37,7 @@ function defaultDriversDoc(): DriversDoc {
   return {
     schema: DRIVERS_SCHEMA,
     app: 'nig-drives',
-    gameVersion: '1.5.0-b',
+    gameVersion: '1.6.0',
     updatedAt: nowIso(),
     activeId: d.id,
     drivers: [d],
